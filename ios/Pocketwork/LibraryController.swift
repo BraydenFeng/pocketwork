@@ -62,6 +62,12 @@ final class LibraryController: ObservableObject {
 		do { try persist(library.deleting(id)) } catch { report(error) }
 	}
 
+	func set_enabled(_ id: String, _ enabled: Bool) {
+		guard var document = library.find(id), document.is_standing else { return }
+		document.enabled = enabled
+		do { try persist(library.upserting(document, now: .now)) } catch { report(error) }
+	}
+
 	// Discards unreadable saved data at the user's explicit request so the app becomes usable again.
 	func replace_unreadable() {
 		storage_blocked = false

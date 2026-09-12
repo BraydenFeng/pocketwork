@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import type { AppDocument } from "../lib/document";
 
-export const STARTER_URL = "/?tool=my-focus-space";
+export const STARTER_URL = "/?routine=my-focus-space";
 
 // Seeds the library before the page loads so specs can start inside the editor with a known tool.
 export async function seed_library(page: Page, documents: AppDocument[]): Promise<void> {

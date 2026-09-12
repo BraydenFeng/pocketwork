@@ -9,7 +9,7 @@ import { Workbench } from "./workbench";
 function error_message(error: unknown): string { return error instanceof Error ? error.message : "Something went wrong. Please try again."; }
 
 function tool_from_url(): string | null {
-	try { return new URLSearchParams(window.location.search).get("tool"); }
+	try { return new URLSearchParams(window.location.search).get("routine"); }
 	catch { return null; }
 }
 
@@ -41,10 +41,10 @@ export function PocketworkApp() {
 		return () => window.removeEventListener("popstate", on_pop);
 	}, []);
 
-	// The URL carries which tool is open so the browser back button returns to My tools.
+	// The URL carries which routine is open so the browser back button returns to My routines.
 	function navigate(id: string | null) {
 		const url = new URL(window.location.href);
-		if (id) { url.searchParams.set("tool", id); } else { url.searchParams.delete("tool"); }
+		if (id) { url.searchParams.set("routine", id); } else { url.searchParams.delete("routine"); }
 		try { window.history.pushState(null, "", url); } catch (failure) { console.warn(error_message(failure)); }
 		set_open_id(id);
 		window.scrollTo({ top: 0 });
@@ -73,6 +73,12 @@ export function PocketworkApp() {
 		catch (failure) { set_error(error_message(failure)); }
 	}
 
+	function toggle_tool(id: string, enabled: boolean) {
+		const tool = find_tool(library, id);
+		if (!tool) { return; }
+		try_persist(upsert_tool(library, { ...tool, enabled }, Date.now()));
+	}
+
 	function remove_tool(id: string) {
 		const tool = find_tool(library, id);
 		if (!tool || !window.confirm(`Delete "${tool.name}"? This cannot be undone. Export it first if you want a copy.`)) { return; }
@@ -86,25 +92,25 @@ export function PocketworkApp() {
 	}
 
 	function add_imported(document: AppDocument) {
-		try { const result = import_tool(library, document, Date.now()); persist(result.library); set_error(null); set_notice(`Added "${result.document.name}" to your tools.`); navigate(result.document.id); }
+		try { const result = import_tool(library, document, Date.now()); persist(result.library); set_error(null); set_notice(`Added "${result.document.name}" to your routines.`); navigate(result.document.id); }
 		catch (failure) { set_error(error_message(failure)); }
 	}
 
 	function replace_unreadable() {
-		if (!window.confirm("Discard the unreadable saved data and start with an empty list of tools?")) { return; }
+		if (!window.confirm("Discard the unreadable saved data and start with an empty list of routines?")) { return; }
 		set_storage_blocked(false); set_error(null);
 		try { save_library(window.localStorage, library); } catch (failure) { set_error(error_message(failure)); }
 	}
 
 	const open_tool = open_id ? find_tool(library, open_id) : undefined;
 
-	if (!ready) { return <div className="app-loading" role="status">Opening your tools…</div>; }
+	if (!ready) { return <div className="app-loading" role="status">Opening your routines…</div>; }
 
 	if (open_tool) {
 		return <Workbench key={open_tool.id} tool={open_tool} on_save={save_tool} on_back={() => navigate(null)} storage_blocked={storage_blocked} storage_error={error} on_replace_unreadable={replace_unreadable} on_dismiss_error={() => set_error(null)} />;
 	}
 
 	return <Home library={library} now={Date.now()} error={error} notice={notice} storage_blocked={storage_blocked}
-		on_open={navigate} on_create={create_tool} on_delete={remove_tool} on_duplicate={copy_tool} on_import={add_imported}
+		on_open={navigate} on_create={create_tool} on_delete={remove_tool} on_duplicate={copy_tool} on_import={add_imported} on_toggle={toggle_tool}
 		on_error={set_error} on_dismiss_error={() => set_error(null)} on_dismiss_notice={() => set_notice(null)} on_replace_unreadable={replace_unreadable} />;
 }

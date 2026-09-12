@@ -26,15 +26,27 @@ export const templates: Template[] = [
 		],
 		rules: focus_rules,
 	}) },
-	{ id: "bedtime", name: "Phone-free bedtime", tagline: "An hour of wind-down with the scrolling apps locked.", build: () => ({
-		schema_version: 1, id: new_id(), name: "Phone-free bedtime", description: "Wind down without the feed.",
+	{ id: "bedtime", name: "Phone-free bedtime", tagline: "Every night from 10 PM, the scrolling apps lock themselves until 7 AM.", build: () => ({
+		schema_version: 1, id: new_id(), name: "Phone-free bedtime", description: "Wind down without the feed. Switch it on once; it runs every night.",
 		blocks: [
 			{ id: "heading", type: "heading", title: "The day is done.", subtitle: "Nothing on your phone needs you until morning." },
-			{ id: "timer", type: "timer", title: "Wind down", minutes: 60 },
+			{ id: "window", type: "schedule", title: "Every night", days: [1, 2, 3, 4, 5, 6, 7], start: "22:00", end: "07:00" },
 			{ id: "tasks", type: "checklist", title: "Before bed", items: [{ id: "task-charge", text: "Phone on the charger, out of reach" }, { id: "task-tomorrow", text: "Write tomorrow's first task" }] },
 			{ id: "shield", type: "screen_time", title: "Feeds off for the night" },
 		],
 		rules: { block_during_focus: true, notify_on_complete: false },
+		enabled: false,
+	}) },
+	{ id: "workday", name: "Workday focus", tagline: "Weekdays 9 to 5, the distractions stay locked on their own.", build: () => ({
+		schema_version: 1, id: new_id(), name: "Workday focus", description: "Set it once. Every workday the feeds are off until five.",
+		blocks: [
+			{ id: "heading", type: "heading", title: "Work hours are work hours.", subtitle: "The feeds will still be there at five." },
+			{ id: "window", type: "schedule", title: "Weekdays", days: [2, 3, 4, 5, 6], start: "09:00", end: "17:00" },
+			{ id: "tasks", type: "checklist", title: "Today", items: [{ id: "task-one", text: "The one thing that must ship" }, { id: "task-two", text: "The one thing that would be nice" }] },
+			{ id: "shield", type: "screen_time", title: "Distractions off until five" },
+		],
+		rules: { block_during_focus: true, notify_on_complete: false },
+		enabled: false,
 	}) },
 	{ id: "morning", name: "Morning start", tagline: "A short checklist and 25 quiet minutes before the phone opens.", build: () => ({
 		schema_version: 1, id: new_id(), name: "Morning start", description: "Start the day on your terms, not the feed's.",
@@ -60,5 +72,5 @@ export const templates: Template[] = [
 ];
 
 export function blank_tool(): AppDocument {
-	return { schema_version: 1, id: new_id(), name: "My new tool", description: "", blocks: [create_block("heading")], rules: { block_during_focus: false, notify_on_complete: false } };
+	return { schema_version: 1, id: new_id(), name: "My new routine", description: "", blocks: [create_block("heading")], rules: { block_during_focus: false, notify_on_complete: false } };
 }

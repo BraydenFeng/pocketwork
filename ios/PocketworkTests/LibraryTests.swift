@@ -73,7 +73,8 @@ final class LibraryTests: XCTestCase {
 
 	func test_bundled_routines_are_valid_and_enforce_something() throws {
 		let catalog = try RoutineCatalog.bundled()
-		XCTAssertEqual(catalog.routines.count, 5)
+		XCTAssertEqual(catalog.routines.count, 6)
+		XCTAssertEqual(catalog.routines.filter(\.document.is_standing).count, 2)
 		for routine in catalog.routines {
 			XCTAssertTrue(routine.document.rules.block_during_focus, routine.name)
 			let first = routine.instantiate(), second = routine.instantiate()
@@ -96,6 +97,8 @@ final class LibraryTests: XCTestCase {
 	func test_summaries_read_in_plain_words() throws {
 		XCTAssertEqual(ToolCopy.summary(try starter()), "25 min session · blocks apps · 3 tasks")
 		XCTAssertEqual(ToolCopy.summary(AppDocument.blank()), "1 block")
+		let bedtime = try XCTUnwrap(RoutineCatalog.bundled().routines.first(where: { $0.template_id == "bedtime" })).document
+		XCTAssertEqual(ToolCopy.summary(bedtime), "Every day · 10 PM to 7 AM · blocks apps · 2 tasks")
 		let entry = LibraryEntry(document: try starter(), updated_at: ToolLibrary.iso_formatter.string(from: now.addingTimeInterval(-300)))
 		XCTAssertEqual(ToolCopy.edited(entry, now: now), "Edited 5 min ago")
 		XCTAssertEqual(ToolCopy.edited(entry, now: now.addingTimeInterval(86_400)), "Edited yesterday")

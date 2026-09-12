@@ -13,7 +13,7 @@ struct TaskDocument: Codable, Identifiable, Equatable {
 }
 
 enum BlockKind: String, Codable {
-	case heading, timer, checklist, counter, note, screen_time
+	case heading, timer, checklist, counter, note, screen_time, schedule
 }
 
 struct BlockDocument: Codable, Identifiable, Equatable {
@@ -25,17 +25,22 @@ struct BlockDocument: Codable, Identifiable, Equatable {
 	var items: [TaskDocument]?
 	var target: Int?
 	var text: String?
+	// Schedule blocks: days use 1 = Sunday … 7 = Saturday (Calendar.weekday); times are "HH:MM" in local time.
+	var days: [Int]?
+	var start: String?
+	var end: String?
 
 	// Mirrors create_block in lib/document.ts so a block added on the phone matches one added in the browser.
 	static func make(_ kind: BlockKind) -> BlockDocument {
 		let id = UUID().uuidString
 		switch kind {
-		case .heading: return BlockDocument(id: id, type: kind, title: "Make room for what matters.", subtitle: "A little space, just for you.", minutes: nil, items: nil, target: nil, text: nil)
-		case .timer: return BlockDocument(id: id, type: kind, title: "Focus session", subtitle: nil, minutes: 25, items: nil, target: nil, text: nil)
-		case .checklist: return BlockDocument(id: id, type: kind, title: "On my list", subtitle: nil, minutes: nil, items: [TaskDocument(id: UUID().uuidString, text: "My first task")], target: nil, text: nil)
-		case .counter: return BlockDocument(id: id, type: kind, title: "Small wins", subtitle: nil, minutes: nil, items: nil, target: 5, text: nil)
-		case .note: return BlockDocument(id: id, type: kind, title: "A note to myself", subtitle: nil, minutes: nil, items: nil, target: nil, text: "One thing at a time.")
-		case .screen_time: return BlockDocument(id: id, type: kind, title: "Fewer distractions", subtitle: nil, minutes: nil, items: nil, target: nil, text: nil)
+		case .heading: return BlockDocument(id: id, type: kind, title: "Make room for what matters.", subtitle: "A little space, just for you.", minutes: nil, items: nil, target: nil, text: nil, days: nil, start: nil, end: nil)
+		case .timer: return BlockDocument(id: id, type: kind, title: "Focus session", subtitle: nil, minutes: 25, items: nil, target: nil, text: nil, days: nil, start: nil, end: nil)
+		case .checklist: return BlockDocument(id: id, type: kind, title: "On my list", subtitle: nil, minutes: nil, items: [TaskDocument(id: UUID().uuidString, text: "My first task")], target: nil, text: nil, days: nil, start: nil, end: nil)
+		case .counter: return BlockDocument(id: id, type: kind, title: "Small wins", subtitle: nil, minutes: nil, items: nil, target: 5, text: nil, days: nil, start: nil, end: nil)
+		case .note: return BlockDocument(id: id, type: kind, title: "A note to myself", subtitle: nil, minutes: nil, items: nil, target: nil, text: "One thing at a time.", days: nil, start: nil, end: nil)
+		case .screen_time: return BlockDocument(id: id, type: kind, title: "Fewer distractions", subtitle: nil, minutes: nil, items: nil, target: nil, text: nil, days: nil, start: nil, end: nil)
+		case .schedule: return BlockDocument(id: id, type: kind, title: "Every evening", subtitle: nil, minutes: nil, items: nil, target: nil, text: nil, days: [1, 2, 3, 4, 5, 6, 7], start: "22:00", end: "07:00")
 		}
 	}
 }
@@ -52,13 +57,18 @@ struct AppDocument: Codable, Equatable {
 	var description: String
 	var blocks: [BlockDocument]
 	var rules: RuleDocument
+	// Only meaningful for a standing routine: whether the person has switched it on.
+	var enabled: Bool?
 
 	var focus_minutes: Int? { blocks.first(where: { $0.type == .timer })?.minutes }
 	var has_timer: Bool { blocks.contains(where: { $0.type == .timer }) }
 	var has_screen_time: Bool { blocks.contains(where: { $0.type == .screen_time }) }
+	var schedule: BlockDocument? { blocks.first(where: { $0.type == .schedule }) }
+	var is_standing: Bool { schedule != nil }
+	var has_engine: Bool { has_timer || is_standing }
 
 	static func blank() -> AppDocument {
-		AppDocument(schema_version: 1, id: UUID().uuidString, name: "My new tool", description: "", blocks: [BlockDocument.make(.heading)], rules: RuleDocument(block_during_focus: false, notify_on_complete: false))
+		AppDocument(schema_version: 1, id: UUID().uuidString, name: "My new routine", description: "", blocks: [BlockDocument.make(.heading)], rules: RuleDocument(block_during_focus: false, notify_on_complete: false), enabled: nil)
 	}
 
 	// Rules that depend on a removed block are switched off rather than left invalid, as remove_block does in the editor.
@@ -66,14 +76,15 @@ struct AppDocument: Codable, Equatable {
 		guard blocks.count > 1 else { return self }
 		var next = self
 		next.blocks.removeAll { $0.id == block_id }
-		next.rules.block_during_focus = rules.block_during_focus && next.has_timer && next.has_screen_time
+		next.rules.block_during_focus = rules.block_during_focus && next.has_engine && next.has_screen_time
 		next.rules.notify_on_complete = rules.notify_on_complete && next.has_timer
+		if !next.is_standing { next.enabled = nil }
 		return next
 	}
 
 	func can_add(_ kind: BlockKind) -> Bool {
 		guard blocks.count < 20 else { return false }
-		if kind == .timer || kind == .screen_time { return !blocks.contains(where: { $0.type == kind }) }
+		if kind == .timer || kind == .screen_time || kind == .schedule { return !blocks.contains(where: { $0.type == kind }) }
 		return true
 	}
 
@@ -82,7 +93,7 @@ struct AppDocument: Codable, Equatable {
 		guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
 			throw DocumentError.invalid("This file is not a Pocketwork configuration.")
 		}
-		try require_keys(object, ["schema_version", "id", "name", "description", "blocks", "rules"])
+		try require_keys(object, ["schema_version", "id", "name", "description", "blocks", "rules"], optional: ["enabled"])
 		guard let raw_blocks = object["blocks"] as? [[String: Any]], let raw_rules = object["rules"] as? [String: Any] else {
 			throw DocumentError.invalid("The tool is missing its blocks or rules.")
 		}
@@ -97,6 +108,7 @@ struct AppDocument: Codable, Equatable {
 			case "counter": extras = ["target"]
 			case "note": extras = ["text"]
 			case "screen_time": extras = []
+			case "schedule": extras = ["days", "start", "end"]
 			default: throw DocumentError.invalid("This version cannot run the \(type) block.")
 			}
 			try require_keys(block, Set(["id", "type", "title"]).union(extras))
@@ -109,8 +121,9 @@ struct AppDocument: Codable, Equatable {
 		return document
 	}
 
-	private static func require_keys(_ object: [String: Any], _ keys: Set<String>) throws {
-		guard Set(object.keys) == keys else { throw DocumentError.invalid("Unexpected or missing configuration fields. Export using the version 1 editor.") }
+	private static func require_keys(_ object: [String: Any], _ keys: Set<String>, optional: Set<String> = []) throws {
+		let present = Set(object.keys)
+		guard keys.isSubset(of: present), present.isSubset(of: keys.union(optional)) else { throw DocumentError.invalid("Unexpected or missing configuration fields. Export using the version 1 editor.") }
 	}
 
 	func validate() throws {
@@ -145,12 +158,24 @@ struct AppDocument: Codable, Equatable {
 			case .screen_time: break
 			}
 		}
-		guard blocks.filter({ $0.type == .timer }).count <= 1, blocks.filter({ $0.type == .screen_time }).count <= 1 else {
-			throw DocumentError.invalid("Version 1 supports one timer and one Screen Time block.")
+		guard blocks.filter({ $0.type == .timer }).count <= 1, blocks.filter({ $0.type == .screen_time }).count <= 1, blocks.filter({ $0.type == .schedule }).count <= 1 else {
+			throw DocumentError.invalid("Version 1 supports one timer, one schedule, and one Screen Time block.")
 		}
-		if rules.block_during_focus && (focus_minutes == nil || !blocks.contains(where: { $0.type == .screen_time })) {
-			throw DocumentError.invalid("Focus blocking needs a timer and Screen Time block.")
+		if let schedule {
+			guard !has_timer else { throw DocumentError.invalid("A routine either runs on a schedule or when you start it, not both.") }
+			guard has_screen_time, rules.block_during_focus else { throw DocumentError.invalid("A scheduled routine needs a Screen Time block with blocking turned on.") }
+			guard let days = schedule.days, !days.isEmpty, days.count <= 7, Set(days).count == days.count, days.allSatisfy({ (1...7).contains($0) }) else {
+				throw DocumentError.invalid("A schedule needs at least one day, each chosen once.")
+			}
+			guard let start = schedule.start, let end = schedule.end, let from = ScheduleWindow.minutes(start), let to = ScheduleWindow.minutes(end), start != end else {
+				throw DocumentError.invalid("A schedule needs a start time and a different end time, like 22:00.")
+			}
+			guard (to > from ? to - from : 24 * 60 - from + to) >= 15 else { throw DocumentError.invalid("A scheduled window must last at least 15 minutes; iOS cannot monitor anything shorter.") }
+		} else if enabled != nil {
+			throw DocumentError.invalid("Only a scheduled routine can be switched on or off.")
 		}
+		if rules.block_during_focus && !has_screen_time { throw DocumentError.invalid("Blocking needs a Screen Time block.") }
+		if rules.block_during_focus && !has_engine { throw DocumentError.invalid("Blocking needs either a timer or a schedule.") }
 		if rules.notify_on_complete && focus_minutes == nil { throw DocumentError.invalid("Completion notifications need a timer.") }
 	}
 

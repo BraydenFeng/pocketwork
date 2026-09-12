@@ -94,12 +94,12 @@
     },
     {
       "template_id": "bedtime",
-      "tagline": "An hour of wind-down with the scrolling apps locked.",
+      "tagline": "Every night from 10 PM, the scrolling apps lock themselves until 7 AM.",
       "document": {
         "schema_version": 1,
         "id": "bedtime",
         "name": "Phone-free bedtime",
-        "description": "Wind down without the feed.",
+        "description": "Wind down without the feed. Switch it on once; it runs every night.",
         "blocks": [
           {
             "id": "heading",
@@ -108,10 +108,20 @@
             "subtitle": "Nothing on your phone needs you until morning."
           },
           {
-            "id": "timer",
-            "type": "timer",
-            "title": "Wind down",
-            "minutes": 60
+            "id": "window",
+            "type": "schedule",
+            "title": "Every night",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "start": "22:00",
+            "end": "07:00"
           },
           {
             "id": "tasks",
@@ -137,7 +147,65 @@
         "rules": {
           "block_during_focus": true,
           "notify_on_complete": false
-        }
+        },
+        "enabled": false
+      }
+    },
+    {
+      "template_id": "workday",
+      "tagline": "Weekdays 9 to 5, the distractions stay locked on their own.",
+      "document": {
+        "schema_version": 1,
+        "id": "workday",
+        "name": "Workday focus",
+        "description": "Set it once. Every workday the feeds are off until five.",
+        "blocks": [
+          {
+            "id": "heading",
+            "type": "heading",
+            "title": "Work hours are work hours.",
+            "subtitle": "The feeds will still be there at five."
+          },
+          {
+            "id": "window",
+            "type": "schedule",
+            "title": "Weekdays",
+            "days": [
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "start": "09:00",
+            "end": "17:00"
+          },
+          {
+            "id": "tasks",
+            "type": "checklist",
+            "title": "Today",
+            "items": [
+              {
+                "id": "task-one",
+                "text": "The one thing that must ship"
+              },
+              {
+                "id": "task-two",
+                "text": "The one thing that would be nice"
+              }
+            ]
+          },
+          {
+            "id": "shield",
+            "type": "screen_time",
+            "title": "Distractions off until five"
+          }
+        ],
+        "rules": {
+          "block_during_focus": true,
+          "notify_on_complete": false
+        },
+        "enabled": false
       }
     },
     {

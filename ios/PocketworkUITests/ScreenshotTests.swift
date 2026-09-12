@@ -17,7 +17,7 @@ final class ScreenshotTests: XCTestCase {
 	}
 
 	func test_walkthrough_screens() throws {
-		XCTAssertTrue(app.navigationBars["My tools"].waitForExistence(timeout: 10))
+		XCTAssertTrue(app.navigationBars["My routines"].waitForExistence(timeout: 10))
 		try snap("01-home-empty")
 
 		element("routine.deep-work").tap()
@@ -25,7 +25,7 @@ final class ScreenshotTests: XCTestCase {
 		try snap("02-tool-deep-work")
 
 		element("tool.edit").tap()
-		XCTAssertTrue(app.navigationBars["Edit tool"].waitForExistence(timeout: 10))
+		XCTAssertTrue(app.navigationBars["Edit routine"].waitForExistence(timeout: 10))
 		try snap("03-editor")
 
 		element("block.timer").tap()
@@ -35,12 +35,18 @@ final class ScreenshotTests: XCTestCase {
 		app.navigationBars["Focus timer"].buttons.firstMatch.tap()
 		app.buttons["Cancel"].tap()
 		app.navigationBars["Deep work"].buttons.firstMatch.tap()
-		XCTAssertTrue(app.navigationBars["My tools"].waitForExistence(timeout: 10))
-		try snap("05-home-with-tool")
+		XCTAssertTrue(app.navigationBars["My routines"].waitForExistence(timeout: 10))
+		try snap("05-home-with-routine")
 
 		element("routine.bedtime").tap()
 		XCTAssertTrue(app.navigationBars["Phone-free bedtime"].waitForExistence(timeout: 10))
-		try snap("06-tool-bedtime")
+		try snap("06-routine-bedtime-standing")
+
+		element("tool.edit").tap()
+		XCTAssertTrue(app.navigationBars["Edit routine"].waitForExistence(timeout: 10))
+		element("block.schedule").tap()
+		XCTAssertTrue(app.navigationBars["Schedule"].waitForExistence(timeout: 10))
+		try snap("07-block-editor-schedule")
 	}
 
 	// SwiftUI exposes list rows and toolbar items as different element types; a typed query per kind stays fast.

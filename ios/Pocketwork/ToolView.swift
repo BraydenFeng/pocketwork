@@ -29,11 +29,11 @@ struct ToolView: View {
 				.navigationTitle(document.name)
 				.navigationBarTitleDisplayMode(.inline)
 				.toolbar {
-					ToolbarItem(placement: .topBarTrailing) { Button("Edit") { showing_editor = true }.disabled(sessions.is_running(document)).accessibilityIdentifier("tool.edit") }
+					ToolbarItem(placement: .topBarTrailing) { Button("Edit") { showing_editor = true }.disabled(sessions.is_running(document) || document.enabled == true).accessibilityIdentifier("tool.edit") }
 					ToolbarItem(placement: .topBarTrailing) {
 						Menu {
 							Button("Reset checklist and counters", systemImage: "arrow.counterclockwise") { sessions.reset_progress(for: document) }
-							Button(role: .destructive) { sessions.stop() } label: { Label("Clear all focus restrictions", systemImage: "lock.open") }.disabled(sessions.is_busy)
+							Button(role: .destructive) { clear_everything() } label: { Label("Clear all focus restrictions", systemImage: "lock.open") }.disabled(sessions.is_busy)
 						} label: { Image(systemName: "ellipsis.circle") }
 					}
 				}
@@ -49,7 +49,7 @@ struct ToolView: View {
 					}
 				}
 			} else {
-				ContentUnavailableView("This tool was deleted", systemImage: "square.stack.3d.up", description: Text("Go back to My tools to pick another."))
+				ContentUnavailableView("This routine was deleted", systemImage: "square.stack.3d.up", description: Text("Go back to My routines to pick another."))
 			}
 		}
 		.tint(.primary)
@@ -62,8 +62,32 @@ struct ToolView: View {
 		} message: { Text(sessions.error_message ?? "") }
 	}
 
+	private func clear_everything() {
+		for id in sessions.clear_everything() { library.set_enabled(id, false) }
+	}
+
+	private func set_standing(_ document: AppDocument, _ enabled: Bool) {
+		if sessions.set_standing(document, enabled: enabled) { library.set_enabled(document.id, enabled) }
+	}
+
 	@ViewBuilder private func block_view(_ block: BlockDocument, in document: AppDocument) -> some View {
 		switch block.type {
+		case .schedule:
+			let enabled = document.enabled == true
+			VStack(alignment: .leading, spacing: 12) {
+				HStack {
+					Label(block.title, systemImage: "calendar.badge.clock").font(.headline)
+					Spacer()
+					Toggle(enabled ? "On" : "Off", isOn: Binding(get: { enabled }, set: { set_standing(document, $0) }))
+						.labelsHidden().accessibilityLabel("Switch \(block.title) on or off").accessibilityIdentifier("tool.switch")
+				}
+				Text(ScheduleWindow.describe(block)).font(.system(size: 28, weight: .semibold, design: .rounded))
+				TimelineView(.periodic(from: .now, by: frozen ? 3600 : 30)) { timeline in
+					Text(ScheduleWindow.describe_status(block, enabled: enabled, at: timeline.date)).font(.subheadline).foregroundStyle(.secondary)
+				}
+				Text(enabled ? "Switch it off to edit this routine." : "Runs by itself once it is on, even with the app closed.").font(.caption).foregroundStyle(.secondary)
+			}
+			.padding(20).background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
 		case .heading:
 			VStack(alignment: .leading, spacing: 12) {
 				Text(block.title).font(.largeTitle.weight(.semibold))
@@ -106,10 +130,11 @@ struct ToolView: View {
 			let running = sessions.is_running(document)
 			VStack(alignment: .leading, spacing: 12) {
 				Label(block.title, systemImage: "shield.lefthalf.filled").font(.headline)
-				Text(running && sessions.session?.blocks_apps == true ? "Focus restrictions are active." : "\(sessions.selected_count(for: document)) apps, categories, or websites selected for this tool.").font(.subheadline).foregroundStyle(.secondary)
+				let standing_active = document.enabled == true && document.schedule.map { ScheduleWindow.status($0, at: .now).active } == true
+				Text((running && sessions.session?.blocks_apps == true) || standing_active ? "Focus restrictions are active." : "\(sessions.selected_count(for: document)) apps, categories, or websites selected for this routine.").font(.subheadline).foregroundStyle(.secondary)
 				Button("Choose apps privately") {
 					Task { if await sessions.authorize_screen_time() { draft_selection = sessions.selection(for: document); showing_picker = true } }
-				}.buttonStyle(.bordered).disabled(running || sessions.is_busy)
+				}.buttonStyle(.bordered).disabled(running || sessions.is_busy || document.enabled == true)
 			}
 		case .counter:
 			let value = sessions.count(block, in: document)

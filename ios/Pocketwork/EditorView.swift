@@ -6,6 +6,7 @@ struct EditorView: View {
 	@Environment(\.dismiss) private var dismiss
 	@State private var draft: AppDocument
 	@State private var validation_message: String?
+	@State private var edit_mode: EditMode = .inactive
 
 	init(document: AppDocument) { _draft = State(initialValue: document) }
 
@@ -13,13 +14,14 @@ struct EditorView: View {
 	private static let kinds: [KindOption] = [
 		KindOption(kind: .heading, label: "Heading", icon: "textformat"), KindOption(kind: .timer, label: "Focus timer", icon: "timer"), KindOption(kind: .checklist, label: "Checklist", icon: "checklist"),
 		KindOption(kind: .counter, label: "Counter", icon: "number"), KindOption(kind: .note, label: "Note", icon: "note.text"), KindOption(kind: .screen_time, label: "Screen Time", icon: "shield.lefthalf.filled"),
+		KindOption(kind: .schedule, label: "Schedule", icon: "calendar.badge.clock"),
 	]
 
 	var body: some View {
 		NavigationStack {
 			Form {
 				Section("Name") {
-					TextField("Tool name", text: $draft.name)
+					TextField("Routine name", text: $draft.name)
 					TextField("What it's for", text: $draft.description, axis: .vertical)
 				}
 				Section {
@@ -40,28 +42,29 @@ struct EditorView: View {
 					.onMove { offsets, destination in draft.blocks.move(fromOffsets: offsets, toOffset: destination) }
 					Menu {
 						ForEach(Self.kinds) { option in
-							Button(option.label, systemImage: option.icon) { draft.blocks.append(BlockDocument.make(option.kind)) }.disabled(!draft.can_add(option.kind))
+							Button(option.label, systemImage: option.icon) { add_block(option.kind) }.disabled(!draft.can_add(option.kind))
 						}
 					} label: { Label("Add block", systemImage: "plus") }
 				} header: { Text("On your screen · \(draft.blocks.count)/20") } footer: {
-					Text("Swipe to remove a block. Drag to reorder. One timer and one Screen Time block per tool.")
+					Text("Swipe to remove a block. Reorder to drag them. A routine runs on a timer or a schedule, not both.")
 				}
 				Section {
 					Toggle(isOn: $draft.rules.block_during_focus) {
-						Text("Block during focus")
-						Text(draft.has_timer && draft.has_screen_time ? "Uses your timer and Screen Time block" : "Add both a timer and a Screen Time block first")
-					}.disabled(!(draft.has_timer && draft.has_screen_time))
+						Text(draft.is_standing ? "Block while active" : "Block during focus")
+						Text(draft.has_engine && draft.has_screen_time ? (draft.is_standing ? "Uses your schedule and Screen Time block" : "Uses your timer and Screen Time block") : "Add a timer or schedule, plus a Screen Time block first")
+					}.disabled(!(draft.has_engine && draft.has_screen_time))
 					Toggle(isOn: $draft.rules.notify_on_complete) {
 						Text("Notify on completion")
-						Text(draft.has_timer ? "A notification when the timer finishes" : "Add a timer first")
+						Text(draft.has_timer ? "A notification when the timer finishes" : draft.is_standing ? "Only for timer routines" : "Add a timer first")
 					}.disabled(!draft.has_timer)
-				} header: { Text("What happens when you focus") }
+				} header: { Text(draft.is_standing ? "What happens on schedule" : "What happens when you focus") }
 			}
-			.navigationTitle("Edit tool")
+			.navigationTitle("Edit routine")
 			.navigationBarTitleDisplayMode(.inline)
+			.environment(\.editMode, $edit_mode)
 			.toolbar {
 				ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-				ToolbarItem(placement: .primaryAction) { EditButton() }
+				ToolbarItem(placement: .primaryAction) { Button(edit_mode == .active ? "Done" : "Reorder") { withAnimation { edit_mode = edit_mode == .active ? .inactive : .active } } }
 				ToolbarItem(placement: .confirmationAction) { Button("Save") { save() } }
 			}
 			.alert("Not quite ready to save", isPresented: Binding(get: { validation_message != nil }, set: { if !$0 { validation_message = nil } })) {
@@ -70,11 +73,22 @@ struct EditorView: View {
 		}
 	}
 
+	private func add_block(_ kind: BlockKind) {
+		if (kind == .schedule && draft.has_timer) || (kind == .timer && draft.is_standing) {
+			validation_message = "A routine runs on a timer or on a schedule, not both. Remove the other one first."
+			return
+		}
+		draft.blocks.append(BlockDocument.make(kind))
+		// A schedule only means something if it locks apps, so switch that rule on when the pieces are there.
+		if kind == .schedule { draft.enabled = false; if draft.has_screen_time { draft.rules.block_during_focus = true } }
+	}
+
 	private func save() {
 		var cleaned = draft
 		cleaned.name = cleaned.name.trimmingCharacters(in: .whitespacesAndNewlines)
-		cleaned.rules.block_during_focus = cleaned.rules.block_during_focus && cleaned.has_timer && cleaned.has_screen_time
+		cleaned.rules.block_during_focus = cleaned.rules.block_during_focus && cleaned.has_engine && cleaned.has_screen_time
 		cleaned.rules.notify_on_complete = cleaned.rules.notify_on_complete && cleaned.has_timer
+		if !cleaned.is_standing { cleaned.enabled = nil }
 		do { try cleaned.validate() } catch { validation_message = error.localizedDescription; return }
 		if library.save(cleaned) { dismiss() }
 	}
@@ -123,6 +137,29 @@ struct BlockEditorView: View {
 				Section("Your note") {
 					TextField("Something worth reading", text: Binding(get: { block.text ?? "" }, set: { block.text = $0 }), axis: .vertical)
 				}
+			case .schedule:
+				Section("Days") {
+					HStack(spacing: 6) {
+						ForEach(ScheduleWindow.all_days, id: \.self) { day in
+							let chosen = (block.days ?? []).contains(day)
+							Button(ScheduleWindow.day_labels[day - 1]) {
+								var days = Set(block.days ?? [])
+								if chosen { if days.count > 1 { days.remove(day) } } else { days.insert(day) }
+								block.days = days.sorted()
+							}
+							.buttonStyle(.bordered).tint(chosen ? Color.primary : Color.secondary).accessibilityAddTraits(chosen ? .isSelected : [])
+						}
+					}
+					HStack {
+						Button("Every day") { block.days = ScheduleWindow.all_days }
+						Spacer()
+						Button("Weekdays") { block.days = ScheduleWindow.weekdays }
+					}.font(.subheadline)
+				}
+				Section {
+					DatePicker("Starts", selection: clock_binding(\.start, fallback: "22:00"), displayedComponents: .hourAndMinute)
+					DatePicker("Ends", selection: clock_binding(\.end, fallback: "07:00"), displayedComponents: .hourAndMinute)
+				} footer: { Text("An end time earlier than the start runs past midnight. Windows need at least 15 minutes.") }
 			case .screen_time:
 				Section {
 					Label("Your selection stays on your phone.", systemImage: "lock.shield")
@@ -132,5 +169,16 @@ struct BlockEditorView: View {
 		}
 		.navigationTitle(EditorView.label(for: block.type))
 		.navigationBarTitleDisplayMode(.inline)
+	}
+
+	// "HH:MM" in the document ↔ a Date on today's calendar for the picker.
+	private func clock_binding(_ key: WritableKeyPath<BlockDocument, String?>, fallback: String) -> Binding<Date> {
+		Binding(get: {
+			let minutes = ScheduleWindow.minutes(block[keyPath: key] ?? fallback) ?? 0
+			return Calendar.current.date(byAdding: .minute, value: minutes, to: Calendar.current.startOfDay(for: .now)) ?? .now
+		}, set: { date in
+			let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+			block[keyPath: key] = ScheduleWindow.clock((parts.hour ?? 0) * 60 + (parts.minute ?? 0))
+		})
 	}
 }

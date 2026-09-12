@@ -1,10 +1,29 @@
+import DeviceActivity
 import FamilyControls
 import Foundation
 import ManagedSettings
 
 struct SharedStore {
 	static let settings_name = ManagedSettingsStore.Name("pocketwork.focus")
+	static let standing_prefix = "pocketwork.standing."
 	private let defaults: UserDefaults
+
+	// Each standing routine shields through its own store so two active routines never clear each other.
+	static func standing_store(_ document_id: String) -> ManagedSettingsStore {
+		ManagedSettingsStore(named: ManagedSettingsStore.Name(standing_prefix + document_id))
+	}
+
+	static func standing_activity(_ document_id: String, weekday: Int) -> DeviceActivityName {
+		DeviceActivityName("\(standing_prefix)\(document_id).\(weekday)")
+	}
+
+	// "pocketwork.standing.<id>.<weekday>" → id. Routine IDs never contain dots.
+	static func standing_id(from activity: DeviceActivityName) -> String? {
+		guard activity.rawValue.hasPrefix(standing_prefix) else { return nil }
+		let rest = activity.rawValue.dropFirst(standing_prefix.count)
+		guard let dot = rest.lastIndex(of: ".") else { return nil }
+		return String(rest[..<dot])
+	}
 
 	init() throws {
 		guard let group = Bundle.main.object(forInfoDictionaryKey: "PocketworkAppGroup") as? String,
@@ -29,6 +48,15 @@ struct SharedStore {
 
 	func remove_selection(for document_id: String) { defaults.removeObject(forKey: selection_key(document_id)) }
 
+	// Which standing routines are switched on, so the monitor extension ignores callbacks from routines that were turned off.
+	func standing_ids() -> Set<String> { Set(defaults.stringArray(forKey: "standing_routines") ?? []) }
+
+	func set_standing(_ document_id: String, enabled: Bool) {
+		var ids = standing_ids()
+		if enabled { ids.insert(document_id) } else { ids.remove(document_id) }
+		defaults.set(Array(ids).sorted(), forKey: "standing_routines")
+	}
+
 	func session() throws -> FocusSession? {
 		guard let data = defaults.data(forKey: "focus_session") else { return nil }
 		return try PropertyListDecoder().decode(FocusSession.self, from: data)
@@ -40,9 +68,8 @@ struct SharedStore {
 
 	func clear_session() { defaults.removeObject(forKey: "focus_session") }
 
-	func apply_selection(for document_id: String) throws {
+	func apply_selection(for document_id: String, to settings: ManagedSettingsStore = ManagedSettingsStore(named: SharedStore.settings_name)) throws {
 		let selection = try selection(for: document_id)
-		let settings = ManagedSettingsStore(named: Self.settings_name)
 		settings.shield.applications = selection.applicationTokens.isEmpty ? nil : selection.applicationTokens
 		settings.shield.webDomains = selection.webDomainTokens.isEmpty ? nil : selection.webDomainTokens
 		settings.shield.applicationCategories = selection.categoryTokens.isEmpty ? nil : .specific(selection.categoryTokens)

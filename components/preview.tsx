@@ -1,14 +1,17 @@
 "use client";
 
-import { BatteryFull, Check, ChevronRight, Pause, Play, Plus, Shield, ShieldCheck, Signal, Wifi } from "lucide-react";
+import { BatteryFull, CalendarClock, Check, ChevronRight, Pause, Play, Plus, Shield, ShieldCheck, Signal, Wifi } from "lucide-react";
 import type { AppDocument, Block } from "@/lib/document";
 import { format_duration, remaining_seconds, type RuntimeAction, type RuntimeState } from "@/lib/runtime";
+import { describe_schedule, describe_status, schedule_status } from "@/lib/schedule";
 
-export function PhonePreview({ document, runtime, now, selected_id, interactive, on_select, dispatch }: {
+export function PhonePreview({ document, runtime, now, selected_id, interactive, on_select, dispatch, on_toggle_enabled }: {
 	document: AppDocument; runtime: RuntimeState; now: number; selected_id: string | null; interactive: boolean;
-	on_select: (id: string) => void; dispatch: (action: RuntimeAction) => void;
+	on_select: (id: string) => void; dispatch: (action: RuntimeAction) => void; on_toggle_enabled: (enabled: boolean) => void;
 }) {
-	const blocking = runtime.status === "running" && document.rules.block_during_focus;
+	const schedule = document.blocks.find((block) => block.type === "schedule");
+	const standing_active = schedule?.type === "schedule" && document.enabled === true && schedule_status(schedule, now).active;
+	const blocking = (runtime.status === "running" || standing_active) && document.rules.block_during_focus;
 	function content(block: Block) {
 		switch (block.type) {
 			case "heading": return <div className="preview-heading"><span className="eyebrow">YOUR SPACE, YOUR PACE</span><h2>{block.title}</h2><p>{block.subtitle}</p></div>;
@@ -21,6 +24,8 @@ export function PhonePreview({ document, runtime, now, selected_id, interactive,
 			case "screen_time": return <div className="preview-shield"><span className="shield-glyph">{blocking ? <ShieldCheck /> : <Shield />}</span><div><h3>{block.title}</h3><p>{blocking ? "Blocking simulated in preview" : "Choose your apps on iPhone"}</p></div><ChevronRight /></div>;
 			case "counter": return <div className="preview-counter"><h3>{block.title}</h3><div className="counter-value"><span>{runtime.counters[block.id] ?? 0}<small> / {block.target}</small></span><button className="button" type="button" aria-label={`Increment ${block.title}`} disabled={!interactive || (runtime.counters[block.id] ?? 0) >= block.target} onClick={() => dispatch({ type: "increment", block_id: block.id, now: Date.now() })}>{(runtime.counters[block.id] ?? 0) >= block.target ? <Check /> : <Plus />}</button></div></div>;
 			case "note": return <div className="preview-note"><h3>{block.title}</h3><p>{block.text}</p></div>;
+			case "schedule": return <div className="preview-schedule"><div className="preview-label-row"><span className="preview-label"><CalendarClock />{block.title}</span><label className="preview-switch"><span>{document.enabled ? "On" : "Off"}</span><input type="checkbox" role="switch" aria-label={`Switch ${block.title} on or off`} disabled={!interactive} checked={document.enabled === true} onChange={(event) => on_toggle_enabled(event.target.checked)} /></label></div>
+				<strong className="schedule-window">{describe_schedule(block)}</strong><span className="timer-caption">{describe_status(block, document.enabled === true, now)}</span></div>;
 		}
 	}
 	return <div className="phone" aria-label="Live iPhone preview"><div className="phone-top"><span>9:41</span><span className="phone-island" aria-hidden="true" /><span className="phone-signals" aria-hidden="true"><Signal /><Wifi /><BatteryFull /></span></div>

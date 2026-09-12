@@ -66,8 +66,56 @@ final class SessionController: ObservableObject {
 
 	func forget(_ document_id: String) {
 		if session?.document_id == document_id { stop() }
+		release_standing(document_id)
 		progress.removeValue(forKey: document_id)
-		do { try SharedStore().remove_selection(for: document_id); try persist_progress() } catch { report(error) }
+		do { try SharedStore().remove_selection(for: document_id); try SharedStore().set_standing(document_id, enabled: false); try persist_progress() } catch { report(error) }
+	}
+
+	// Standing routines: one repeating DeviceActivity per chosen weekday. iOS fires the monitor extension at each window edge.
+	func set_standing(_ document: AppDocument, enabled: Bool) -> Bool {
+		guard let schedule = document.schedule, let days = schedule.days, let start = schedule.start, let end = schedule.end,
+			let from = ScheduleWindow.minutes(start), let to = ScheduleWindow.minutes(end) else { return false }
+		guard !enabled else {
+			do {
+				let shared = try SharedStore()
+				guard AuthorizationCenter.shared.authorizationStatus == .approved else { throw DocumentError.invalid("Allow Screen Time access and choose apps before switching this routine on.") }
+				guard selected_count(for: document) > 0 else { throw DocumentError.invalid("Choose at least one app, website, or category for this routine first.") }
+				var scheduled: [DeviceActivityName] = []
+				do {
+					for day in days {
+						let end_day = to > from ? day : (day % 7) + 1
+						let window = DeviceActivitySchedule(intervalStart: DateComponents(hour: from / 60, minute: from % 60, weekday: day), intervalEnd: DateComponents(hour: to / 60, minute: to % 60, weekday: end_day), repeats: true)
+						let activity = SharedStore.standing_activity(document.id, weekday: day)
+						try center.startMonitoring(activity, during: window)
+						scheduled.append(activity)
+					}
+				} catch { center.stopMonitoring(scheduled); throw error }
+				shared.set_standing(document.id, enabled: true)
+				let store = SharedStore.standing_store(document.id)
+				if ScheduleWindow.status(schedule, at: .now).active { try shared.apply_selection(for: document.id, to: store) } else { store.clearAllSettings() }
+				objectWillChange.send()
+				return true
+			} catch { release_standing(document.id); report(error); return false }
+		}
+		release_standing(document.id)
+		do { try SharedStore().set_standing(document.id, enabled: false) } catch { report(error) }
+		objectWillChange.send()
+		return true
+	}
+
+	private func release_standing(_ document_id: String) {
+		center.stopMonitoring(center.activities.filter { SharedStore.standing_id(from: $0) == document_id })
+		SharedStore.standing_store(document_id).clearAllSettings()
+	}
+
+	// The emergency exit: every shield this app has ever applied comes off. Returns the standing routines that were switched off.
+	func clear_everything() -> [String] {
+		stop()
+		let ids = (try? SharedStore().standing_ids()) ?? []
+		for id in ids { release_standing(id); _ = try? SharedStore().set_standing(id, enabled: false) }
+		center.stopMonitoring(center.activities.filter { $0.rawValue.hasPrefix(SharedStore.standing_prefix) })
+		objectWillChange.send()
+		return Array(ids)
 	}
 
 	func start(_ document: AppDocument) async {

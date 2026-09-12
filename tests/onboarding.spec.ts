@@ -11,7 +11,7 @@ test("guides customization, preview testing, and honest iPhone setup", async ({ 
 	await expect(page.getByLabel("Session length")).toBeVisible();
 	await page.getByLabel("Session length").selectOption("30");
 	await expect(page.getByLabel("Time remaining")).toHaveText("30:00");
-	await guide.getByRole("button", { name: "2 Try your tool", exact: true }).click();
+	await guide.getByRole("button", { name: "2 Try your routine", exact: true }).click();
 	await guide.getByRole("button", { name: "Open test mode", exact: true }).click();
 	await expect(page.getByRole("button", { name: "Try it", exact: true })).toHaveAttribute("aria-pressed", "true");
 	await page.getByRole("button", { name: "Start focusing", exact: true }).click();
@@ -59,7 +59,7 @@ test("guidance works for a blank tool with no timer", async ({ page }) => {
 	await page.getByRole("button", { name: "Edit a block", exact: true }).click();
 	await expect(page.getByRole("textbox", { name: "Supporting text", exact: true })).toBeVisible();
 	await page.getByRole("button", { name: "Add Counter", exact: true }).click();
-	await page.getByRole("button", { name: "2 Try your tool", exact: true }).click();
+	await page.getByRole("button", { name: "2 Try your routine", exact: true }).click();
 	await page.getByRole("button", { name: "Open test mode", exact: true }).click();
 	await page.getByRole("button", { name: "Increment Small wins", exact: true }).click();
 	await expect(page.locator(".counter-value")).toContainText("1 / 5");
