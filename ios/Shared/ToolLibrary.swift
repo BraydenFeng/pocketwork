@@ -89,6 +89,7 @@ enum ToolCopy {
 	static func summary(_ document: AppDocument) -> String {
 		var parts: [String] = []
 		if let minutes = document.focus_minutes { parts.append("\(minutes) min session") }
+		if let schedule = document.schedule { parts.append(ScheduleWindow.describe(schedule)) }
 		if document.rules.block_during_focus { parts.append("blocks apps") }
 		let tasks = document.blocks.compactMap(\.items).reduce(0) { $0 + $1.count }
 		if tasks > 0 { parts.append("\(tasks) task\(tasks == 1 ? "" : "s")") }
