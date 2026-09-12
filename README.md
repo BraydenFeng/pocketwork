@@ -1,6 +1,6 @@
 # Pocketwork
 
-A local-first visual workbench for personal iPhone tools. Temporary product name; no accounts, AI inference, tracking, subscription billing, or public deployment.
+Small iPhone routines that hold you to what you decided. A local-first web editor plus a SwiftUI iPhone app that share one routine format. No AI inference, no tracking; an optional account only syncs your own routines.
 
 ## Run the editor
 
@@ -11,21 +11,22 @@ npm ci
 npm run dev
 ```
 
-Open http://127.0.0.1:3210. The server binds to loopback only. Your tools are saved in this browser's localStorage; switching browser or port does not carry them with it. Export backups before clearing browser data.
+Open http://127.0.0.1:3210. The server binds to loopback only. Your routines are saved in this browser's localStorage (and to your account once you sign in); switching browser or port does not carry them with it unless you are signed in. Export backups before clearing browser data.
 
-## First slice
+## What is built
 
-- My tools is the front door: every saved tool as a card (open, duplicate, delete), plus five ready-made routines (Deep work, Study sprints, Phone-free bedtime, Morning start, Reading time) and a blank start. Picking a routine creates a tool and opens the editor; `?tool=<id>` in the URL means the browser back button returns to the list. A browser that only has a v1 single draft sees it as its first tool; the old key is left in place.
-- A skippable, replayable Quick start guide walks through customization, test mode, and the native iPhone setup boundary without replacing your draft. Dismissal is remembered locally.
+- My routines is the front door: every saved routine as a card (open, duplicate, delete), app groups, six ready-made routines, and a blank start. Picking one creates a routine and opens the editor; `?routine=<id>` in the URL means the browser back button returns to the list. A browser that only has a v1 single draft sees it as its first routine; the old key is left in place.
+- Two kinds of routine. One-time: a Focus timer you start yourself. Standing: a Schedule block (days plus a window such as 22:00 to 07:00, may cross midnight, at least 15 minutes) with an On/Off switch on the card and in the preview; it locks the chosen apps by itself while the window is open. A routine has a timer or a schedule, never both, and a schedule always needs a Screen Time block with blocking on.
+- App groups: named once in the library (Social, Work, Distractions), filled with real apps on each iPhone through Apple's picker, referenced by name from a routine's Screen Time block. Three functions: block the groups, allow only the groups (everything else locks), or limit the groups to so many minutes inside the routine's window. Renaming a group follows through every routine; a group in use cannot be deleted; a routine that mentions a new group creates it. With no groups a routine keeps its own private app selection.
+- A skippable, replayable Quick start guide walks through customization, test mode, and the native iPhone setup boundary. Dismissal is remembered locally.
 - Layout / Rules / Advanced separate visual editing from behavior and raw configuration; included native blocks open their settings. Narrow layouts bring settings into view and offer Back to preview.
-- Add, edit, reorder (drag or keyboard-accessible move buttons), and remove heading, timer, checklist, counter, note, and Screen Time blocks.
-- Configure blocking-during-focus and completion-notification rules.
+- Add, edit, reorder (drag or keyboard-accessible move buttons), and remove heading, timer, schedule, checklist, counter, note, and Screen Time blocks.
 - Switch between selecting blocks and interacting with the phone preview. The activity log explicitly labels native effects as simulations.
 - Undo/redo up to 60 edits; validated import/export with a versioned, bounded schema.
-- The SwiftUI iPhone app has the same My tools list and routines, edits tools on the phone, and runs them with permission handling, per-tool private app selection, session state, a DeviceActivity monitor extension, and on-device checklist/counter storage. `public/routines.pocketwork.json` (regenerate with `npm run routines`) is the shared routine fixture; a test keeps it identical to `lib/templates.ts`.
-- GitHub Actions (`.github/workflows/ci.yml`) runs the web checks on Linux and compiles and tests the iPhone app on a macOS runner, so the Swift is verified without a Mac.
+- The SwiftUI iPhone app has the same My routines list, ready-made routines, and app groups; edits routines on the phone; and runs them with permission handling, session state, a DeviceActivity monitor extension, and on-device checklist/counter storage. Standing routines register one repeating DeviceActivity per chosen weekday and shield through their own ManagedSettings store; limits use DeviceActivity usage thresholds. `public/routines.pocketwork.json` (regenerate with `npm run routines`) is the shared routine fixture; a test keeps it identical to `lib/templates.ts`.
+- GitHub Actions (`.github/workflows/ci.yml`) runs the web checks on Linux and compiles and tests the iPhone app on a macOS runner, uploading simulator screenshots, so the Swift is verified without a Mac.
 
-**The browser does not block apps. Native source is included but has not been compiled or tested on an iPhone from this Windows machine.** Follow `ios/README.md` for signing, provisioning, physical-device checks, and Apple's approval requirements.
+**The browser does not block apps. Native source compiles and passes its tests on a simulator, but has not run on a physical iPhone.** Follow `ios/README.md` for signing, provisioning, physical-device checks, and Apple's approval requirements.
 
 ## Account and sync (optional)
 
