@@ -59,7 +59,9 @@ describe("tool library", () => {
 	});
 	it("deletes, duplicates with a fresh ID, and imports around collisions", () => {
 		const library = upsert_tool(empty_library, copy(), NOW);
-		expect(delete_tool(library, "my-focus-space").tools).toHaveLength(0);
+		const deleted = delete_tool(library, "my-focus-space", NOW);
+		expect(deleted.tools).toHaveLength(0);
+		expect(deleted.removed).toEqual({ "my-focus-space": new Date(NOW).toISOString() });
 		const copied = duplicate_tool(library, "my-focus-space", NOW);
 		expect(copied.document.id).not.toBe("my-focus-space");
 		expect(copied.document.name).toBe("My focus space copy");

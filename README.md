@@ -27,6 +27,10 @@ Open http://127.0.0.1:3210. The server binds to loopback only. Your tools are sa
 
 **The browser does not block apps. Native source is included but has not been compiled or tested on an iPhone from this Windows machine.** Follow `ios/README.md` for signing, provisioning, physical-device checks, and Apple's approval requirements.
 
+## Account and sync (optional)
+
+Without a configured project everything stays on this browser. To turn on accounts: create a Supabase project, copy `.env.example` to `.env` with the Project URL and anon/publishable key, run `supabase/schema.sql` once in the SQL editor, enable the Google provider under Authentication → Providers, and add `http://127.0.0.1:3210` (and any deployed origin) to Authentication → URL Configuration. Sign in with Google appears in the top bar. The whole library is one JSON row per user; the browser stays local-first and reconciles on sign-in, on focus, and after every save (`lib/sync.ts`: newest edit wins, deletions are remembered for 30 days).
+
 ## Architecture
 
 ```text

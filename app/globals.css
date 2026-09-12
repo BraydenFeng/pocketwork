@@ -210,6 +210,13 @@ kbd { font: inherit; font-size: var(--t-micro); padding-inline: var(--s-1); bord
 .workbench-footer { display: flex; justify-content: space-between; gap: var(--s-4); padding: var(--s-3) var(--s-5); border-top: var(--hairline); color: var(--c-text-faint); background: var(--c-surface); font-family: var(--font-mono); font-size: var(--t-micro); }
 .workbench-footer > span:first-child { display: flex; align-items: center; gap: var(--s-2); }
 .footer-separator { margin-inline: var(--s-2); color: var(--c-border-hi); }
+/* Account: the chip in the top bar and the spinning sync glyph. */
+.account-chip { display: inline-flex; align-items: center; gap: var(--s-2); }
+.account-email { font-size: var(--t-small); color: var(--c-text-dim); max-width: var(--w-rail); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.save-status > svg { width: var(--icon-small); height: var(--icon-small); }
+.is-spinning { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* Schedule block: day chips, time fields, and the switch that appears on cards and in the preview. */
 .day-picker { display: flex; gap: var(--s-1); flex-wrap: wrap; }
 .day-picker button { min-width: var(--glyph); min-height: var(--control-h); padding: 0 var(--s-2); border: var(--hairline); border-radius: var(--r-1); background: var(--c-surface); font-size: var(--t-small); color: var(--c-text-dim); }

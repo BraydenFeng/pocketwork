@@ -10,6 +10,7 @@ import { load_guide_dismissed, save_guide_dismissed } from "@/lib/onboarding";
 import { Button, SectionLabel, TextField, Toggle } from "./ui";
 import { PhonePreview } from "./preview";
 import { QuickStart, type GuideStep } from "./quick-start";
+import type { SyncState } from "./app";
 
 const block_catalog = [
 	{ type: "heading", label: "Heading", description: "A title and supporting text", icon: Type },
@@ -23,8 +24,8 @@ const block_catalog = [
 
 function error_message(error: unknown): string { return error instanceof Error ? error.message : "Something went wrong. Please try again."; }
 
-export function Workbench({ tool, on_save, on_back, storage_blocked, storage_error, on_replace_unreadable, on_dismiss_error }: {
-	tool: AppDocument; on_save: (document: AppDocument) => void; on_back: () => void; storage_blocked: boolean; storage_error: string | null; on_replace_unreadable: () => void; on_dismiss_error: () => void;
+export function Workbench({ tool, on_save, on_back, storage_blocked, storage_error, on_replace_unreadable, on_dismiss_error, sync }: {
+	tool: AppDocument; on_save: (document: AppDocument) => void; on_back: () => void; storage_blocked: boolean; storage_error: string | null; on_replace_unreadable: () => void; on_dismiss_error: () => void; sync: SyncState;
 }) {
 	const [history, set_history] = useState<History<AppDocument>>({ past: [], present: tool, future: [] });
 	const document = history.present;
@@ -162,7 +163,7 @@ export function Workbench({ tool, on_save, on_back, storage_blocked, storage_err
 	return <div className="workbench"><a className="skip-link" href="#canvas">Skip to workbench</a>
 		<header className="topbar"><div className="brand"><Layers2 /><span>pocketwork<span className="brand-period">.</span></span></div><span className="workspace-label">PERSONAL APP WORKBENCH</span><div className="topbar-actions"><button ref={help_ref} type="button" className="button button-quiet quick-start-toggle" aria-expanded={guide_open} aria-controls="quick-start" disabled={!ready} onClick={() => toggle_guide(!guide_open)}><BookOpen />Quick start</button><Button variant="quiet" onClick={() => open_inspector("device")}><Smartphone />iPhone setup</Button><span className="header-divider" /><Button variant="primary" onClick={export_tool} disabled={!ready || !valid}><Download />Export routine</Button></div>
 		</header>
-		<div className="projectbar"><div><div className="breadcrumb"><button type="button" className="breadcrumb-back" onClick={on_back}><ArrowLeft />My routines</button><ChevronRight /><span>Editing</span></div><button className="project-title" type="button" title="Edit routine name and description" onClick={() => open_inspector("app")}><h1>{document.name}</h1><SlidersHorizontal /></button></div><div className="project-meta"><span className={`save-status ${storage_blocked ? "has-error" : ""}`}><span />{storage_blocked ? "Draft recovery needed" : save_state}</span><span className="local-tag">LOCAL FIRST</span></div></div>
+		<div className="projectbar"><div><div className="breadcrumb"><button type="button" className="breadcrumb-back" onClick={on_back}><ArrowLeft />My routines</button><ChevronRight /><span>Editing</span></div><button className="project-title" type="button" title="Edit routine name and description" onClick={() => open_inspector("app")}><h1>{document.name}</h1><SlidersHorizontal /></button></div><div className="project-meta"><span className={`save-status ${storage_blocked ? "has-error" : ""}`}><span />{storage_blocked ? "Draft recovery needed" : save_state}</span><span className="local-tag">{sync === "off" ? "LOCAL FIRST" : sync === "syncing" ? "SYNCING" : sync === "error" ? "SYNC PAUSED" : "SYNCED"}</span></div></div>
 		{guide_open && <QuickStart step={guide_step} on_step={set_guide_step} on_action={guide_action} on_dismiss={() => toggle_guide(false)} />}
 		{(error ?? storage_error) && <div className="alert-banner" role="alert"><Info /><span>{error ?? storage_error}</span>{storage_blocked && <Button onClick={on_replace_unreadable}>Replace unreadable data</Button>}<Button variant="quiet" aria-label="Dismiss error" onClick={() => { set_error(null); on_dismiss_error(); }}><X /></Button></div>}
 		{notice && <div className="notice-banner" role="status"><Check />{notice}</div>}

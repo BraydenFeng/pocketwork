@@ -1,20 +1,28 @@
 "use client";
 
 import { useRef } from "react";
-import { ArrowRight, Check, Copy, Info, Layers2, Plus, Trash2, Upload, X } from "lucide-react";
+import { ArrowRight, Check, CloudOff, Copy, Info, Layers2, LogIn, LogOut, Plus, RefreshCw, Trash2, Upload, X } from "lucide-react";
+import type { Account } from "@/lib/cloud";
+import type { SyncState } from "./app";
 import { is_standing, MAX_DOCUMENT_BYTES, parse_document, type AppDocument } from "@/lib/document";
 import { describe_status } from "@/lib/schedule";
 import { format_edited, sorted_tools, summarize_tool, type Library } from "@/lib/library";
 import { blank_tool, templates } from "@/lib/templates";
 import { Button, SectionLabel } from "./ui";
 
-export function Home({ library, now, error, notice, storage_blocked, on_open, on_create, on_delete, on_duplicate, on_import, on_toggle, on_error, on_dismiss_error, on_dismiss_notice, on_replace_unreadable }: {
+export function Home({ library, now, error, notice, storage_blocked, cloud_available, account, sync, on_sign_in, on_sign_out, on_open, on_create, on_delete, on_duplicate, on_import, on_toggle, on_error, on_dismiss_error, on_dismiss_notice, on_replace_unreadable }: {
 	library: Library; now: number; error: string | null; notice: string | null; storage_blocked: boolean;
+	cloud_available: boolean; account: Account | null; sync: SyncState; on_sign_in: () => void; on_sign_out: () => void;
 	on_open: (id: string) => void; on_create: (document: AppDocument) => void; on_delete: (id: string) => void; on_duplicate: (id: string) => void; on_import: (document: AppDocument) => void; on_toggle: (id: string, enabled: boolean) => void;
 	on_error: (message: string) => void; on_dismiss_error: () => void; on_dismiss_notice: () => void; on_replace_unreadable: () => void;
 }) {
 	const file_input = useRef<HTMLInputElement>(null);
 	const tools = sorted_tools(library);
+	const saved_where = storage_blocked ? "Saved routines need attention"
+		: !account ? `${tools.length} saved on this browser`
+		: sync === "syncing" ? "Syncing with your account…"
+		: sync === "error" ? "Saved here · could not reach your account"
+		: `${tools.length} saved · synced to ${account.email ?? "your account"}`;
 
 	async function import_file(file: File | undefined) {
 		if (!file) { return; }
@@ -26,10 +34,12 @@ export function Home({ library, now, error, notice, storage_blocked, on_open, on
 	}
 
 	return <div className="workbench home"><a className="skip-link" href="#my-tools">Skip to my routines</a>
-		<header className="topbar"><div className="brand"><Layers2 /><span>pocketwork<span className="brand-period">.</span></span></div><span className="workspace-label">PERSONAL APP WORKBENCH</span><div className="topbar-actions"><Button onClick={() => file_input.current?.click()}><Upload />Add from file</Button></div>
+		<header className="topbar"><div className="brand"><Layers2 /><span>pocketwork<span className="brand-period">.</span></span></div><span className="workspace-label">PERSONAL APP WORKBENCH</span><div className="topbar-actions">{cloud_available && (account
+				? <span className="account-chip"><span className="account-email">{account.email ?? "Signed in"}</span><Button variant="quiet" onClick={on_sign_out}><LogOut />Sign out</Button></span>
+				: <Button variant="primary" onClick={on_sign_in}><LogIn />Sign in with Google</Button>)}<Button onClick={() => file_input.current?.click()}><Upload />Add from file</Button></div>
 			<input ref={file_input} className="file-input" type="file" accept=".json,application/json" aria-label="Import routine file" onChange={(event) => { void import_file(event.target.files?.[0]); }} />
 		</header>
-		<div className="projectbar home-intro"><div><h1>My routines</h1><p className="supporting">Small iPhone routines that hold you to what you decided. Start from one that works, then make it yours.</p></div><span className={`save-status ${storage_blocked ? "has-error" : ""}`}><span />{storage_blocked ? "Saved routines need attention" : `${tools.length} saved on this browser`}</span></div>
+		<div className="projectbar home-intro"><div><h1>My routines</h1><p className="supporting">{account ? "Everything here is on your account, so it shows up on your iPhone too." : cloud_available ? "Sign in and your routines follow you to your iPhone. Until then they live on this browser." : "Small iPhone routines that hold you to what you decided. Start from one that works, then make it yours."}</p></div><span className={`save-status ${storage_blocked || sync === "error" ? "has-error" : ""}`}>{sync === "syncing" ? <RefreshCw className="is-spinning" /> : sync === "error" ? <CloudOff /> : <span />}{saved_where}</span></div>
 		{error && <div className="alert-banner" role="alert"><Info /><span>{error}</span>{storage_blocked && <Button onClick={on_replace_unreadable}>Replace unreadable data</Button>}<Button variant="quiet" aria-label="Dismiss error" onClick={on_dismiss_error}><X /></Button></div>}
 		{notice && <div className="notice-banner" role="status"><Check />{notice}<Button variant="quiet" aria-label="Dismiss message" onClick={on_dismiss_notice}><X /></Button></div>}
 		<main className="home-main">

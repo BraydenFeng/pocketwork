@@ -7,7 +7,8 @@ export const LIBRARY_KEY = "pocketwork.library.v1";
 export const MAX_TOOLS = 50;
 
 const entry_schema = z.object({ document: document_schema, updated_at: z.string().datetime() }).strict();
-export const library_schema = z.object({ schema_version: z.literal(1), tools: z.array(entry_schema).max(MAX_TOOLS) }).strict().superRefine((library, context) => {
+// `removed` remembers deletions (id → when) so a routine deleted on one device does not come back from another.
+export const library_schema = z.object({ schema_version: z.literal(1), tools: z.array(entry_schema).max(MAX_TOOLS), removed: z.record(z.string(), z.string().datetime()).optional() }).strict().superRefine((library, context) => {
 	const ids = new Set<string>();
 	for (const entry of library.tools) {
 		if (ids.has(entry.document.id)) { context.addIssue({ code: "custom", message: "Every routine needs a unique ID." }); }
@@ -54,8 +55,8 @@ export function upsert_tool(library: Library, document: AppDocument, now: number
 	return { ...library, tools: exists ? library.tools.map((item) => item.document.id === document.id ? entry : item) : [...library.tools, entry] };
 }
 
-export function delete_tool(library: Library, id: string): Library {
-	return { ...library, tools: library.tools.filter((entry) => entry.document.id !== id) };
+export function delete_tool(library: Library, id: string, now: number): Library {
+	return { ...library, tools: library.tools.filter((entry) => entry.document.id !== id), removed: { ...library.removed, [id]: timestamp(now) } };
 }
 
 export function duplicate_tool(library: Library, id: string, now: number): { library: Library; document: AppDocument } {
