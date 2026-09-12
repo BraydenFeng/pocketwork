@@ -40,8 +40,10 @@ final class SessionController: ObservableObject {
 
 	func is_running(_ document: AppDocument) -> Bool { session?.document_id == document.id }
 
+	// Read during view rendering, so it must never publish state; a missing App Group is logged and shows as zero selected.
 	func selection(for document: AppDocument) -> FamilyActivitySelection {
-		do { return try SharedStore().selection(for: document.id) } catch { report(error); return FamilyActivitySelection() }
+		do { return try SharedStore().selection(for: document.id) }
+		catch { logger.warning("App selection unavailable: \(error.localizedDescription, privacy: .public)"); return FamilyActivitySelection() }
 	}
 
 	func selected_count(for document: AppDocument) -> Int {

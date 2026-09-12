@@ -11,9 +11,10 @@ struct ToolView: View {
 	@State private var showing_editor = false
 	@State private var showing_picker = false
 	@State private var draft_selection = FamilyActivitySelection()
-	private let clock = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 	// UI tests freeze the clock; a view that redraws every second never lets XCUITest see the app as idle.
-	private let frozen = CommandLine.arguments.contains("--ui-testing")
+	private static let frozen = CommandLine.arguments.contains("--ui-testing")
+	private let frozen = ToolView.frozen
+	private let clock = Timer.publish(every: ToolView.frozen ? 3600 : 1, on: .main, in: .common).autoconnect()
 
 	var body: some View {
 		Group {
