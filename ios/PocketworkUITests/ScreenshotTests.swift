@@ -12,7 +12,7 @@ final class ScreenshotTests: XCTestCase {
 			try FileManager.default.createDirectory(at: output!, withIntermediateDirectories: true)
 		}
 		app = XCUIApplication()
-		app.launchArguments = ["--reset-library"]
+		app.launchArguments = ["--reset-library", "--ui-testing"]
 		app.launch()
 	}
 

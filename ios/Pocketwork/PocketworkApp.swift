@@ -11,6 +11,7 @@ struct PocketworkApp: App {
 			UserDefaults.standard.removeObject(forKey: LibraryController.library_key)
 			UserDefaults.standard.removeObject(forKey: LibraryController.legacy_key)
 		}
+		if CommandLine.arguments.contains("--ui-testing") { UIView.setAnimationsEnabled(false) }
 	}
 
 	var body: some Scene {

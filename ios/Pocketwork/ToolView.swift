@@ -12,6 +12,8 @@ struct ToolView: View {
 	@State private var showing_picker = false
 	@State private var draft_selection = FamilyActivitySelection()
 	private let clock = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+	// UI tests freeze the clock; a view that redraws every second never lets XCUITest see the app as idle.
+	private let frozen = CommandLine.arguments.contains("--ui-testing")
 
 	var body: some View {
 		Group {
@@ -51,7 +53,7 @@ struct ToolView: View {
 		}
 		.tint(.primary)
 		.onReceive(clock) { _ in
-			if let session = sessions.session, session.has_ended(at: .now) { sessions.refresh() }
+			if !frozen, let session = sessions.session, session.has_ended(at: .now) { sessions.refresh() }
 		}
 		.onChange(of: scene_phase) { _, phase in if phase == .active { sessions.refresh() } }
 		.alert("Couldn’t complete that action", isPresented: Binding(get: { sessions.error_message != nil }, set: { if !$0 { sessions.error_message = nil } })) {
@@ -71,7 +73,7 @@ struct ToolView: View {
 			let other_running = sessions.session != nil && !running
 			VStack(alignment: .leading, spacing: 12) {
 				Text(block.title).font(.headline)
-				TimelineView(.periodic(from: .now, by: 1)) { timeline in
+				TimelineView(.periodic(from: .now, by: frozen ? 3600 : 1)) { timeline in
 					let seconds = running ? (sessions.session?.remaining(at: timeline.date) ?? 0) : (block.minutes ?? 25) * 60
 					Text(String(format: "%02d:%02d", seconds / 60, seconds % 60)).font(.system(size: 56, weight: .medium, design: .rounded)).monospacedDigit()
 				}
