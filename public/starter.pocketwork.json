@@ -1,0 +1,17 @@
+{
+	"schema_version": 1,
+	"id": "my-focus-space",
+	"name": "My focus space",
+	"description": "A quieter place to get things done.",
+	"blocks": [
+		{ "id": "welcome", "type": "heading", "title": "A little less noise.", "subtitle": "A little more room for your next good idea." },
+		{ "id": "focus", "type": "timer", "title": "Make some headway", "minutes": 25 },
+		{ "id": "tasks", "type": "checklist", "title": "What matters today", "items": [
+			{ "id": "task-one", "text": "Choose one thing to work on" },
+			{ "id": "task-two", "text": "Give it my full attention" },
+			{ "id": "task-three", "text": "Leave a note for next time" }
+		] },
+		{ "id": "shield", "type": "screen_time", "title": "Leave distractions outside" }
+	],
+	"rules": { "block_during_focus": true, "notify_on_complete": true }
+}

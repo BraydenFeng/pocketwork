@@ -1,0 +1,135 @@
+import SwiftUI
+
+// On-phone editing of a tool. Works on a draft; nothing is saved until Save passes the same validation as the web editor.
+struct EditorView: View {
+	@EnvironmentObject private var library: LibraryController
+	@Environment(\.dismiss) private var dismiss
+	@State private var draft: AppDocument
+	@State private var validation_message: String?
+
+	init(document: AppDocument) { _draft = State(initialValue: document) }
+
+	struct KindOption: Identifiable { let kind: BlockKind; let label: String; let icon: String; var id: BlockKind { kind } }
+	private static let kinds: [KindOption] = [
+		KindOption(kind: .heading, label: "Heading", icon: "textformat"), KindOption(kind: .timer, label: "Focus timer", icon: "timer"), KindOption(kind: .checklist, label: "Checklist", icon: "checklist"),
+		KindOption(kind: .counter, label: "Counter", icon: "number"), KindOption(kind: .note, label: "Note", icon: "note.text"), KindOption(kind: .screen_time, label: "Screen Time", icon: "shield.lefthalf.filled"),
+	]
+
+	var body: some View {
+		NavigationStack {
+			Form {
+				Section("Name") {
+					TextField("Tool name", text: $draft.name)
+					TextField("What it's for", text: $draft.description, axis: .vertical)
+				}
+				Section {
+					ForEach($draft.blocks) { $block in
+						NavigationLink { BlockEditorView(block: $block) } label: {
+							Label {
+								VStack(alignment: .leading) {
+									Text(block.title)
+									Text(Self.label(for: block.type)).font(.caption).foregroundStyle(.secondary)
+								}
+							} icon: { Image(systemName: Self.icon(for: block.type)) }
+						}
+					}
+					.onDelete { offsets in
+						for index in offsets.sorted(by: >) where draft.blocks.count > 1 { draft = draft.removing_block(draft.blocks[index].id) }
+					}
+					.onMove { offsets, destination in draft.blocks.move(fromOffsets: offsets, toOffset: destination) }
+					Menu {
+						ForEach(Self.kinds) { option in
+							Button(option.label, systemImage: option.icon) { draft.blocks.append(BlockDocument.make(option.kind)) }.disabled(!draft.can_add(option.kind))
+						}
+					} label: { Label("Add block", systemImage: "plus") }
+				} header: { Text("On your screen · \(draft.blocks.count)/20") } footer: {
+					Text("Swipe to remove a block. Drag to reorder. One timer and one Screen Time block per tool.")
+				}
+				Section {
+					Toggle(isOn: $draft.rules.block_during_focus) {
+						Text("Block during focus")
+						Text(draft.has_timer && draft.has_screen_time ? "Uses your timer and Screen Time block" : "Add both a timer and a Screen Time block first")
+					}.disabled(!(draft.has_timer && draft.has_screen_time))
+					Toggle(isOn: $draft.rules.notify_on_complete) {
+						Text("Notify on completion")
+						Text(draft.has_timer ? "A notification when the timer finishes" : "Add a timer first")
+					}.disabled(!draft.has_timer)
+				} header: { Text("What happens when you focus") }
+			}
+			.navigationTitle("Edit tool")
+			.navigationBarTitleDisplayMode(.inline)
+			.toolbar {
+				ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+				ToolbarItem(placement: .primaryAction) { EditButton() }
+				ToolbarItem(placement: .confirmationAction) { Button("Save") { save() } }
+			}
+			.alert("Not quite ready to save", isPresented: Binding(get: { validation_message != nil }, set: { if !$0 { validation_message = nil } })) {
+				Button("OK") { validation_message = nil }
+			} message: { Text(validation_message ?? "") }
+		}
+	}
+
+	private func save() {
+		var cleaned = draft
+		cleaned.name = cleaned.name.trimmingCharacters(in: .whitespacesAndNewlines)
+		cleaned.rules.block_during_focus = cleaned.rules.block_during_focus && cleaned.has_timer && cleaned.has_screen_time
+		cleaned.rules.notify_on_complete = cleaned.rules.notify_on_complete && cleaned.has_timer
+		do { try cleaned.validate() } catch { validation_message = error.localizedDescription; return }
+		if library.save(cleaned) { dismiss() }
+	}
+
+	static func label(for kind: BlockKind) -> String { kinds.first(where: { $0.kind == kind })?.label ?? kind.rawValue }
+	static func icon(for kind: BlockKind) -> String { kinds.first(where: { $0.kind == kind })?.icon ?? "square" }
+}
+
+struct BlockEditorView: View {
+	@Binding var block: BlockDocument
+	private static let minute_options = [15, 20, 25, 30, 45, 60, 90, 120]
+
+	var body: some View {
+		Form {
+			Section("Title") { TextField("Title", text: $block.title) }
+			switch block.type {
+			case .heading:
+				Section("Supporting text") {
+					TextField("A line under the title", text: Binding(get: { block.subtitle ?? "" }, set: { block.subtitle = $0 }), axis: .vertical)
+				}
+			case .timer:
+				Section {
+					Picker("Session length", selection: Binding(get: { block.minutes ?? 25 }, set: { block.minutes = $0 })) {
+						ForEach(Array(Set(Self.minute_options + [block.minutes ?? 25])).sorted(), id: \.self) { minutes in Text("\(minutes) minutes").tag(minutes) }
+					}
+				} footer: { Text("15 to 120 minutes. Screen Time needs at least 15.") }
+			case .checklist:
+				Section {
+					ForEach(Binding(get: { block.items ?? [] }, set: { block.items = $0 })) { $item in
+						TextField("Task", text: $item.text)
+					}
+					.onDelete { offsets in
+						var items = block.items ?? []
+						guard items.count > 1 else { return }
+						items.remove(atOffsets: offsets)
+						block.items = items
+					}
+					Button("Add task", systemImage: "plus") { block.items = (block.items ?? []) + [TaskDocument(id: UUID().uuidString, text: "Another small step")] }
+						.disabled((block.items ?? []).count >= 20)
+				} header: { Text("Tasks · \((block.items ?? []).count)/20") } footer: { Text("Swipe a task to remove it.") }
+			case .counter:
+				Section("Target") {
+					Stepper("\(block.target ?? 1)", value: Binding(get: { block.target ?? 1 }, set: { block.target = $0 }), in: 1...1000)
+				}
+			case .note:
+				Section("Your note") {
+					TextField("Something worth reading", text: Binding(get: { block.text ?? "" }, set: { block.text = $0 }), axis: .vertical)
+				}
+			case .screen_time:
+				Section {
+					Label("Your selection stays on your phone.", systemImage: "lock.shield")
+					Text("Choose the apps to block from the tool screen, using Apple's private picker. They are released when the session ends or you stop it.").font(.subheadline).foregroundStyle(.secondary)
+				}
+			}
+		}
+		.navigationTitle(EditorView.label(for: block.type))
+		.navigationBarTitleDisplayMode(.inline)
+	}
+}

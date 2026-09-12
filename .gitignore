@@ -1,0 +1,17 @@
+node_modules/
+.next/
+out/
+coverage/
+test-results/
+*.tsbuildinfo
+.env*
+!.env.example
+.DS_Store
+ios/*.xcodeproj/
+ios/build/
+ios/.build/
+ios/*.xcworkspace/
+ios/Config.local.xcconfig
+.runtime/
+.claude/
+ios/xcodebuild.log

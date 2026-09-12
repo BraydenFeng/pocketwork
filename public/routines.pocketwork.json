@@ -1,0 +1,241 @@
+{
+  "schema_version": 1,
+  "routines": [
+    {
+      "template_id": "deep-work",
+      "tagline": "90 minutes, apps locked, one task in front of you.",
+      "document": {
+        "schema_version": 1,
+        "id": "deep-work",
+        "name": "Deep work",
+        "description": "One long block of real work.",
+        "blocks": [
+          {
+            "id": "heading",
+            "type": "heading",
+            "title": "One thing, done well.",
+            "subtitle": "Everything else can wait ninety minutes."
+          },
+          {
+            "id": "timer",
+            "type": "timer",
+            "title": "Deep work",
+            "minutes": 90
+          },
+          {
+            "id": "tasks",
+            "type": "checklist",
+            "title": "Before you start",
+            "items": [
+              {
+                "id": "task-pick",
+                "text": "Pick the one task that matters"
+              },
+              {
+                "id": "task-close",
+                "text": "Close every other tab"
+              },
+              {
+                "id": "task-phone",
+                "text": "Put the phone face down"
+              }
+            ]
+          },
+          {
+            "id": "shield",
+            "type": "screen_time",
+            "title": "Distractions stay out"
+          }
+        ],
+        "rules": {
+          "block_during_focus": true,
+          "notify_on_complete": true
+        }
+      }
+    },
+    {
+      "template_id": "study-sprint",
+      "tagline": "45-minute sprints, count them up, phone stays quiet.",
+      "document": {
+        "schema_version": 1,
+        "id": "study-sprint",
+        "name": "Study sprints",
+        "description": "Short, repeatable rounds of focused study.",
+        "blocks": [
+          {
+            "id": "heading",
+            "type": "heading",
+            "title": "Sprint, rest, repeat.",
+            "subtitle": "Four rounds is a solid session."
+          },
+          {
+            "id": "timer",
+            "type": "timer",
+            "title": "Study sprint",
+            "minutes": 45
+          },
+          {
+            "id": "counter",
+            "type": "counter",
+            "title": "Sprints finished",
+            "target": 4
+          },
+          {
+            "id": "shield",
+            "type": "screen_time",
+            "title": "Nothing but the books"
+          }
+        ],
+        "rules": {
+          "block_during_focus": true,
+          "notify_on_complete": true
+        }
+      }
+    },
+    {
+      "template_id": "bedtime",
+      "tagline": "An hour of wind-down with the scrolling apps locked.",
+      "document": {
+        "schema_version": 1,
+        "id": "bedtime",
+        "name": "Phone-free bedtime",
+        "description": "Wind down without the feed.",
+        "blocks": [
+          {
+            "id": "heading",
+            "type": "heading",
+            "title": "The day is done.",
+            "subtitle": "Nothing on your phone needs you until morning."
+          },
+          {
+            "id": "timer",
+            "type": "timer",
+            "title": "Wind down",
+            "minutes": 60
+          },
+          {
+            "id": "tasks",
+            "type": "checklist",
+            "title": "Before bed",
+            "items": [
+              {
+                "id": "task-charge",
+                "text": "Phone on the charger, out of reach"
+              },
+              {
+                "id": "task-tomorrow",
+                "text": "Write tomorrow's first task"
+              }
+            ]
+          },
+          {
+            "id": "shield",
+            "type": "screen_time",
+            "title": "Feeds off for the night"
+          }
+        ],
+        "rules": {
+          "block_during_focus": true,
+          "notify_on_complete": false
+        }
+      }
+    },
+    {
+      "template_id": "morning",
+      "tagline": "A short checklist and 25 quiet minutes before the phone opens.",
+      "document": {
+        "schema_version": 1,
+        "id": "morning",
+        "name": "Morning start",
+        "description": "Start the day on your terms, not the feed's.",
+        "blocks": [
+          {
+            "id": "heading",
+            "type": "heading",
+            "title": "Yours first.",
+            "subtitle": "The phone can have you after this."
+          },
+          {
+            "id": "tasks",
+            "type": "checklist",
+            "title": "First things",
+            "items": [
+              {
+                "id": "task-water",
+                "text": "Drink a glass of water"
+              },
+              {
+                "id": "task-move",
+                "text": "Move for five minutes"
+              },
+              {
+                "id": "task-plan",
+                "text": "Decide today's one thing"
+              }
+            ]
+          },
+          {
+            "id": "timer",
+            "type": "timer",
+            "title": "Quiet start",
+            "minutes": 25
+          },
+          {
+            "id": "shield",
+            "type": "screen_time",
+            "title": "Feeds wait until you're done"
+          }
+        ],
+        "rules": {
+          "block_during_focus": true,
+          "notify_on_complete": true
+        }
+      }
+    },
+    {
+      "template_id": "reading",
+      "tagline": "30 minutes with a book and a page counter, apps locked.",
+      "document": {
+        "schema_version": 1,
+        "id": "reading",
+        "name": "Reading time",
+        "description": "Pages instead of posts.",
+        "blocks": [
+          {
+            "id": "heading",
+            "type": "heading",
+            "title": "Pages, not posts.",
+            "subtitle": "Half an hour is enough to get lost in it."
+          },
+          {
+            "id": "timer",
+            "type": "timer",
+            "title": "Reading",
+            "minutes": 30
+          },
+          {
+            "id": "counter",
+            "type": "counter",
+            "title": "Pages read",
+            "target": 20
+          },
+          {
+            "id": "note",
+            "type": "note",
+            "title": "Worth remembering",
+            "text": "Jot one line about what you read."
+          },
+          {
+            "id": "shield",
+            "type": "screen_time",
+            "title": "The feed can wait"
+          }
+        ],
+        "rules": {
+          "block_during_focus": true,
+          "notify_on_complete": true
+        }
+      }
+    }
+  ]
+}

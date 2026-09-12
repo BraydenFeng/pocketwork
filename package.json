@@ -1,0 +1,31 @@
+{
+	"name": "pocketwork",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "next dev --hostname 127.0.0.1 --port 3210",
+		"build": "npm run verify:ui && next build",
+		"start": "next start --hostname 127.0.0.1 --port 3210",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run",
+		"test:browser": "playwright test",
+		"verify:ui": "node tools/ui-lint.mjs \"app/**/*.{css,tsx}\" \"components/**/*.{css,tsx}\"",
+		"routines": "node tools/write-routines.mjs"
+	},
+	"dependencies": {
+		"lucide-react": "1.42.0",
+		"next": "16.3.4",
+		"react": "19.2.8",
+		"react-dom": "19.2.8",
+		"zod": "4.5.4"
+	},
+	"devDependencies": {
+		"@playwright/test": "1.63.0",
+		"@types/node": "26.5.0",
+		"@types/react": "19.2.18",
+		"@types/react-dom": "19.2.7",
+		"typescript": "7.0.2",
+		"vitest": "5.0.0"
+	}
+}
