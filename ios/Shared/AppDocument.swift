@@ -156,6 +156,7 @@ struct AppDocument: Codable, Equatable {
 				guard let text = block.text else { throw DocumentError.invalid("Missing note text.") }
 				try Self.validate_text(text, maximum: 1000)
 			case .screen_time: break
+			case .schedule: break // days and times are checked once, below, together with the rules that depend on them
 			}
 		}
 		guard blocks.filter({ $0.type == .timer }).count <= 1, blocks.filter({ $0.type == .screen_time }).count <= 1, blocks.filter({ $0.type == .schedule }).count <= 1 else {
