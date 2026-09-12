@@ -142,12 +142,15 @@ struct BlockEditorView: View {
 					HStack(spacing: 6) {
 						ForEach(ScheduleWindow.all_days, id: \.self) { day in
 							let chosen = (block.days ?? []).contains(day)
-							Button(ScheduleWindow.day_labels[day - 1]) {
+							Button {
 								var days = Set(block.days ?? [])
 								if chosen { if days.count > 1 { days.remove(day) } } else { days.insert(day) }
 								block.days = days.sorted()
+							} label: {
+								Text(String(ScheduleWindow.day_labels[day - 1].prefix(2))).font(.subheadline.weight(.medium)).lineLimit(1).frame(maxWidth: .infinity)
 							}
-							.buttonStyle(.bordered).tint(chosen ? Color.primary : Color.secondary).accessibilityAddTraits(chosen ? .isSelected : [])
+							.buttonStyle(.bordered).controlSize(.small).tint(chosen ? Color.primary : Color.secondary)
+							.accessibilityLabel(ScheduleWindow.day_labels[day - 1]).accessibilityAddTraits(chosen ? .isSelected : [])
 						}
 					}
 					HStack {
