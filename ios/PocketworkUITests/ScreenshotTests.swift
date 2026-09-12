@@ -43,11 +43,12 @@ final class ScreenshotTests: XCTestCase {
 		try snap("06-tool-bedtime")
 	}
 
-	// SwiftUI exposes list rows and toolbar items as different element types, so match on identifier alone.
+	// SwiftUI exposes list rows and toolbar items as different element types; a typed query per kind stays fast.
 	private func element(_ identifier: String) -> XCUIElement {
-		let match = app.descendants(matching: .any).matching(identifier: identifier).firstMatch
-		XCTAssertTrue(match.waitForExistence(timeout: 10), "Missing \(identifier)")
-		return match
+		let candidates = [app.buttons[identifier], app.cells[identifier], app.otherElements[identifier], app.staticTexts[identifier]]
+		for candidate in candidates where candidate.waitForExistence(timeout: 5) { return candidate }
+		XCTFail("Missing \(identifier)")
+		return candidates[0]
 	}
 
 	private func snap(_ name: String) throws {
