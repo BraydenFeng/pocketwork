@@ -26,7 +26,7 @@ struct ToolView: View {
 				.navigationTitle(document.name)
 				.navigationBarTitleDisplayMode(.inline)
 				.toolbar {
-					ToolbarItem(placement: .topBarTrailing) { Button("Edit") { showing_editor = true }.disabled(sessions.is_running(document)) }
+					ToolbarItem(placement: .topBarTrailing) { Button("Edit") { showing_editor = true }.disabled(sessions.is_running(document)).accessibilityIdentifier("tool.edit") }
 					ToolbarItem(placement: .topBarTrailing) {
 						Menu {
 							Button("Reset checklist and counters", systemImage: "arrow.counterclockwise") { sessions.reset_progress(for: document) }

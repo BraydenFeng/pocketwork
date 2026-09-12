@@ -26,6 +26,7 @@ struct HomeView: View {
 					}
 					ForEach(library.sorted_tools) { entry in
 						NavigationLink(value: entry.document.id) { tool_row(entry) }
+							.accessibilityIdentifier("tool.\(entry.document.id)")
 							.swipeActions(edge: .trailing) {
 								Button(role: .destructive) { pending_delete = entry } label: { Label("Delete", systemImage: "trash") }
 								Button { duplicate(entry.document.id) } label: { Label("Duplicate", systemImage: "doc.on.doc") }.tint(.secondary)
@@ -41,6 +42,7 @@ struct HomeView: View {
 				Section {
 					ForEach(library.routines) { routine in
 						Button { if let document = library.create(from: routine) { path = [document.id] } } label: { routine_row(routine) }
+							.accessibilityIdentifier("routine.\(routine.template_id)")
 					}
 					Button { if let document = library.create_blank() { path = [document.id] } } label: {
 						VStack(alignment: .leading, spacing: 4) {

@@ -48,7 +48,7 @@ targets:
       - target: FocusMonitor
         embed: true
     scheme:
-      testTargets: [PocketworkTests]
+      testTargets: [PocketworkTests, PocketworkUITests]
   FocusMonitor:
     type: app-extension
     platform: iOS
@@ -80,5 +80,15 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: true
+    dependencies:
+      - target: Pocketwork
+  PocketworkUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [PocketworkUITests]
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        TEST_TARGET_NAME: Pocketwork
     dependencies:
       - target: Pocketwork

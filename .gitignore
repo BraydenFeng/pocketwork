@@ -15,3 +15,4 @@ ios/Config.local.xcconfig
 .runtime/
 .claude/
 ios/xcodebuild.log
+ios/screenshots/

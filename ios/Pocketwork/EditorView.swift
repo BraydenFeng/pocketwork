@@ -32,6 +32,7 @@ struct EditorView: View {
 								}
 							} icon: { Image(systemName: Self.icon(for: block.type)) }
 						}
+						.accessibilityIdentifier("block.\(block.type.rawValue)")
 					}
 					.onDelete { offsets in
 						for index in offsets.sorted(by: >) where draft.blocks.count > 1 { draft = draft.removing_block(draft.blocks[index].id) }
