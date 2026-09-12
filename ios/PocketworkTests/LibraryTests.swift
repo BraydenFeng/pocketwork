@@ -98,7 +98,7 @@ final class LibraryTests: XCTestCase {
 		XCTAssertEqual(ToolCopy.summary(try starter()), "25 min session · blocks apps · 3 tasks")
 		XCTAssertEqual(ToolCopy.summary(AppDocument.blank()), "1 block")
 		let bedtime = try XCTUnwrap(RoutineCatalog.bundled().routines.first(where: { $0.template_id == "bedtime" })).document
-		XCTAssertEqual(ToolCopy.summary(bedtime), "Every day · 10 PM to 7 AM · blocks apps · 2 tasks")
+		XCTAssertEqual(ToolCopy.summary(bedtime), "Every day · 10 PM to 7 AM · blocks Social · 2 tasks")
 		let entry = LibraryEntry(document: try starter(), updated_at: ToolLibrary.iso_formatter.string(from: now.addingTimeInterval(-300)))
 		XCTAssertEqual(ToolCopy.edited(entry, now: now), "Edited 5 min ago")
 		XCTAssertEqual(ToolCopy.edited(entry, now: now.addingTimeInterval(86_400)), "Edited yesterday")
@@ -128,5 +128,59 @@ final class LibraryTests: XCTestCase {
 		controller.replace_unreadable()
 		XCTAssertNotNil(controller.create_blank())
 		XCTAssertEqual(LibraryController(defaults: defaults).sorted_tools.count, 1)
+	}
+
+	func test_groups_are_named_once_and_followed_by_every_routine() throws {
+		var library = try ToolLibrary.empty.adding_group(" Social ")
+		XCTAssertEqual(library.groups?.map(\.name), ["Social"])
+		XCTAssertThrowsError(try library.adding_group("social"))
+		var routine = try starter()
+		routine.blocks = routine.blocks.map { block in
+			guard block.type == .screen_time else { return block }
+			var copy = block; copy.mode = .block; copy.groups = ["Social"]; return copy
+		}
+		library = try library.upserting(routine, now: now)
+		XCTAssertEqual(ToolCopy.summary(routine), "25 min session · blocks Social · 3 tasks")
+		let id = try XCTUnwrap(library.groups?.first?.id)
+		library = try library.renaming_group(id, to: "Feeds", now: now.addingTimeInterval(1))
+		XCTAssertEqual(library.tools[0].document.shield?.group_names, ["Feeds"])
+		XCTAssertThrowsError(try library.removing_group(id))
+		let unused = try ToolLibrary.empty.adding_group("Unused")
+		XCTAssertNil(try unused.removing_group(try XCTUnwrap(unused.groups?.first?.id)).groups)
+	}
+
+	func test_routines_create_the_groups_they_mention() throws {
+		var routine = try starter()
+		routine.blocks = routine.blocks.map { block in
+			guard block.type == .screen_time else { return block }
+			var copy = block; copy.mode = .allow_only; copy.groups = ["Work", "Study"]; return copy
+		}
+		let library = try ToolLibrary.empty.upserting(routine, now: now)
+		XCTAssertEqual(library.groups?.map(\.name), ["Work", "Study"])
+		XCTAssertEqual(library.group(named: "work")?.name, "Work")
+		XCTAssertEqual(routine.shield?.shield_description, "Only Work, Study")
+	}
+
+	func test_validates_the_three_functions() throws {
+		func shield(_ change: (inout BlockDocument) -> Void) throws -> AppDocument {
+			var document = try starter()
+			document.blocks = document.blocks.map { block in guard block.type == .screen_time else { return block }; var copy = block; change(&copy); return copy }
+			return document
+		}
+		XCTAssertThrowsError(try shield { $0.mode = .allow_only }.validate())
+		XCTAssertThrowsError(try shield { $0.mode = .limit; $0.groups = ["Social"] }.validate())
+		XCTAssertNoThrow(try shield { $0.mode = .limit; $0.groups = ["Social"]; $0.limit_minutes = 30 }.validate())
+		XCTAssertThrowsError(try shield { $0.mode = .block; $0.groups = ["Social"]; $0.limit_minutes = 30 }.validate())
+		XCTAssertThrowsError(try shield { $0.groups = ["Social", "social"] }.validate())
+		XCTAssertNoThrow(try shield { _ in }.validate())
+		let limited = try shield { $0.mode = .limit; $0.groups = ["Social"]; $0.limit_minutes = 30 }
+		XCTAssertEqual(limited.shield?.shield_description, "Social · 30 min limit")
+		XCTAssertEqual(try AppDocument.decode(JSONEncoder().encode(limited)), limited)
+	}
+
+	func test_tombstones_are_written_on_delete() throws {
+		let library = try ToolLibrary.empty.upserting(try starter(), now: now).deleting("my-focus-space", now: now)
+		XCTAssertEqual(library.tools.count, 0)
+		XCTAssertEqual(library.removed?["my-focus-space"], ToolLibrary.iso_formatter.string(from: now))
 	}
 }

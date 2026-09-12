@@ -11,6 +11,7 @@ struct ToolView: View {
 	@State private var showing_editor = false
 	@State private var showing_picker = false
 	@State private var draft_selection = FamilyActivitySelection()
+	@State private var showing_groups = false
 	// UI tests freeze the clock; a view that redraws every second never lets XCUITest see the app as idle.
 	private static let frozen = CommandLine.arguments.contains("--ui-testing")
 	private let frozen = ToolView.frozen
@@ -38,6 +39,7 @@ struct ToolView: View {
 					}
 				}
 				.sheet(isPresented: $showing_editor) { EditorView(document: document) }
+				.navigationDestination(isPresented: $showing_groups) { GroupsView() }
 				.sheet(isPresented: $showing_picker) {
 					NavigationStack {
 						FamilyActivityPicker(selection: $draft_selection)
@@ -67,7 +69,7 @@ struct ToolView: View {
 	}
 
 	private func set_standing(_ document: AppDocument, _ enabled: Bool) {
-		if sessions.set_standing(document, enabled: enabled) { library.set_enabled(document.id, enabled) }
+		if sessions.set_standing(document, enabled: enabled, groups: library.groups) { library.set_enabled(document.id, enabled) }
 	}
 
 	@ViewBuilder private func block_view(_ block: BlockDocument, in document: AppDocument) -> some View {
@@ -103,7 +105,7 @@ struct ToolView: View {
 					Text(String(format: "%02d:%02d", seconds / 60, seconds % 60)).font(.system(size: 56, weight: .medium, design: .rounded)).monospacedDigit()
 				}
 				Button {
-					if running { sessions.stop() } else { Task { await sessions.start(document) } }
+					if running { sessions.stop() } else { Task { await sessions.start(document, groups: library.groups) } }
 				} label: {
 					Label(sessions.is_busy ? "Preparing…" : running ? "End session" : "Start focusing", systemImage: running ? "stop.fill" : "play.fill").frame(maxWidth: .infinity).padding(.vertical, 8)
 				}
@@ -128,13 +130,29 @@ struct ToolView: View {
 			}
 		case .screen_time:
 			let running = sessions.is_running(document)
+			let standing_active = document.enabled == true && document.schedule.map { ScheduleWindow.status($0, at: .now).active } == true
+			let active = (running && sessions.session?.blocks_apps == true) || standing_active
 			VStack(alignment: .leading, spacing: 12) {
 				Label(block.title, systemImage: "shield.lefthalf.filled").font(.headline)
-				let standing_active = document.enabled == true && document.schedule.map { ScheduleWindow.status($0, at: .now).active } == true
-				Text((running && sessions.session?.blocks_apps == true) || standing_active ? "Focus restrictions are active." : "\(sessions.selected_count(for: document)) apps, categories, or websites selected for this routine.").font(.subheadline).foregroundStyle(.secondary)
-				Button("Choose apps privately") {
-					Task { if await sessions.authorize_screen_time() { draft_selection = sessions.selection(for: document); showing_picker = true } }
-				}.buttonStyle(.bordered).disabled(running || sessions.is_busy || document.enabled == true)
+				Text(block.shield_description).font(.subheadline.weight(.medium))
+				if block.group_names.isEmpty {
+					Text(active ? "Focus restrictions are active." : "\(sessions.selected_count(for: document)) apps, categories, or websites selected for this routine.").font(.subheadline).foregroundStyle(.secondary)
+					Button("Choose apps privately") {
+						Task { if await sessions.authorize_screen_time() { draft_selection = sessions.selection(for: document); showing_picker = true } }
+					}.buttonStyle(.bordered).disabled(running || sessions.is_busy || document.enabled == true)
+				} else {
+					ForEach(block.group_names, id: \.self) { name in
+						let group = library.groups.first { $0.name.lowercased() == name.lowercased() }
+						let count = group.map { sessions.group_count($0) } ?? 0
+						HStack {
+							Text(name)
+							Spacer()
+							Text(group == nil ? "not created yet" : count == 0 ? "no apps yet" : "\(count) selected").font(.subheadline).foregroundStyle(group == nil || count == 0 ? .orange : .secondary)
+						}
+					}
+					Text(active ? "Focus restrictions are active." : block.shield_mode == .limit ? "Locks after \(block.limit_minutes ?? 0) minutes of use inside this routine." : block.shield_mode == .allow_only ? "Everything except these groups is locked while this runs." : "These groups are locked while this runs.").font(.caption).foregroundStyle(.secondary)
+					Button("Set up app groups", systemImage: "square.grid.2x2") { showing_groups = true }.buttonStyle(.bordered).accessibilityIdentifier("tool.groups")
+				}
 			}
 		case .counter:
 			let value = sessions.count(block, in: document)

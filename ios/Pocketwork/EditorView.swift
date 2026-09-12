@@ -26,7 +26,7 @@ struct EditorView: View {
 				}
 				Section {
 					ForEach($draft.blocks) { $block in
-						NavigationLink { BlockEditorView(block: $block) } label: {
+						NavigationLink { BlockEditorView(block: $block, groups: library.groups) } label: {
 							Label {
 								VStack(alignment: .leading) {
 									Text(block.title)
@@ -99,7 +99,10 @@ struct EditorView: View {
 
 struct BlockEditorView: View {
 	@Binding var block: BlockDocument
+	var groups: [AppGroup] = []
+	@State private var new_group = ""
 	private static let minute_options = [15, 20, 25, 30, 45, 60, 90, 120]
+	private static let limit_options = [15, 30, 45, 60, 90, 120, 180]
 
 	var body: some View {
 		Form {
@@ -165,13 +168,50 @@ struct BlockEditorView: View {
 				} footer: { Text("An end time earlier than the start runs past midnight. Windows need at least 15 minutes.") }
 			case .screen_time:
 				Section {
-					Label("Your selection stays on your phone.", systemImage: "lock.shield")
-					Text("Choose the apps to block from the tool screen, using Apple's private picker. They are released when the session ends or you stop it.").font(.subheadline).foregroundStyle(.secondary)
+					Picker("What happens", selection: Binding(get: { block.shield_mode }, set: { mode in
+						block.mode = mode
+						block.limit_minutes = mode == .limit ? (block.limit_minutes ?? 30) : nil
+					})) {
+						Text("Block").tag(ShieldMode.block)
+						Text("Only these").tag(ShieldMode.allow_only)
+						Text("Limit").tag(ShieldMode.limit)
+					}.pickerStyle(.segmented)
+					if block.shield_mode == .limit {
+						Picker("Minutes before it locks", selection: Binding(get: { block.limit_minutes ?? 30 }, set: { block.limit_minutes = $0 })) {
+							ForEach(Array(Set(Self.limit_options + [block.limit_minutes ?? 30])).sorted(), id: \.self) { minutes in Text("\(minutes) minutes").tag(minutes) }
+						}
+					}
+				} footer: {
+					Text(block.shield_mode == .block ? "The groups below are locked while the routine runs." : block.shield_mode == .allow_only ? "Everything except the groups below is locked while the routine runs." : "The groups below lock once they have been used this long inside the routine.")
+				}
+				Section {
+					let names = Array(Set(groups.map(\.name) + block.group_names)).sorted { $0.lowercased() < $1.lowercased() }
+					if names.isEmpty { Text("No groups yet. Name one below; you choose its apps under App groups.").foregroundStyle(.secondary) }
+					ForEach(names, id: \.self) { name in
+						Toggle(name, isOn: Binding(get: { block.group_names.contains { $0.lowercased() == name.lowercased() } }, set: { on in
+							var current = block.group_names.filter { $0.lowercased() != name.lowercased() }
+							if on { current.append(name) }
+							block.groups = current.isEmpty ? nil : current
+						}))
+					}
+					HStack {
+						TextField("New group, e.g. Social", text: $new_group).onSubmit(add_group)
+						Button("Add") { add_group() }.disabled(new_group.trimmingCharacters(in: .whitespaces).isEmpty)
+					}
+				} header: { Text("App groups") } footer: {
+					Text(block.group_names.isEmpty ? "With no groups, this routine asks you to choose its apps on the routine screen." : "\(block.shield_description). The apps in each group are chosen under App groups and stay on this iPhone.")
 				}
 			}
 		}
 		.navigationTitle(EditorView.label(for: block.type))
 		.navigationBarTitleDisplayMode(.inline)
+	}
+
+	private func add_group() {
+		let name = new_group.trimmingCharacters(in: .whitespaces)
+		guard !name.isEmpty, name.utf16.count <= 40, !block.group_names.contains(where: { $0.lowercased() == name.lowercased() }) else { new_group = ""; return }
+		block.groups = block.group_names + [name]
+		new_group = ""
 	}
 
 	// "HH:MM" in the document ↔ a Date on today's calendar for the picker.

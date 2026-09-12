@@ -32,7 +32,23 @@ final class LibraryController: ObservableObject {
 	}
 
 	var sorted_tools: [LibraryEntry] { library.sorted }
+	var groups: [AppGroup] { library.groups ?? [] }
 	func tool(_ id: String) -> AppDocument? { library.find(id) }
+
+	@discardableResult
+	func add_group(_ name: String) -> AppGroup? {
+		do { let next = try library.adding_group(name); try persist(next); return next.group(named: name) }
+		catch { report(error); return nil }
+	}
+
+	func rename_group(_ id: String, to name: String) {
+		do { try persist(library.renaming_group(id, to: name, now: .now)) } catch { report(error) }
+	}
+
+	@discardableResult
+	func remove_group(_ id: String) -> Bool {
+		do { try persist(library.removing_group(id)); return true } catch { report(error); return false }
+	}
 
 	func report(_ error: Error) {
 		logger.error("Library operation failed: \(error.localizedDescription, privacy: .public)")

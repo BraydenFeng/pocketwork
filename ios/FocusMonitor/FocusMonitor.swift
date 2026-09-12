@@ -15,8 +15,8 @@ final class FocusMonitor: DeviceActivityMonitor {
 			if session.has_ended(at: .now) {
 				ManagedSettingsStore(named: SharedStore.settings_name).clearAllSettings()
 				shared.clear_session()
-			} else if session.blocks_apps {
-				try shared.apply_selection(for: session.document_id)
+			} else if session.blocks_apps, try shared.plan(for: session.document_id)?.mode != .limit {
+				try shared.apply_plan(for: session.document_id, to: ManagedSettingsStore(named: SharedStore.settings_name))
 			}
 		} catch {
 			logger.error("Unable to start focus monitoring: \(error.localizedDescription, privacy: .public)")
@@ -39,15 +39,33 @@ final class FocusMonitor: DeviceActivityMonitor {
 	}
 
 	// A standing routine's window opened. Shield only if the person still has it switched on; otherwise fail safe and clear.
+	// A limit plan waits for the usage threshold instead of shielding at the start.
 	private func standing_window_opened(_ routine_id: String) {
 		let store = SharedStore.standing_store(routine_id)
 		do {
 			let shared = try SharedStore()
 			guard shared.standing_ids().contains(routine_id) else { store.clearAllSettings(); return }
-			try shared.apply_selection(for: routine_id, to: store)
+			if try shared.plan(for: routine_id)?.mode == .limit { store.clearAllSettings(); return }
+			try shared.apply_plan(for: routine_id, to: store)
 		} catch {
 			logger.error("Unable to apply a scheduled routine: \(error.localizedDescription, privacy: .public)")
 			store.clearAllSettings()
+		}
+	}
+
+	// A limited group used up its minutes inside the window: lock it for the rest of the window.
+	override func eventDidReachThreshold(_ event: DeviceActivityEvent.Name, activity: DeviceActivityName) {
+		super.eventDidReachThreshold(event, activity: activity)
+		do {
+			let shared = try SharedStore()
+			if let routine_id = SharedStore.standing_id(from: activity) {
+				guard shared.standing_ids().contains(routine_id) else { return }
+				try shared.apply_plan(for: routine_id, to: SharedStore.standing_store(routine_id))
+			} else if let session = try shared.session(), session.activity_name == activity.rawValue, !session.has_ended(at: .now) {
+				try shared.apply_plan(for: session.document_id, to: ManagedSettingsStore(named: SharedStore.settings_name))
+			}
+		} catch {
+			logger.error("Unable to apply a limit: \(error.localizedDescription, privacy: .public)")
 		}
 	}
 }

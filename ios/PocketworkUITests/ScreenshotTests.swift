@@ -47,6 +47,17 @@ final class ScreenshotTests: XCTestCase {
 		element("block.schedule").tap()
 		XCTAssertTrue(app.navigationBars["Schedule"].waitForExistence(timeout: 10))
 		try snap("07-block-editor-schedule")
+
+		app.navigationBars["Schedule"].buttons.firstMatch.tap()
+		element("block.screen_time").tap()
+		XCTAssertTrue(app.navigationBars["Screen Time"].waitForExistence(timeout: 10))
+		try snap("08-block-editor-screen-time")
+
+		app.navigationBars["Screen Time"].buttons.firstMatch.tap()
+		app.buttons["Cancel"].tap()
+		element("tool.groups").tap()
+		XCTAssertTrue(app.navigationBars["App groups"].waitForExistence(timeout: 10))
+		try snap("09-app-groups")
 	}
 
 	// SwiftUI exposes list rows and toolbar items as different element types; a typed query per kind stays fast.

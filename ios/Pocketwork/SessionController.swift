@@ -46,9 +46,41 @@ final class SessionController: ObservableObject {
 		catch { logger.warning("App selection unavailable: \(error.localizedDescription, privacy: .public)"); return FamilyActivitySelection() }
 	}
 
-	func selected_count(for document: AppDocument) -> Int {
-		let selection = selection(for: document)
-		return selection.applicationTokens.count + selection.categoryTokens.count + selection.webDomainTokens.count
+	func selected_count(for document: AppDocument) -> Int { SharedStore.count(selection(for: document)) }
+
+	func group_selection(_ group: AppGroup) -> FamilyActivitySelection {
+		do { return try SharedStore().group_selection(group.id) }
+		catch { logger.warning("Group selection unavailable: \(error.localizedDescription, privacy: .public)"); return FamilyActivitySelection() }
+	}
+
+	func group_count(_ group: AppGroup) -> Int { SharedStore.count(group_selection(group)) }
+
+	func save_group_selection(_ value: FamilyActivitySelection, for group: AppGroup) {
+		do { try SharedStore().save_group_selection(value, for: group.id); objectWillChange.send() } catch { report(error) }
+	}
+
+	func forget_group(_ group_id: String) {
+		do { try SharedStore().remove_group_selection(group_id) } catch { report(error) }
+	}
+
+	// Turns the routine's Screen Time block into a plan the monitor extension can act on without the library.
+	// Throws in plain words when a group is missing or has no apps yet, so the person knows what to fix.
+	func plan(for document: AppDocument, groups: [AppGroup]) throws -> SharedStore.ShieldPlan {
+		guard let shield = document.shield else { return SharedStore.ShieldPlan(mode: .block, group_ids: [], limit_minutes: nil) }
+		var ids: [String] = []
+		for name in shield.group_names {
+			guard let group = groups.first(where: { $0.name.lowercased() == name.lowercased() }) else { throw DocumentError.invalid("The app group \"\(name)\" does not exist yet. Create it under App groups.") }
+			guard group_count(group) > 0 else { throw DocumentError.invalid("Choose the apps for \"\(group.name)\" first (App groups).") }
+			ids.append(group.id)
+		}
+		if ids.isEmpty { guard selected_count(for: document) > 0 else { throw DocumentError.invalid("Choose at least one app, website, or category to block.") } }
+		return SharedStore.ShieldPlan(mode: shield.shield_mode, group_ids: ids, limit_minutes: shield.shield_mode == .limit ? shield.limit_minutes : nil)
+	}
+
+	private func limit_events(_ plan: SharedStore.ShieldPlan, document_id: String, shared: SharedStore) throws -> [DeviceActivityEvent.Name: DeviceActivityEvent] {
+		guard plan.mode == .limit, let minutes = plan.limit_minutes else { return [:] }
+		let selection = try shared.resolved_selection(for: document_id, plan: plan)
+		return [DeviceActivityEvent.Name("pocketwork.limit"): DeviceActivityEvent(applications: selection.applicationTokens, categories: selection.categoryTokens, webDomains: selection.webDomainTokens, threshold: DateComponents(minute: minutes))]
 	}
 
 	func authorize_screen_time() async -> Bool {
@@ -72,27 +104,29 @@ final class SessionController: ObservableObject {
 	}
 
 	// Standing routines: one repeating DeviceActivity per chosen weekday. iOS fires the monitor extension at each window edge.
-	func set_standing(_ document: AppDocument, enabled: Bool) -> Bool {
+	func set_standing(_ document: AppDocument, enabled: Bool, groups: [AppGroup]) -> Bool {
 		guard let schedule = document.schedule, let days = schedule.days, let start = schedule.start, let end = schedule.end,
 			let from = ScheduleWindow.minutes(start), let to = ScheduleWindow.minutes(end) else { return false }
 		guard !enabled else {
 			do {
 				let shared = try SharedStore()
 				guard AuthorizationCenter.shared.authorizationStatus == .approved else { throw DocumentError.invalid("Allow Screen Time access and choose apps before switching this routine on.") }
-				guard selected_count(for: document) > 0 else { throw DocumentError.invalid("Choose at least one app, website, or category for this routine first.") }
+				let shield_plan = try plan(for: document, groups: groups)
+				try shared.save_plan(shield_plan, for: document.id)
+				let events = try limit_events(shield_plan, document_id: document.id, shared: shared)
 				var scheduled: [DeviceActivityName] = []
 				do {
 					for day in days {
 						let end_day = to > from ? day : (day % 7) + 1
 						let window = DeviceActivitySchedule(intervalStart: DateComponents(hour: from / 60, minute: from % 60, weekday: day), intervalEnd: DateComponents(hour: to / 60, minute: to % 60, weekday: end_day), repeats: true)
 						let activity = SharedStore.standing_activity(document.id, weekday: day)
-						try center.startMonitoring(activity, during: window)
+						try center.startMonitoring(activity, during: window, events: events)
 						scheduled.append(activity)
 					}
 				} catch { center.stopMonitoring(scheduled); throw error }
 				shared.set_standing(document.id, enabled: true)
 				let store = SharedStore.standing_store(document.id)
-				if ScheduleWindow.status(schedule, at: .now).active { try shared.apply_selection(for: document.id, to: store) } else { store.clearAllSettings() }
+				if shield_plan.mode != .limit, ScheduleWindow.status(schedule, at: .now).active { try shared.apply_plan(for: document.id, to: store) } else { store.clearAllSettings() }
 				objectWillChange.send()
 				return true
 			} catch { release_standing(document.id); report(error); return false }
@@ -106,6 +140,7 @@ final class SessionController: ObservableObject {
 	private func release_standing(_ document_id: String) {
 		center.stopMonitoring(center.activities.filter { SharedStore.standing_id(from: $0) == document_id })
 		SharedStore.standing_store(document_id).clearAllSettings()
+		if let shared = try? SharedStore(), session?.document_id != document_id { shared.remove_plan(for: document_id) }
 	}
 
 	// The emergency exit: every shield this app has ever applied comes off. Returns the standing routines that were switched off.
@@ -118,7 +153,7 @@ final class SessionController: ObservableObject {
 		return Array(ids)
 	}
 
-	func start(_ document: AppDocument) async {
+	func start(_ document: AppDocument, groups: [AppGroup]) async {
 		guard !is_busy, session == nil, let minutes = document.focus_minutes else {
 			if session != nil { error_message = "Another session is already running. End it first." }
 			return
@@ -128,9 +163,10 @@ final class SessionController: ObservableObject {
 		var scheduled_activity: DeviceActivityName?
 		do {
 			let shared = try SharedStore()
+			var shield_plan: SharedStore.ShieldPlan?
 			if document.rules.block_during_focus {
 				guard AuthorizationCenter.shared.authorizationStatus == .approved else { throw DocumentError.invalid("Choose apps and allow Screen Time access before starting this blocking session.") }
-				guard selected_count(for: document) > 0 else { throw DocumentError.invalid("Choose at least one app, website, or category to block.") }
+				shield_plan = try plan(for: document, groups: groups)
 			}
 			if document.rules.notify_on_complete {
 				let granted = try await notifications.requestAuthorization(options: [.alert, .sound])
@@ -144,9 +180,10 @@ final class SessionController: ObservableObject {
 				let parts: Set<Calendar.Component> = [.year, .month, .day, .hour, .minute, .second]
 				let schedule = DeviceActivitySchedule(intervalStart: calendar.dateComponents(parts, from: now), intervalEnd: calendar.dateComponents(parts, from: record.ends_at), repeats: false)
 				try shared.save_session(record)
-				try center.startMonitoring(activity, during: schedule)
+				if let shield_plan { try shared.save_plan(shield_plan, for: document.id) }
+				try center.startMonitoring(activity, during: schedule, events: try limit_events(shield_plan ?? SharedStore.ShieldPlan(mode: .block, group_ids: [], limit_minutes: nil), document_id: document.id, shared: shared))
 				scheduled_activity = activity
-				try shared.apply_selection(for: document.id)
+				if shield_plan?.mode != .limit { try shared.apply_plan(for: document.id, to: ManagedSettingsStore(named: SharedStore.settings_name)) }
 			} else {
 				try shared.save_session(record)
 			}
@@ -174,7 +211,11 @@ final class SessionController: ObservableObject {
 		center.stopMonitoring(center.activities.filter { $0.rawValue.hasPrefix("pocketwork.") })
 		notifications.removePendingNotificationRequests(withIdentifiers: [notification_id])
 		notifications.removeDeliveredNotifications(withIdentifiers: [notification_id])
-		do { try SharedStore().clear_session() } catch { report(error) }
+		do {
+			let shared = try SharedStore()
+			if let running = session { shared.remove_plan(for: running.document_id) }
+			shared.clear_session()
+		} catch { report(error) }
 		session = nil
 	}
 

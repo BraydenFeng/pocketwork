@@ -34,8 +34,74 @@ struct SharedStore {
 		self.defaults = defaults
 	}
 
-	// Each tool keeps its own private app selection; the tokens never leave this App Group.
+	// Routines without groups keep their own private app selection; groups keep theirs under a separate prefix. Tokens never leave this App Group.
 	private func selection_key(_ document_id: String) -> String { "selected_activities.\(document_id)" }
+	private func group_key(_ group_id: String) -> String { "group_activities.\(group_id)" }
+
+	func group_selection(_ group_id: String) throws -> FamilyActivitySelection {
+		guard let data = defaults.data(forKey: group_key(group_id)) else { return FamilyActivitySelection() }
+		return try PropertyListDecoder().decode(FamilyActivitySelection.self, from: data)
+	}
+
+	func save_group_selection(_ selection: FamilyActivitySelection, for group_id: String) throws {
+		defaults.set(try PropertyListEncoder().encode(selection), forKey: group_key(group_id))
+	}
+
+	func remove_group_selection(_ group_id: String) { defaults.removeObject(forKey: group_key(group_id)) }
+
+	// What a running routine does to which apps, written when it starts so the monitor extension needs no library.
+	struct ShieldPlan: Codable, Equatable {
+		var mode: ShieldMode
+		var group_ids: [String]
+		var limit_minutes: Int?
+	}
+
+	private func plan_key(_ document_id: String) -> String { "shield_plan.\(document_id)" }
+
+	func plan(for document_id: String) throws -> ShieldPlan? {
+		guard let data = defaults.data(forKey: plan_key(document_id)) else { return nil }
+		return try PropertyListDecoder().decode(ShieldPlan.self, from: data)
+	}
+
+	func save_plan(_ plan: ShieldPlan, for document_id: String) throws {
+		defaults.set(try PropertyListEncoder().encode(plan), forKey: plan_key(document_id))
+	}
+
+	func remove_plan(for document_id: String) { defaults.removeObject(forKey: plan_key(document_id)) }
+
+	// Everything the plan points at, merged. Falls back to the routine's own selection when it names no groups.
+	func resolved_selection(for document_id: String, plan: ShieldPlan?) throws -> FamilyActivitySelection {
+		guard let plan, !plan.group_ids.isEmpty else { return try selection(for: document_id) }
+		var merged = FamilyActivitySelection()
+		for group_id in plan.group_ids {
+			let part = try group_selection(group_id)
+			merged.applicationTokens.formUnion(part.applicationTokens)
+			merged.categoryTokens.formUnion(part.categoryTokens)
+			merged.webDomainTokens.formUnion(part.webDomainTokens)
+		}
+		return merged
+	}
+
+	static func count(_ selection: FamilyActivitySelection) -> Int {
+		selection.applicationTokens.count + selection.categoryTokens.count + selection.webDomainTokens.count
+	}
+
+	// Applies the routine's plan to a store: block locks the selection, allow_only locks everything else, limit locks the selection (called once the threshold is hit).
+	func apply_plan(for document_id: String, to settings: ManagedSettingsStore) throws {
+		let plan = try plan(for: document_id)
+		let selection = try resolved_selection(for: document_id, plan: plan)
+		if plan?.mode == .allow_only {
+			settings.shield.applications = nil
+			settings.shield.webDomains = nil
+			settings.shield.applicationCategories = .all(except: selection.applicationTokens)
+			settings.shield.webDomainCategories = .all(except: selection.webDomainTokens)
+		} else {
+			settings.shield.applications = selection.applicationTokens.isEmpty ? nil : selection.applicationTokens
+			settings.shield.webDomains = selection.webDomainTokens.isEmpty ? nil : selection.webDomainTokens
+			settings.shield.applicationCategories = selection.categoryTokens.isEmpty ? nil : .specific(selection.categoryTokens)
+			settings.shield.webDomainCategories = selection.categoryTokens.isEmpty ? nil : .specific(selection.categoryTokens)
+		}
+	}
 
 	func selection(for document_id: String) throws -> FamilyActivitySelection {
 		guard let data = defaults.data(forKey: selection_key(document_id)) else { return FamilyActivitySelection() }

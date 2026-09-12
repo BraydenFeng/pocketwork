@@ -16,6 +16,16 @@ enum BlockKind: String, Codable {
 	case heading, timer, checklist, counter, note, screen_time, schedule
 }
 
+// What a Screen Time block does to its groups. Mirrors ShieldMode in lib/document.ts.
+enum ShieldMode: String, Codable {
+	case block, allow_only, limit
+}
+
+struct AppGroup: Codable, Equatable, Identifiable {
+	var id: String
+	var name: String
+}
+
 struct BlockDocument: Codable, Identifiable, Equatable {
 	var id: String
 	var type: BlockKind
@@ -29,18 +39,37 @@ struct BlockDocument: Codable, Identifiable, Equatable {
 	var days: [Int]?
 	var start: String?
 	var end: String?
+	// Screen Time blocks: named app groups (filled on the phone) and what happens to them. No groups means "choose apps for this routine".
+	var mode: ShieldMode?
+	var groups: [String]?
+	var limit_minutes: Int?
+
+	var shield_mode: ShieldMode { mode ?? .block }
+	var group_names: [String] { groups ?? [] }
+
+	// Plain words for what the Screen Time block does. Mirrors describe_shield in lib/document.ts.
+	var shield_description: String {
+		let names = group_names
+		if names.isEmpty { return "Apps chosen on iPhone" }
+		let list = names.count <= 3 ? names.joined(separator: ", ") : "\(names.prefix(2).joined(separator: ", ")) + \(names.count - 2) more"
+		switch shield_mode {
+		case .block: return "Blocks \(list)"
+		case .allow_only: return "Only \(list)"
+		case .limit: return "\(list) · \(limit_minutes ?? 0) min limit"
+		}
+	}
 
 	// Mirrors create_block in lib/document.ts so a block added on the phone matches one added in the browser.
 	static func make(_ kind: BlockKind) -> BlockDocument {
 		let id = UUID().uuidString
 		switch kind {
-		case .heading: return BlockDocument(id: id, type: kind, title: "Make room for what matters.", subtitle: "A little space, just for you.", minutes: nil, items: nil, target: nil, text: nil, days: nil, start: nil, end: nil)
-		case .timer: return BlockDocument(id: id, type: kind, title: "Focus session", subtitle: nil, minutes: 25, items: nil, target: nil, text: nil, days: nil, start: nil, end: nil)
-		case .checklist: return BlockDocument(id: id, type: kind, title: "On my list", subtitle: nil, minutes: nil, items: [TaskDocument(id: UUID().uuidString, text: "My first task")], target: nil, text: nil, days: nil, start: nil, end: nil)
-		case .counter: return BlockDocument(id: id, type: kind, title: "Small wins", subtitle: nil, minutes: nil, items: nil, target: 5, text: nil, days: nil, start: nil, end: nil)
-		case .note: return BlockDocument(id: id, type: kind, title: "A note to myself", subtitle: nil, minutes: nil, items: nil, target: nil, text: "One thing at a time.", days: nil, start: nil, end: nil)
-		case .screen_time: return BlockDocument(id: id, type: kind, title: "Fewer distractions", subtitle: nil, minutes: nil, items: nil, target: nil, text: nil, days: nil, start: nil, end: nil)
-		case .schedule: return BlockDocument(id: id, type: kind, title: "Every evening", subtitle: nil, minutes: nil, items: nil, target: nil, text: nil, days: [1, 2, 3, 4, 5, 6, 7], start: "22:00", end: "07:00")
+		case .heading: return BlockDocument(id: id, type: kind, title: "Make room for what matters.", subtitle: "A little space, just for you.", minutes: nil, items: nil, target: nil, text: nil, days: nil, start: nil, end: nil, mode: nil, groups: nil, limit_minutes: nil)
+		case .timer: return BlockDocument(id: id, type: kind, title: "Focus session", subtitle: nil, minutes: 25, items: nil, target: nil, text: nil, days: nil, start: nil, end: nil, mode: nil, groups: nil, limit_minutes: nil)
+		case .checklist: return BlockDocument(id: id, type: kind, title: "On my list", subtitle: nil, minutes: nil, items: [TaskDocument(id: UUID().uuidString, text: "My first task")], target: nil, text: nil, days: nil, start: nil, end: nil, mode: nil, groups: nil, limit_minutes: nil)
+		case .counter: return BlockDocument(id: id, type: kind, title: "Small wins", subtitle: nil, minutes: nil, items: nil, target: 5, text: nil, days: nil, start: nil, end: nil, mode: nil, groups: nil, limit_minutes: nil)
+		case .note: return BlockDocument(id: id, type: kind, title: "A note to myself", subtitle: nil, minutes: nil, items: nil, target: nil, text: "One thing at a time.", days: nil, start: nil, end: nil, mode: nil, groups: nil, limit_minutes: nil)
+		case .screen_time: return BlockDocument(id: id, type: kind, title: "Fewer distractions", subtitle: nil, minutes: nil, items: nil, target: nil, text: nil, days: nil, start: nil, end: nil, mode: nil, groups: nil, limit_minutes: nil)
+		case .schedule: return BlockDocument(id: id, type: kind, title: "Every evening", subtitle: nil, minutes: nil, items: nil, target: nil, text: nil, days: [1, 2, 3, 4, 5, 6, 7], start: "22:00", end: "07:00", mode: nil, groups: nil, limit_minutes: nil)
 		}
 	}
 }
@@ -64,8 +93,18 @@ struct AppDocument: Codable, Equatable {
 	var has_timer: Bool { blocks.contains(where: { $0.type == .timer }) }
 	var has_screen_time: Bool { blocks.contains(where: { $0.type == .screen_time }) }
 	var schedule: BlockDocument? { blocks.first(where: { $0.type == .schedule }) }
+	var shield: BlockDocument? { blocks.first(where: { $0.type == .screen_time }) }
 	var is_standing: Bool { schedule != nil }
 	var has_engine: Bool { has_timer || is_standing }
+
+	// Group names this routine mentions, in order, without case-insensitive duplicates.
+	var referenced_groups: [String] {
+		var names: [String] = []
+		for block in blocks where block.type == .screen_time {
+			for name in block.group_names where !names.contains(where: { $0.lowercased() == name.lowercased() }) { names.append(name) }
+		}
+		return names
+	}
 
 	static func blank() -> AppDocument {
 		AppDocument(schema_version: 1, id: UUID().uuidString, name: "My new routine", description: "", blocks: [BlockDocument.make(.heading)], rules: RuleDocument(block_during_focus: false, notify_on_complete: false), enabled: nil)
@@ -111,7 +150,7 @@ struct AppDocument: Codable, Equatable {
 			case "schedule": extras = ["days", "start", "end"]
 			default: throw DocumentError.invalid("This version cannot run the \(type) block.")
 			}
-			try require_keys(block, Set(["id", "type", "title"]).union(extras))
+			try require_keys(block, Set(["id", "type", "title"]).union(extras), optional: type == "screen_time" ? ["mode", "groups", "limit_minutes"] : [])
 			if let tasks = block["items"] as? [[String: Any]] {
 				for task in tasks { try require_keys(task, ["id", "text"]) }
 			}
@@ -155,7 +194,13 @@ struct AppDocument: Codable, Equatable {
 			case .note:
 				guard let text = block.text else { throw DocumentError.invalid("Missing note text.") }
 				try Self.validate_text(text, maximum: 1000)
-			case .screen_time: break
+			case .screen_time:
+				let names = block.group_names
+				guard names.count <= 20, Set(names.map { $0.lowercased() }).count == names.count else { throw DocumentError.invalid("Each group can only be listed once.") }
+				for name in names { try Self.validate_text(name, maximum: 40, required: true) }
+				if (block.shield_mode == .allow_only || block.shield_mode == .limit) && names.isEmpty { throw DocumentError.invalid("\"\(block.shield_mode == .limit ? "Limit" : "Only these")\" needs at least one app group.") }
+				if block.shield_mode == .limit { guard let minutes = block.limit_minutes, (15...1440).contains(minutes) else { throw DocumentError.invalid("A limit needs 15 to 1440 minutes.") } }
+				else if block.limit_minutes != nil { throw DocumentError.invalid("Minutes only apply to a limit.") }
 			case .schedule: break // days and times are checked once, below, together with the rules that depend on them
 			}
 		}
@@ -180,7 +225,7 @@ struct AppDocument: Codable, Equatable {
 		if rules.notify_on_complete && focus_minutes == nil { throw DocumentError.invalid("Completion notifications need a timer.") }
 	}
 
-	private static func validate_id(_ value: String) throws {
+	static func validate_id(_ value: String) throws {
 		guard value.range(of: "^[a-zA-Z0-9_-]{1,64}$", options: .regularExpression) != nil else {
 			throw DocumentError.invalid("Invalid block or task identifier.")
 		}

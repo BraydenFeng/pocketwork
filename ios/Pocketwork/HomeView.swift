@@ -7,6 +7,7 @@ struct HomeView: View {
 	@EnvironmentObject private var library: LibraryController
 	@EnvironmentObject private var sessions: SessionController
 	@State private var path: [String] = []
+	@State private var showing_groups = false
 	@State private var showing_import = false
 	@State private var pending_delete: LibraryEntry?
 	private let logger = Logger(subsystem: "Pocketwork", category: "FileImport")
@@ -39,6 +40,20 @@ struct HomeView: View {
 				} header: { Text("My routines") } footer: {
 					if !library.sorted_tools.isEmpty { Text("Swipe a routine to duplicate or delete it. Scheduled routines have a switch.") }
 				}
+				if !library.groups.isEmpty || !library.sorted_tools.isEmpty {
+					Section {
+						Button { showing_groups = true } label: {
+							HStack {
+								VStack(alignment: .leading, spacing: 4) {
+									Text("App groups").font(.headline)
+									Text(library.groups.isEmpty ? "Name the apps once. Every routine can use them." : library.groups.map(\.name).joined(separator: ", ")).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+								}
+								Spacer()
+								Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+							}
+						}.accessibilityIdentifier("home.groups")
+					}
+				}
 				Section {
 					ForEach(library.routines) { routine in
 						Button { if let document = library.create(from: routine) { path = [document.id] } } label: { routine_row(routine) }
@@ -56,9 +71,11 @@ struct HomeView: View {
 			}
 			.navigationTitle("My routines")
 			.navigationDestination(for: String.self) { id in ToolView(document_id: id) }
+			.navigationDestination(isPresented: $showing_groups) { GroupsView() }
 			.toolbar {
 				ToolbarItem(placement: .topBarTrailing) {
 					Menu {
+						Button("App groups", systemImage: "square.grid.2x2") { showing_groups = true }
 						Button("Add from file", systemImage: "square.and.arrow.down") { showing_import = true }
 						Button(role: .destructive) { for id in sessions.clear_everything() { library.set_enabled(id, false) } } label: { Label("Clear all focus restrictions", systemImage: "lock.open") }.disabled(sessions.is_busy)
 					} label: { Image(systemName: "ellipsis.circle") }
@@ -97,7 +114,7 @@ struct HomeView: View {
 			if entry.document.is_standing {
 				Spacer()
 				Toggle("On", isOn: Binding(get: { entry.document.enabled == true }, set: { enabled in
-					if sessions.set_standing(entry.document, enabled: enabled) { library.set_enabled(entry.document.id, enabled) }
+					if sessions.set_standing(entry.document, enabled: enabled, groups: library.groups) { library.set_enabled(entry.document.id, enabled) }
 				})).labelsHidden().accessibilityLabel("Switch \(entry.document.name) on or off")
 			}
 		}
