@@ -48,17 +48,26 @@ jobs:
           DEVICE=$(xcrun simctl list devices available | grep -E "iPhone (1[5-9]|[2-9][0-9])" | head -n 1 | sed -E 's/^ *([^(]+) \(.*/\1/' | xargs)
           echo "Using simulator: $DEVICE"
           echo "device=$DEVICE" >> "$GITHUB_OUTPUT"
-      - name: Build and test
+      - name: Build and test (unit tests, then a UI walkthrough that saves screenshots)
         working-directory: ios
+        env:
+          TEST_RUNNER_SCREENSHOT_DIR: ${{ github.workspace }}/ios/screenshots
         run: |
           set -o pipefail
+          mkdir -p screenshots
           xcodebuild test \
             -project Pocketwork.xcodeproj \
             -scheme Pocketwork \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
-            | tee xcodebuild.log | grep -E "error:|warning: unused|Test Suite|Test Case|passed|failed|BUILD|TEST" || true
+            | tee xcodebuild.log | grep -E "error:|Test Suite|Test Case|BUILD|TEST" || true
           grep -q "\*\* TEST SUCCEEDED \*\*" xcodebuild.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: iphone-screenshots
+          path: ios/screenshots/*.png
+          if-no-files-found: warn
       - uses: actions/upload-artifact@v4
         if: always()
         with:
