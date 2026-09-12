@@ -144,7 +144,11 @@ final class SessionController: ObservableObject {
 				shared.clear_session()
 				session = nil
 			}
-		} catch { ManagedSettingsStore(named: SharedStore.settings_name).clearAllSettings(); report(error) }
+		} catch {
+			// Runs on launch and every foreground; an alert here would greet the user before they did anything, so log and fail safe instead.
+			ManagedSettingsStore(named: SharedStore.settings_name).clearAllSettings()
+			logger.error("Session refresh failed: \(error.localizedDescription, privacy: .public)")
+		}
 	}
 
 	func completed(_ task_id: String, in document: AppDocument) -> Bool { progress[document.id]?.completed_tasks.contains(task_id) ?? false }
