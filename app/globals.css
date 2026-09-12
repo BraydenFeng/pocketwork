@@ -210,6 +210,23 @@ kbd { font: inherit; font-size: var(--t-micro); padding-inline: var(--s-1); bord
 .workbench-footer { display: flex; justify-content: space-between; gap: var(--s-4); padding: var(--s-3) var(--s-5); border-top: var(--hairline); color: var(--c-text-faint); background: var(--c-surface); font-family: var(--font-mono); font-size: var(--t-micro); }
 .workbench-footer > span:first-child { display: flex; align-items: center; gap: var(--s-2); }
 .footer-separator { margin-inline: var(--s-2); color: var(--c-border-hi); }
+/* App groups: chips on the home screen, and the mode radio + picks in the Screen Time inspector. */
+.group-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.group-chip { display: inline-flex; align-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-3); border: var(--hairline); border-radius: var(--r-1); background: var(--c-surface); min-height: var(--touch-h); }
+.group-chip > svg { color: var(--c-text-faint); }
+.group-chip .supporting { display: inline; }
+.group-chip .text-button { padding: var(--s-1); color: var(--c-text-faint); }
+.group-chip .text-button:hover { color: var(--c-text); }
+.group-chip .text-button.is-danger:hover { color: var(--c-danger); }
+.group-chip.is-new { background: var(--c-bg); border-style: dashed; }
+.group-rename { display: flex; gap: var(--s-2); align-items: center; }
+.group-rename .field { min-height: var(--control-h); }
+.mode-radio { display: grid; gap: var(--s-2); }
+.mode-radio button { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-1); padding: var(--s-3); border: var(--hairline); border-radius: var(--r-1); background: var(--c-surface); text-align: left; }
+.mode-radio button span { font-size: var(--t-small); color: var(--c-text-faint); }
+.mode-radio button[aria-checked="true"] { border: var(--border-selected); }
+.group-picks { display: grid; gap: var(--s-1); }
+
 /* Account: the chip in the top bar and the spinning sync glyph. */
 .account-chip { display: inline-flex; align-items: center; gap: var(--s-2); }
 .account-email { font-size: var(--t-small); color: var(--c-text-dim); max-width: var(--w-rail); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

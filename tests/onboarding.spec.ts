@@ -15,7 +15,7 @@ test("guides customization, preview testing, and honest iPhone setup", async ({ 
 	await guide.getByRole("button", { name: "Open test mode", exact: true }).click();
 	await expect(page.getByRole("button", { name: "Try it", exact: true })).toHaveAttribute("aria-pressed", "true");
 	await page.getByRole("button", { name: "Start focusing", exact: true }).click();
-	await expect(page.getByText("Blocking simulated in preview")).toBeVisible();
+	await expect(page.locator(".preview-shield")).toContainText("simulated");
 	await guide.getByRole("button", { name: "3 Take it to iPhone", exact: true }).click();
 	await expect(guide).toContainText("there is no App Store download yet");
 	await guide.getByRole("button", { name: "See iPhone setup", exact: true }).click();

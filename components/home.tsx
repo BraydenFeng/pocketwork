@@ -1,23 +1,30 @@
 "use client";
 
 import { useRef } from "react";
-import { ArrowRight, Check, CloudOff, Copy, Info, Layers2, LogIn, LogOut, Plus, RefreshCw, Trash2, Upload, X } from "lucide-react";
+import { useState } from "react";
+import { ArrowRight, Check, CloudOff, Copy, Info, Layers2, LogIn, LogOut, Pencil, Plus, RefreshCw, Shield, Trash2, Upload, X } from "lucide-react";
 import type { Account } from "@/lib/cloud";
 import type { SyncState } from "./app";
 import { is_standing, MAX_DOCUMENT_BYTES, parse_document, type AppDocument } from "@/lib/document";
 import { describe_status } from "@/lib/schedule";
-import { format_edited, sorted_tools, summarize_tool, type Library } from "@/lib/library";
+import { format_edited, routines_using_group, sorted_tools, summarize_tool, type Library } from "@/lib/library";
 import { blank_tool, templates } from "@/lib/templates";
 import { Button, SectionLabel } from "./ui";
 
-export function Home({ library, now, error, notice, storage_blocked, cloud_available, account, sync, on_sign_in, on_sign_out, on_open, on_create, on_delete, on_duplicate, on_import, on_toggle, on_error, on_dismiss_error, on_dismiss_notice, on_replace_unreadable }: {
+export function Home({ library, now, error, notice, storage_blocked, cloud_available, account, sync, on_sign_in, on_sign_out, on_open, on_create, on_delete, on_duplicate, on_import, on_toggle, on_add_group, on_rename_group, on_remove_group, on_error, on_dismiss_error, on_dismiss_notice, on_replace_unreadable }: {
 	library: Library; now: number; error: string | null; notice: string | null; storage_blocked: boolean;
 	cloud_available: boolean; account: Account | null; sync: SyncState; on_sign_in: () => void; on_sign_out: () => void;
 	on_open: (id: string) => void; on_create: (document: AppDocument) => void; on_delete: (id: string) => void; on_duplicate: (id: string) => void; on_import: (document: AppDocument) => void; on_toggle: (id: string, enabled: boolean) => void;
+	on_add_group: (name: string) => void; on_rename_group: (id: string, name: string) => void; on_remove_group: (id: string) => void;
 	on_error: (message: string) => void; on_dismiss_error: () => void; on_dismiss_notice: () => void; on_replace_unreadable: () => void;
 }) {
 	const file_input = useRef<HTMLInputElement>(null);
 	const tools = sorted_tools(library);
+	const groups = library.groups ?? [];
+	const [new_group, set_new_group] = useState("");
+	const [renaming, set_renaming] = useState<{ id: string; name: string } | null>(null);
+	function submit_group() { if (new_group.trim()) { on_add_group(new_group); set_new_group(""); } }
+	function submit_rename() { if (renaming && renaming.name.trim()) { on_rename_group(renaming.id, renaming.name); } set_renaming(null); }
 	const saved_where = storage_blocked ? "Saved routines need attention"
 		: !account ? `${tools.length} saved on this browser`
 		: sync === "syncing" ? "Syncing with your account…"
@@ -52,8 +59,19 @@ export function Home({ library, now, error, notice, storage_blocked, cloud_avail
 					<div className="tool-actions">{is_standing(entry.document) && <label className="card-switch"><input type="checkbox" role="switch" aria-label={`Switch ${entry.document.name} on or off`} checked={entry.document.enabled === true} onChange={(event) => on_toggle(entry.document.id, event.target.checked)} /><span>{entry.document.enabled ? "On" : "Off"}</span></label>}<button type="button" className="text-button" onClick={() => on_duplicate(entry.document.id)} aria-label={`Duplicate ${entry.document.name}`}><Copy />Duplicate</button><button type="button" className="text-button is-danger" onClick={() => on_delete(entry.document.id)} aria-label={`Delete ${entry.document.name}`}><Trash2 />Delete</button></div>
 				</li>; })}</ul> : <p className="empty-hint home-empty">Choose a routine below and it becomes your first one. You can change every part of it afterwards.</p>}
 			</section>
+			<section className="home-section" aria-labelledby="groups-heading">
+				<div className="home-section-heading"><SectionLabel number="02">APP GROUPS</SectionLabel><h2 id="groups-heading">Name the apps once. Every routine can use them.</h2><p className="supporting">Groups like Social or Work are named here and filled with real apps on your iPhone, privately. A routine can block a group, allow only a group, or limit it to so many minutes.</p></div>
+				<ul className="group-list" aria-label="App groups">{groups.map((group) => {
+					const used_by = routines_using_group(library, group.name);
+					return <li key={group.id} className="group-chip">{renaming?.id === group.id
+						? <form className="group-rename" onSubmit={(event) => { event.preventDefault(); submit_rename(); }}><input className="field" aria-label={`New name for ${group.name}`} value={renaming.name} autoFocus maxLength={40} onChange={(event) => set_renaming({ id: group.id, name: event.target.value })} onBlur={submit_rename} /></form>
+						: <><Shield /><strong>{group.name}</strong><span className="supporting">{used_by.length ? `${used_by.length} routine${used_by.length === 1 ? "" : "s"}` : "not used yet"}</span><button type="button" className="text-button" aria-label={`Rename ${group.name}`} onClick={() => set_renaming({ id: group.id, name: group.name })}><Pencil /></button><button type="button" className="text-button is-danger" aria-label={`Delete group ${group.name}`} onClick={() => on_remove_group(group.id)}><Trash2 /></button></>}
+					</li>; })}
+					<li className="group-chip is-new"><form className="group-rename" onSubmit={(event) => { event.preventDefault(); submit_group(); }}><input className="field" aria-label="New group name" placeholder={groups.length ? "Another group…" : "Social, Games, Work…"} value={new_group} maxLength={40} onChange={(event) => set_new_group(event.target.value)} /><Button onClick={submit_group} disabled={!new_group.trim()}><Plus />Add group</Button></form></li>
+				</ul>
+			</section>
 			<section className="home-section" aria-labelledby="routines-heading">
-				<div className="home-section-heading"><SectionLabel number="02">READY-MADE ROUTINES</SectionLabel><h2 id="routines-heading">Ready to use. Yours to change.</h2><p className="supporting">Some run when you start them. Some switch themselves on at set times. All keep the apps you choose out of the way.</p></div>
+				<div className="home-section-heading"><SectionLabel number="03">READY-MADE ROUTINES</SectionLabel><h2 id="routines-heading">Ready to use. Yours to change.</h2><p className="supporting">Some run when you start them. Some switch themselves on at set times. All keep the apps you choose out of the way.</p></div>
 				<ul className="tool-grid" aria-label="Routines">{templates.map((template) => <li key={template.id} className="tool-card is-template">
 					<div className="tool-body"><strong>{template.name}</strong><span className="supporting">{template.tagline}</span></div>
 					<div className="tool-actions"><Button variant="primary" onClick={() => on_create(template.build())}>Use this routine<ArrowRight /></Button></div>

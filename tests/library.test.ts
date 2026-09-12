@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { document_schema, serialize_document, starter_document, type AppDocument } from "../lib/document";
-import { delete_tool, duplicate_tool, empty_library, find_tool, format_edited, import_tool, LIBRARY_KEY, load_library, MAX_TOOLS, save_library, sorted_tools, summarize_tool, upsert_tool, type Library } from "../lib/library";
+import { describe_shield, document_schema, serialize_document, starter_document, type AppDocument } from "../lib/document";
+import { add_group, delete_tool, duplicate_tool, empty_library, find_group, find_tool, format_edited, import_tool, LIBRARY_KEY, load_library, MAX_TOOLS, remove_group, rename_group, save_library, sorted_tools, summarize_tool, upsert_tool, type Library } from "../lib/library";
 import { DRAFT_KEY } from "../lib/storage";
 import { blank_tool, templates } from "../lib/templates";
 import routines_fixture from "../public/routines.pocketwork.json";
@@ -111,5 +111,42 @@ describe("routine templates", () => {
 	});
 	it("every routine enforces something, not just tracks it", () => {
 		for (const template of templates) { expect(template.build().rules.block_during_focus, template.name).toBe(true); }
+	});
+});
+
+describe("app groups", () => {
+	it("adds, renames through every routine, and refuses to delete a group in use", () => {
+		let library = add_group(empty_library, " Social ");
+		expect(library.groups).toEqual([{ id: expect.any(String), name: "Social" }]);
+		expect(() => add_group(library, "social")).toThrow("already");
+		const routine = { ...copy(), blocks: copy().blocks.map((block) => block.type === "screen_time" ? { ...block, mode: "block" as const, groups: ["Social"] } : block) };
+		library = upsert_tool(library, routine, NOW);
+		expect(summarize_tool(routine)).toBe("25 min session · blocks Social · 3 tasks");
+		const id = library.groups![0].id;
+		library = rename_group(library, id, "Feeds", NOW + 1000);
+		const shield = library.tools[0].document.blocks.find((block) => block.type === "screen_time");
+		expect(shield?.type === "screen_time" && shield.groups).toEqual(["Feeds"]);
+		expect(library.tools[0].updated_at).toBe(new Date(NOW + 1000).toISOString());
+		expect(() => remove_group(library, id)).toThrow("used by");
+		const unused = add_group(empty_library, "Unused");
+		expect(remove_group(unused, unused.groups![0].id).groups).toBeUndefined();
+	});
+	it("creates groups a routine mentions but the library does not have yet", () => {
+		const routine = { ...copy(), blocks: copy().blocks.map((block) => block.type === "screen_time" ? { ...block, mode: "allow_only" as const, groups: ["Work", "Study"] } : block) };
+		const library = upsert_tool(empty_library, routine, NOW);
+		expect(library.groups?.map((group) => group.name)).toEqual(["Work", "Study"]);
+		expect(find_group(library, "work")?.name).toBe("Work");
+	});
+	it("validates the three functions", () => {
+		const shield = (extra: Record<string, unknown>) => ({ ...copy(), blocks: copy().blocks.map((block) => block.type === "screen_time" ? { ...block, ...extra } : block) });
+		expect(document_schema.safeParse(shield({ mode: "allow_only" })).success).toBe(false);
+		expect(document_schema.safeParse(shield({ mode: "limit", groups: ["Social"] })).success).toBe(false);
+		expect(document_schema.safeParse(shield({ mode: "limit", groups: ["Social"], limit_minutes: 30 })).success).toBe(true);
+		expect(document_schema.safeParse(shield({ mode: "block", groups: ["Social"], limit_minutes: 30 })).success).toBe(false);
+		expect(document_schema.safeParse(shield({ groups: ["Social", "social"] })).success).toBe(false);
+		expect(document_schema.safeParse(shield({})).success).toBe(true);
+		expect(describe_shield({ id: "s", type: "screen_time", title: "S", mode: "limit", groups: ["Social"], limit_minutes: 30 })).toBe("Social · 30 min limit");
+		expect(describe_shield({ id: "s", type: "screen_time", title: "S", mode: "allow_only", groups: ["Work"] })).toBe("Only Work");
+		expect(describe_shield({ id: "s", type: "screen_time", title: "S" })).toBe("Apps chosen on iPhone");
 	});
 });

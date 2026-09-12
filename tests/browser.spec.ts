@@ -31,7 +31,7 @@ test("runs the preview and completes its simulated rules", async ({ page }) => {
 	await page.goto(STARTER_URL);
 	await page.getByRole("button", { name: "Try it", exact: true }).click();
 	await page.getByRole("button", { name: "Start focusing", exact: true }).click();
-	await expect(page.getByText("Blocking simulated in preview")).toBeVisible();
+	await expect(page.locator(".preview-shield")).toContainText("simulated");
 	await page.getByRole("checkbox", { name: "Choose one thing to work on" }).check();
 	await expect(page.locator(".preview-label-row")).toContainText("1/3");
 	await page.getByRole("button", { name: "Simulate timer finishing" }).click();

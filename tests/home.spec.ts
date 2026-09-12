@@ -14,7 +14,7 @@ test("a new browser goes from routine to editor to a saved tool card", async ({ 
 	await page.getByRole("button", { name: "My routines", exact: true }).click();
 	await expect(page).not.toHaveURL(/\?routine=/);
 	await expect(page.getByRole("button", { name: "Open Deep work", exact: true })).toBeVisible();
-	await expect(page.locator(".tool-card:not(.is-template)").first()).toContainText("90 min session · blocks apps · 3 tasks");
+	await expect(page.locator(".tool-card:not(.is-template)").first()).toContainText("90 min session · blocks Distractions · 3 tasks");
 	await page.reload();
 	await expect(page.getByRole("button", { name: "Open Deep work", exact: true })).toBeVisible();
 });
@@ -106,4 +106,31 @@ test("the editor refuses a timer next to a schedule and edits the window", async
 	await page.getByRole("group", { name: "Days of the week" }).getByRole("button", { name: "Sat" }).click();
 	await page.getByLabel("Ends").fill("18:00");
 	await expect(page.getByText("Mon, Tue, Wed, Thu, Fri, Sat · 9 AM to 6 PM")).toBeVisible();
+});
+
+test("app groups are named on the home screen and used by routines", async ({ page }) => {
+	await page.goto("/");
+	await page.getByLabel("New group name").fill("Social");
+	await page.getByRole("button", { name: "Add group", exact: true }).click();
+	await expect(page.getByRole("list", { name: "App groups" })).toContainText("Social");
+	await expect(page.getByRole("list", { name: "App groups" })).toContainText("not used yet");
+	await page.getByRole("list", { name: "Routines" }).locator(".tool-card", { hasText: "Workday focus" }).getByRole("button", { name: "Use this routine" }).click();
+	await expect(page.locator(".preview-shield")).toContainText("Only Work");
+	await page.getByRole("button", { name: "Edit Screen Time", exact: true }).click();
+	await expect(page.getByRole("radio", { name: /Only these/ })).toHaveAttribute("aria-checked", "true");
+	await page.getByRole("checkbox", { name: "Social" }).check();
+	await expect(page.locator(".preview-shield")).toContainText("Only Work, Social");
+	await page.getByRole("radio", { name: /Limit/ }).click();
+	await page.getByLabel("Minutes before it locks").selectOption("45");
+	await expect(page.locator(".preview-shield")).toContainText("Work, Social · 45 min limit");
+	await page.getByRole("button", { name: "My routines", exact: true }).click();
+	const groups = page.getByRole("list", { name: "App groups" });
+	await expect(groups).toContainText("Work");
+	await groups.locator(".group-chip", { hasText: "Social" }).getByRole("button", { name: "Rename Social" }).click();
+	await page.getByLabel("New name for Social").fill("Feeds");
+	await page.getByLabel("New name for Social").press("Enter");
+	await expect(page.locator(".tool-card:not(.is-template)", { hasText: "Workday focus" })).toContainText("Work, Feeds · 45 min limit");
+	page.once("dialog", (dialog) => dialog.accept());
+	await groups.locator(".group-chip", { hasText: "Feeds" }).getByRole("button", { name: "Delete group Feeds" }).click();
+	await expect(page.locator(".alert-banner")).toContainText("used by");
 });

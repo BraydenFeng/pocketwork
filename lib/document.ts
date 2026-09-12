@@ -4,6 +4,8 @@ const identifier = z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/);
 const short_text = z.string().trim().min(1).max(80);
 const base_fields = { id: identifier, title: short_text };
 const clock_time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Times look like 22:00.");
+export const group_name = z.string().trim().min(1).max(40);
+export const MAX_GROUPS = 20;
 
 export const block_schema = z.discriminatedUnion("type", [
 	z.object({ ...base_fields, type: z.literal("heading"), subtitle: z.string().max(200) }).strict(),
@@ -11,7 +13,9 @@ export const block_schema = z.discriminatedUnion("type", [
 	z.object({ ...base_fields, type: z.literal("checklist"), items: z.array(z.object({ id: identifier, text: short_text }).strict()).min(1).max(20) }).strict(),
 	z.object({ ...base_fields, type: z.literal("counter"), target: z.number().int().min(1).max(1000) }).strict(),
 	z.object({ ...base_fields, type: z.literal("note"), text: z.string().max(1000) }).strict(),
-	z.object({ ...base_fields, type: z.literal("screen_time") }).strict(),
+	// What happens to which apps. Groups are named on the web and filled on the phone; no groups means "choose apps for this routine on the phone".
+	// block: lock the groups. allow_only: lock everything except the groups. limit: lock the groups after limit_minutes of use inside the routine's window.
+	z.object({ ...base_fields, type: z.literal("screen_time"), mode: z.enum(["block", "allow_only", "limit"]).optional(), groups: z.array(group_name).max(MAX_GROUPS).optional(), limit_minutes: z.number().int().min(15).max(1440).optional() }).strict(),
 	// A standing routine: instead of a timer you start, a window that turns itself on. Days use 1 = Sunday … 7 = Saturday.
 	z.object({ ...base_fields, type: z.literal("schedule"), days: z.array(z.number().int().min(1).max(7)).min(1).max(7), start: clock_time, end: clock_time }).strict(),
 ]);
@@ -58,6 +62,14 @@ export const document_schema = z.object({
 	} else if (document.enabled !== undefined) {
 		context.addIssue({ code: "custom", message: "Only a scheduled routine can be switched on or off." });
 	}
+	const shield = document.blocks.find((block) => block.type === "screen_time");
+	if (shield && shield.type === "screen_time") {
+		const groups = shield.groups ?? [];
+		if (new Set(groups.map((name) => name.toLowerCase())).size !== groups.length) { context.addIssue({ code: "custom", message: "Each group can only be listed once." }); }
+		if ((shield.mode === "allow_only" || shield.mode === "limit") && groups.length === 0) { context.addIssue({ code: "custom", message: `"${shield.mode === "limit" ? "Limit" : "Only these"}" needs at least one app group.` }); }
+		if (shield.mode === "limit" && shield.limit_minutes === undefined) { context.addIssue({ code: "custom", message: "A limit needs a number of minutes." }); }
+		if (shield.mode !== "limit" && shield.limit_minutes !== undefined) { context.addIssue({ code: "custom", message: "Minutes only apply to a limit." }); }
+	}
 	if (document.rules.block_during_focus && !has_screen_time) {
 		context.addIssue({ code: "custom", message: "Blocking needs a Screen Time block." });
 	}
@@ -75,6 +87,31 @@ export type BlockType = Block["type"];
 export const MAX_DOCUMENT_BYTES = 100_000;
 
 export function is_standing(document: AppDocument): boolean { return document.blocks.some((block) => block.type === "schedule"); }
+
+export type ShieldMode = "block" | "allow_only" | "limit";
+export function shield_mode(block: Extract<Block, { type: "screen_time" }>): ShieldMode { return block.mode ?? "block"; }
+
+// Group names a routine refers to, in document order, without duplicates.
+export function referenced_groups(document: AppDocument): string[] {
+	const names: string[] = [];
+	for (const block of document.blocks) {
+		if (block.type !== "screen_time") { continue; }
+		for (const name of block.groups ?? []) { if (!names.some((entry) => entry.toLowerCase() === name.toLowerCase())) { names.push(name); } }
+	}
+	return names;
+}
+
+// Plain words for what the Screen Time block does, used on cards, in the preview, and on the phone.
+export function describe_shield(block: Extract<Block, { type: "screen_time" }>): string {
+	const groups = block.groups ?? [];
+	if (groups.length === 0) { return "Apps chosen on iPhone"; }
+	const list = groups.length <= 3 ? groups.join(", ") : `${groups.slice(0, 2).join(", ")} + ${groups.length - 2} more`;
+	switch (shield_mode(block)) {
+		case "block": return `Blocks ${list}`;
+		case "allow_only": return `Only ${list}`;
+		case "limit": return `${list} · ${block.limit_minutes} min limit`;
+	}
+}
 
 export function parse_document(text: string): AppDocument {
 	if (new TextEncoder().encode(text).length > MAX_DOCUMENT_BYTES) {

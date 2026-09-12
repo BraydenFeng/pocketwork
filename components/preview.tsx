@@ -1,7 +1,7 @@
 "use client";
 
 import { BatteryFull, CalendarClock, Check, ChevronRight, Pause, Play, Plus, Shield, ShieldCheck, Signal, Wifi } from "lucide-react";
-import type { AppDocument, Block } from "@/lib/document";
+import { describe_shield, type AppDocument, type Block } from "@/lib/document";
 import { format_duration, remaining_seconds, type RuntimeAction, type RuntimeState } from "@/lib/runtime";
 import { describe_schedule, describe_status, schedule_status } from "@/lib/schedule";
 
@@ -21,7 +21,7 @@ export function PhonePreview({ document, runtime, now, selected_id, interactive,
 				</button></div>;
 			case "checklist": return <div className="preview-checklist"><div className="preview-label-row"><h3>{block.title}</h3><span>{block.items.filter((item) => runtime.completed_tasks.includes(item.id)).length}/{block.items.length}</span></div>
 				{block.items.map((item) => <label className="task-row" key={item.id}><input type="checkbox" disabled={!interactive} checked={runtime.completed_tasks.includes(item.id)} onChange={() => dispatch({ type: "toggle_task", task_id: item.id, now: Date.now() })} /><span>{item.text}</span></label>)}</div>;
-			case "screen_time": return <div className="preview-shield"><span className="shield-glyph">{blocking ? <ShieldCheck /> : <Shield />}</span><div><h3>{block.title}</h3><p>{blocking ? "Blocking simulated in preview" : "Choose your apps on iPhone"}</p></div><ChevronRight /></div>;
+			case "screen_time": return <div className="preview-shield"><span className="shield-glyph">{blocking ? <ShieldCheck /> : <Shield />}</span><div><h3>{block.title}</h3><p>{blocking ? `${describe_shield(block)} · simulated` : describe_shield(block)}</p></div><ChevronRight /></div>;
 			case "counter": return <div className="preview-counter"><h3>{block.title}</h3><div className="counter-value"><span>{runtime.counters[block.id] ?? 0}<small> / {block.target}</small></span><button className="button" type="button" aria-label={`Increment ${block.title}`} disabled={!interactive || (runtime.counters[block.id] ?? 0) >= block.target} onClick={() => dispatch({ type: "increment", block_id: block.id, now: Date.now() })}>{(runtime.counters[block.id] ?? 0) >= block.target ? <Check /> : <Plus />}</button></div></div>;
 			case "note": return <div className="preview-note"><h3>{block.title}</h3><p>{block.text}</p></div>;
 			case "schedule": return <div className="preview-schedule"><div className="preview-label-row"><span className="preview-label"><CalendarClock />{block.title}</span><label className="preview-switch"><span>{document.enabled ? "On" : "Off"}</span><input type="checkbox" role="switch" aria-label={`Switch ${block.title} on or off`} disabled={!interactive} checked={document.enabled === true} onChange={(event) => on_toggle_enabled(event.target.checked)} /></label></div>

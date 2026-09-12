@@ -44,7 +44,11 @@
           {
             "id": "shield",
             "type": "screen_time",
-            "title": "Distractions stay out"
+            "title": "Distractions stay out",
+            "mode": "block",
+            "groups": [
+              "Distractions"
+            ]
           }
         ],
         "rules": {
@@ -83,7 +87,11 @@
           {
             "id": "shield",
             "type": "screen_time",
-            "title": "Nothing but the books"
+            "title": "Nothing but the books",
+            "mode": "block",
+            "groups": [
+              "Distractions"
+            ]
           }
         ],
         "rules": {
@@ -141,7 +149,11 @@
           {
             "id": "shield",
             "type": "screen_time",
-            "title": "Feeds off for the night"
+            "title": "Feeds off for the night",
+            "mode": "block",
+            "groups": [
+              "Social"
+            ]
           }
         ],
         "rules": {
@@ -153,7 +165,7 @@
     },
     {
       "template_id": "workday",
-      "tagline": "Weekdays 9 to 5, the distractions stay locked on their own.",
+      "tagline": "Weekdays 9 to 5, only your Work apps open; everything else waits.",
       "document": {
         "schema_version": 1,
         "id": "workday",
@@ -198,7 +210,11 @@
           {
             "id": "shield",
             "type": "screen_time",
-            "title": "Distractions off until five"
+            "title": "Only work apps until five",
+            "mode": "allow_only",
+            "groups": [
+              "Work"
+            ]
           }
         ],
         "rules": {
@@ -251,7 +267,11 @@
           {
             "id": "shield",
             "type": "screen_time",
-            "title": "Feeds wait until you're done"
+            "title": "Feeds wait until you're done",
+            "mode": "block",
+            "groups": [
+              "Social"
+            ]
           }
         ],
         "rules": {
@@ -296,7 +316,11 @@
           {
             "id": "shield",
             "type": "screen_time",
-            "title": "The feed can wait"
+            "title": "The feed can wait",
+            "mode": "block",
+            "groups": [
+              "Social"
+            ]
           }
         ],
         "rules": {

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppDocument } from "@/lib/document";
 import { connect_cloud, current_account, fetch_library, push_library, sign_in_with_google, sign_out, watch_account, type Account, type Cloud } from "@/lib/cloud";
-import { delete_tool, duplicate_tool, empty_library, find_tool, import_tool, load_library, save_library, upsert_tool, type Library } from "@/lib/library";
+import { add_group, delete_tool, duplicate_tool, empty_library, find_tool, import_tool, load_library, remove_group, rename_group, save_library, upsert_tool, type Library } from "@/lib/library";
 import { merge_libraries, same_library } from "@/lib/sync";
 import { Home } from "./home";
 import { Workbench } from "./workbench";
@@ -168,6 +168,19 @@ export function PocketworkApp() {
 		try { save_library(window.localStorage, library); } catch (failure) { set_error(error_message(failure)); }
 	}
 
+	// Group operations validate before they persist, so the whole step sits inside the try.
+	function attempt(step: () => Library) {
+		try { persist(step()); set_error(null); }
+		catch (failure) { set_error(error_message(failure)); }
+	}
+	function create_group(name: string) { attempt(() => add_group(library, name)); }
+	function change_group_name(id: string, name: string) { attempt(() => rename_group(library, id, name, Date.now())); }
+	function drop_group(id: string) {
+		const group = (library.groups ?? []).find((entry) => entry.id === id);
+		if (!group || !window.confirm(`Delete the app group "${group.name}"? The apps chosen for it on your iPhone are forgotten too.`)) { return; }
+		attempt(() => remove_group(library, id));
+	}
+
 	async function start_sign_in() {
 		if (!cloud) { return; }
 		try { await sign_in_with_google(cloud); } catch (failure) { set_error(error_message(failure)); }
@@ -184,11 +197,12 @@ export function PocketworkApp() {
 	if (!ready) { return <div className="app-loading" role="status">Opening your routines…</div>; }
 
 	if (open_tool) {
-		return <Workbench key={open_tool.id} tool={open_tool} on_save={save_tool} on_back={() => navigate(null)} storage_blocked={storage_blocked} storage_error={error} on_replace_unreadable={replace_unreadable} on_dismiss_error={() => set_error(null)} sync={account ? sync : "off"} />;
+		return <Workbench key={open_tool.id} tool={open_tool} groups={library.groups ?? []} on_save={save_tool} on_back={() => navigate(null)} storage_blocked={storage_blocked} storage_error={error} on_replace_unreadable={replace_unreadable} on_dismiss_error={() => set_error(null)} sync={account ? sync : "off"} />;
 	}
 
 	return <Home library={library} now={Date.now()} error={error} notice={notice} storage_blocked={storage_blocked}
 		cloud_available={cloud !== null} account={account} sync={sync} on_sign_in={() => { void start_sign_in(); }} on_sign_out={() => { void finish_sign_out(); }}
 		on_open={navigate} on_create={create_tool} on_delete={remove_tool} on_duplicate={copy_tool} on_import={add_imported} on_toggle={toggle_tool}
+		on_add_group={create_group} on_rename_group={change_group_name} on_remove_group={drop_group}
 		on_error={set_error} on_dismiss_error={() => set_error(null)} on_dismiss_notice={() => set_notice(null)} on_replace_unreadable={replace_unreadable} />;
 }
