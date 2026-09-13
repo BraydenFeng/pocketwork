@@ -34,12 +34,12 @@ A small, live personal app sits beside its human-readable behavior recipe, like 
 - Values live in tokens.css; components compose shared primitives.
 - Hairlines and surface steps, no decorative shadows or gradients.
 - Three structural radii plus the device bezel; pill reserved for state indicators.
-- No AI inference, telemetry, accounts, public deployment, or payment collection in this first slice.
+- No AI inference, telemetry, or payment collection. Accounts sync personal routines.
 - The imported document is strictly validated data, not executable code.
 
 ## Front door
 
-My tools comes before the workbench. A person sees their saved tools as cards and a short row of routines that already work; the editor only appears after they pick one. Routines are named for the outcome (Deep work, Phone-free bedtime), not the blocks, and every one enforces something rather than only tracking it. Cards say what a tool does in one mono line (25 min session, blocks apps, 3 tasks). The browser back button always returns to the list.
+My tools comes before the workbench. A person sees only their saved routines as cards and a New routine action that opens a blank editor. The ready-made routine catalog was removed at Brayden’s request on 2026-09-13. Routines are named for the outcome (Deep work, Phone-free bedtime), not the blocks, and every one enforces something rather than only tracking it. Cards say what a tool does in one mono line (25 min session, blocks apps, 3 tasks). The browser back button always returns to the list.
 
 ## First-use guidance
 

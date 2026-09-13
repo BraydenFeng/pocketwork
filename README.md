@@ -15,7 +15,7 @@ Open http://127.0.0.1:3210. The server binds to loopback only. Your routines are
 
 ## What is built
 
-- My routines is the front door: every saved routine as a card (open, duplicate, delete), app groups, six ready-made routines, and a blank start. Picking one creates a routine and opens the editor; `?routine=<id>` in the URL means the browser back button returns to the list. A browser that only has a v1 single draft sees it as its first routine; the old key is left in place.
+- My routines is the front door: every saved routine as a card (open, duplicate, delete), app groups and a blank start. Picking one creates a routine and opens the editor; `?routine=<id>` in the URL means the browser back button returns to the list. A browser that only has a v1 single draft sees it as its first routine; the old key is left in place.
 - Two kinds of routine. One-time: a Focus timer you start yourself. Standing: a Schedule block (days plus a window such as 22:00 to 07:00, may cross midnight, at least 15 minutes) with an On/Off switch on the card and in the preview; it locks the chosen apps by itself while the window is open. A routine has a timer or a schedule, never both, and a schedule always needs a Screen Time block with blocking on.
 - App groups: named once in the library (Social, Work, Distractions), filled with real apps on each iPhone through Apple's picker, referenced by name from a routine's Screen Time block. Three functions: block the groups, allow only the groups (everything else locks), or limit the groups to so many minutes inside the routine's window. Renaming a group follows through every routine; a group in use cannot be deleted; a routine that mentions a new group creates it. With no groups a routine keeps its own private app selection.
 - A skippable, replayable Quick start guide walks through customization, test mode, and the native iPhone setup boundary. Dismissal is remembered locally.
@@ -23,7 +23,7 @@ Open http://127.0.0.1:3210. The server binds to loopback only. Your routines are
 - Add, edit, reorder (drag or keyboard-accessible move buttons), and remove heading, timer, schedule, checklist, counter, note, and Screen Time blocks.
 - Switch between selecting blocks and interacting with the phone preview. The activity log explicitly labels native effects as simulations.
 - Undo/redo up to 60 edits; validated import/export with a versioned, bounded schema.
-- The SwiftUI iPhone app has the same My routines list, ready-made routines, and app groups; edits routines on the phone; and runs them with permission handling, session state, a DeviceActivity monitor extension, and on-device checklist/counter storage. Standing routines register one repeating DeviceActivity per chosen weekday and shield through their own ManagedSettings store; limits use DeviceActivity usage thresholds. `public/routines.pocketwork.json` (regenerate with `npm run routines`) is the shared routine fixture; a test keeps it identical to `lib/templates.ts`.
+- The SwiftUI iPhone app has the same My routines list and app groups; edits routines on the phone; and runs them with permission handling, session state, a DeviceActivity monitor extension, and on-device checklist/counter storage. Standing routines register one repeating DeviceActivity per chosen weekday and shield through their own ManagedSettings store; limits use DeviceActivity usage thresholds. `public/routines.pocketwork.json` (regenerate with `npm run routines`) is the shared routine fixture; a test keeps it identical to `lib/templates.ts`.
 - GitHub Actions (`.github/workflows/ci.yml`) runs the web checks on Linux and compiles and tests the iPhone app on a macOS runner, uploading simulator screenshots, so the Swift is verified without a Mac.
 
 **The browser does not block apps. Native source compiles and passes its tests on a simulator, but has not run on a physical iPhone.** Follow `ios/README.md` for signing, provisioning, physical-device checks, and Apple's approval requirements.
@@ -59,4 +59,12 @@ UI tokens and structural rules are in `DESIGN.md` and `app/tokens.css`. `tools/u
 
 ## Intentionally not built yet
 
-Cloud sync, multi-device pairing, App Store release, subscriptions, a full drag-and-drop layout grid, recurring schedules, calendar/location integrations, widgets, and MCP. The first MCP implementation should manipulate this same strict document schema with authenticated, user-approved edits, not expose arbitrary native execution.
+App Store release, subscriptions, a full drag-and-drop layout grid, calendar/location integrations, widgets, and MCP. The first MCP implementation should manipulate this same strict document schema with authenticated, user-approved edits, not expose arbitrary native execution.
+
+## Web and iPhone cloud workflow
+
+Use Sign in with Apple on the website and in the updated TestFlight app with the same Apple account. Start with New routine; the ready-made catalog is no longer shown. Existing personal routines are preserved. The website saves locally immediately and syncs after edits, on focus, and every 15 seconds while visible. The iPhone syncs after edits, on opening/foreground, or pull-to-refresh. iOS does not receive cloud changes while the app is closed; open it to apply updated schedules. Choose apps and grant Screen Time access on the phone. Ongoing timer progress and private app selections remain on device.
+
+The existing Supabase libraries table and RLS policies work without another migration. Writes compare the server updated_at timestamp and retry after conflicts. Account libraries are stored separately on each device. iPhone refresh tokens live in Keychain. Google support is implemented but hidden until enabled (web: NEXT_PUBLIC_GOOGLE_ENABLED=true, iOS Info.plist: SupabaseGoogleEnabled=true).
+
+Add com.braydenfeng.pocketwork://auth/callback to Supabase Authentication redirect URLs. iOS reads SupabaseURL and SupabaseAnonKey from build settings, supplied by the manual TestFlight workflow from the same public client settings as the website. No service-role key is bundled. Local iOS builds need SUPABASE_URL and SUPABASE_ANON_KEY build settings.

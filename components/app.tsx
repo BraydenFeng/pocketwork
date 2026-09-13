@@ -68,7 +68,7 @@ export function PocketworkApp() {
 
 	useEffect(() => {
 		const owner = account?.id ?? null;
-		if (active_owner.current === owner && account_ready.current) { return; }
+		if (active_owner.current === owner && (!owner || account_ready.current)) { account_ready.current = true; return; }
 		account_ready.current = false;
 		try {
 			const previous_owner = active_owner.current;

@@ -15,7 +15,7 @@ struct AccountView: View {
 				} else {
 					HStack {
 						Button("Sign in with Apple") { cloud.sign_in(provider: "apple") }.buttonStyle(PrimaryButtonStyle())
-						Button("Google") { cloud.sign_in(provider: "google") }.buttonStyle(QuietButtonStyle())
+						if Bundle.main.object(forInfoDictionaryKey: "SupabaseGoogleEnabled") as? Bool == true { Button("Google") { cloud.sign_in(provider: "google") }.buttonStyle(QuietButtonStyle()) }
 					}.disabled(cloud.busy)
 				}
 				if let error = cloud.error_message { Text(error).font(.system(size: 13)).foregroundStyle(Theme.danger) }

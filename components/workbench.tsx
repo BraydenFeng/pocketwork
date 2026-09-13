@@ -29,6 +29,11 @@ export function Workbench({ tool, groups, on_save, on_back, storage_blocked, sto
 	tool: AppDocument; groups: AppGroup[]; on_save: (document: AppDocument) => void; on_back: () => void; storage_blocked: boolean; storage_error: string | null; on_replace_unreadable: () => void; on_dismiss_error: () => void; sync: SyncState;
 }) {
 	const [history, set_history] = useState<History<AppDocument>>({ past: [], present: tool, future: [] });
+	const [previous_tool, set_previous_tool] = useState(tool);
+	if (tool !== previous_tool) {
+		set_previous_tool(tool);
+		if (history.present === previous_tool) { set_history({ past: [], present: tool, future: [] }); }
+	}
 	const document = history.present;
 	const [ready, set_ready] = useState(false);
 	const [save_state, set_save_state] = useState("Saved on this browser");

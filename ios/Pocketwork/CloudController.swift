@@ -132,7 +132,7 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 
 	func sync() async {
 		guard var credentials = session, let library, !library.storage_blocked, !syncing else { return }
-		syncing = true; status = "Syncing…"
+		syncing = true; status = "Syncingâ€¦"
 		let epoch = generation
 		defer { syncing = false }
 		do {
@@ -173,7 +173,7 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 				status = "Synced with your account"; error_message = nil; return
 			}
 			throw DocumentError.invalid("Another device is saving. Pull to refresh to retry.")
-		} catch { status = "Saved on this iPhone · sync needs attention"; fail(error) }
+		} catch { status = "Saved on this iPhone Â· sync needs attention"; fail(error) }
 	}
 
 	private func fail(_ error: Error) { error_message = error.localizedDescription }
