@@ -1,0 +1,101 @@
+name: TestFlight
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+jobs:
+  upload:
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      ASC_KEY_ID: JCD8ZK546C
+      ASC_ISSUER_ID: f468a1c0-aa8d-4b2b-ba03-b085f9f307d0
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Import signing material
+        env:
+          CERTIFICATE: ${{ secrets.APPLE_DISTRIBUTION_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_PASSWORD }}
+          APP_PROFILE: ${{ secrets.APPLE_APP_PROFILE }}
+          MONITOR_PROFILE: ${{ secrets.APPLE_MONITOR_PROFILE }}
+          API_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          for name in CERTIFICATE CERTIFICATE_PASSWORD APP_PROFILE MONITOR_PROFILE API_KEY; do
+            test -n "${!name}" || { echo "Missing signing secret: $name"; exit 1; }
+          done
+          KEYCHAIN="$RUNNER_TEMP/pocketwork.keychain-db"
+          KEYCHAIN_PASSWORD=$(openssl rand -hex 32)
+          echo "::add-mask::$KEYCHAIN_PASSWORD"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          printf '%s' "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles" "$HOME/private_keys"
+          printf '%s' "$APP_PROFILE" | base64 --decode > "$RUNNER_TEMP/app.mobileprovision"
+          printf '%s' "$MONITOR_PROFILE" | base64 --decode > "$RUNNER_TEMP/monitor.mobileprovision"
+          for target in app monitor; do
+            security cms -D -i "$RUNNER_TEMP/$target.mobileprovision" > "$RUNNER_TEMP/$target.plist"
+            UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' "$RUNNER_TEMP/$target.plist")
+            cp "$RUNNER_TEMP/$target.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
+          done
+          printf '%s' "$API_KEY" > "$HOME/private_keys/AuthKey_$ASC_KEY_ID.p8"
+          chmod 600 "$HOME/private_keys/AuthKey_$ASC_KEY_ID.p8"
+      - name: Configure distribution signing
+        run: |
+          set -euo pipefail
+          export APP_PROFILE_NAME=$(/usr/libexec/PlistBuddy -c 'Print Name' "$RUNNER_TEMP/app.plist")
+          export MONITOR_PROFILE_NAME=$(/usr/libexec/PlistBuddy -c 'Print Name' "$RUNNER_TEMP/monitor.plist")
+          ruby <<'RUBY'
+          require 'yaml'
+          path = 'ios/project.yml'
+          project = YAML.load_file(path)
+          project['settings']['base']['CURRENT_PROJECT_VERSION'] = ENV.fetch('GITHUB_RUN_NUMBER')
+          {'Pocketwork' => 'APP_PROFILE_NAME', 'FocusMonitor' => 'MONITOR_PROFILE_NAME'}.each do |target, variable|
+            settings = project['targets'][target]['settings']['base']
+            settings['CODE_SIGN_STYLE'] = 'Manual'
+            settings['CODE_SIGN_IDENTITY'] = 'Apple Distribution'
+            settings['PROVISIONING_PROFILE_SPECIFIER'] = ENV.fetch(variable)
+          end
+          File.write(path, YAML.dump(project))
+          RUBY
+          python3 <<'PY'
+          import os, plistlib
+          options = {'method': 'app-store-connect', 'teamID': 'W9DZ99R2NS', 'signingStyle': 'manual', 'signingCertificate': 'Apple Distribution', 'manageAppVersionAndBuildNumber': False, 'provisioningProfiles': {'com.braydenfeng.pocketwork': os.environ['APP_PROFILE_NAME'], 'com.braydenfeng.pocketwork.FocusMonitor': os.environ['MONITOR_PROFILE_NAME']}}
+          with open(os.environ['RUNNER_TEMP'] + '/ExportOptions.plist', 'wb') as handle:
+              plistlib.dump(options, handle)
+          PY
+          cd ios
+          xcodegen generate
+      - name: Archive and export
+        run: |
+          set -euo pipefail
+          xcodebuild archive -project ios/Pocketwork.xcodeproj -scheme Pocketwork -configuration Release -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Pocketwork.xcarchive" > "$RUNNER_TEMP/archive.log" 2>&1 || { tail -n 100 "$RUNNER_TEMP/archive.log"; exit 1; }
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Pocketwork.xcarchive" -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" > "$RUNNER_TEMP/export.log" 2>&1 || { tail -n 100 "$RUNNER_TEMP/export.log"; exit 1; }
+      - name: Upload to TestFlight
+        run: |
+          set -euo pipefail
+          xcrun altool --upload-app --type ios --file "$RUNNER_TEMP/export/Pocketwork.ipa" --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+      - name: Keep build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testflight-build-logs
+          path: |
+            ${{ runner.temp }}/archive.log
+            ${{ runner.temp }}/export.log
+          if-no-files-found: ignore
+      - name: Remove signing material
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/pocketwork.keychain-db" || true
+          rm -f "$HOME/private_keys/AuthKey_$ASC_KEY_ID.p8" "$RUNNER_TEMP/certificate.p12"
+          rm -f "$RUNNER_TEMP/app.mobileprovision" "$RUNNER_TEMP/monitor.mobileprovision"

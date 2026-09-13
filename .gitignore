@@ -16,3 +16,8 @@ ios/Config.local.xcconfig
 .claude/
 ios/xcodebuild.log
 ios/screenshots/
+
+# Private Apple signing keys
+*.p8
+
+.signing/
