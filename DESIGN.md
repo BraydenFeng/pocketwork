@@ -55,3 +55,8 @@ Brayden requested a Notion/Obsidian-inspired phone interface and direct home-scr
 
 
 Phone editing follow-up: Edit opens the actual routine page in place. Preserve its heading rail, timer and counter cards, checklist rows, and note typography. Text becomes editable where it already lives; only configuration controls replace live actions. A quiet bottom bar offers Cancel, Add block, and behavior settings. Save returns to the same running page. Home allowances likewise keep their existing page and edit budgets inside its schedule cards. No block list or separate inspector is the default editing destination.
+
+
+## Connected logic workspace
+
+Brayden selected a Supabase-diagram-like node canvas alongside the Page view. Repeat three structures: compact node cards with labelled input/output ports, graphite connection wires with one selected accent, and a separate inspector for node settings. Node positions are workspace geometry; connections translate into the existing executable native routine schema. Unsupported combinations must fail explicitly rather than imply arbitrary code execution. Keep Page and Logic visibly accessible for home allowances as well as ordinary routines. Native capability boundaries remain visible, and draft graphs require Apply before their rules sync.

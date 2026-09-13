@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
+import { graph_from_document } from "../lib/logic-graph";
 import { call_mcp_tool } from "../lib/mcp";
 import { personal_routine } from "../lib/personal-routine";
 import { empty_library } from "../lib/library";
@@ -33,4 +34,23 @@ it("describes partial-minute and geofence limits", async () => {
 	const result = await call_mcp_tool(cloud, account, "get_capabilities", {});
 	expect(result.content[0].text).toContain("partial minute");
 	expect(result.content[0].text).toContain("150 m");
+});
+
+it("graph tools only read routines in the authenticated account", async () => {
+	vi.mocked(fetch_library).mockResolvedValue(null);
+	await expect(call_mcp_tool(cloud, account, "get_routine_graph", { id: personal_routine.id })).rejects.toThrow("not found");
+	expect(fetch_library).toHaveBeenCalledWith(cloud, account);
+});
+it("graph saves reject a stale base before writing", async () => {
+	vi.mocked(fetch_library).mockResolvedValue({ library: { ...empty_library, tools: [{ document: { ...personal_routine, name: "Newer edit" }, updated_at: "now" }] }, updated_at: "revision" });
+	const graph = graph_from_document(personal_routine); graph.nodes.find((node) => node.kind === "allowance")!.policy!.rules[0].allowance_minutes = 45;
+	await expect(call_mcp_tool(cloud, account, "save_routine_graph", { base_document: personal_routine, graph })).rejects.toThrow("changed");
+	expect(push_library).not.toHaveBeenCalled();
+});
+it("graph saves compile the edited budget into the owner library", async () => {
+	vi.mocked(fetch_library).mockResolvedValue({ library: { ...empty_library, tools: [{ document: personal_routine, updated_at: "now" }] }, updated_at: "revision" });
+	vi.mocked(push_library).mockResolvedValue(true);
+	const graph = graph_from_document(personal_routine); graph.nodes.find((node) => node.kind === "allowance")!.policy!.rules[0].allowance_minutes = 45;
+	await call_mcp_tool(cloud, account, "save_routine_graph", { base_document: personal_routine, graph });
+	expect(vi.mocked(push_library).mock.calls[0][2].tools[0].document.home_allowance!.rules[0].allowance_minutes).toBe(45);
 });

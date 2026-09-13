@@ -48,8 +48,9 @@ test("existing native blocks open settings instead of appearing disabled", async
 	await expect(page.locator(".block-outline li")).toHaveCount(4);
 	await page.getByRole("button", { name: "Edit Screen Time", exact: true }).click();
 	await expect(page.getByText("Your selection stays on your phone.")).toBeVisible();
-	await page.getByRole("tab", { name: "Rules", exact: true }).click();
-	await page.getByRole("button", { name: "Test these rules", exact: true }).click();
+	await page.getByRole("tab", { name: "Logic", exact: true }).click();
+	await page.getByRole("tab", { name: "Page", exact: true }).click();
+	await page.getByRole("button", { name: "Try it", exact: true }).click();
 	await expect(page.getByRole("button", { name: "Start focusing", exact: true })).toBeEnabled();
 });
 
