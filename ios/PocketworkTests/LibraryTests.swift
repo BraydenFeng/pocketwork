@@ -146,7 +146,7 @@ final class LibraryTests: XCTestCase {
 		XCTAssertEqual(library.tools[0].document.shield?.group_names, ["Feeds"])
 		XCTAssertThrowsError(try library.removing_group(id))
 		let unused = try ToolLibrary.empty.adding_group("Unused")
-		XCTAssertNil(try unused.removing_group(try XCTUnwrap(unused.groups?.first?.id)).groups)
+		XCTAssertEqual(try unused.removing_group(try XCTUnwrap(unused.groups?.first?.id)).groups, [])
 	}
 
 	func test_routines_create_the_groups_they_mention() throws {

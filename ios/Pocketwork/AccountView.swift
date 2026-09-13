@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AccountView: View {
 	@EnvironmentObject private var cloud: CloudController
+	@EnvironmentObject private var sessions: SessionController
 	var body: some View {
 		VStack(alignment: .leading, spacing: 10) {
 			if cloud.configured {
@@ -18,6 +19,7 @@ struct AccountView: View {
 						if Bundle.main.object(forInfoDictionaryKey: "SupabaseGoogleEnabled") as? Bool == true { Button("Google") { cloud.sign_in(provider: "google") }.buttonStyle(QuietButtonStyle()) }
 					}.disabled(cloud.busy)
 				}
+				if let error = sessions.error_message { Text(error).font(.system(size: 13)).foregroundStyle(Theme.danger) }
 				if let error = cloud.error_message { Text(error).font(.system(size: 13)).foregroundStyle(Theme.danger) }
 			} else { Text("Cloud sync is not configured in this build.").supporting() }
 		}

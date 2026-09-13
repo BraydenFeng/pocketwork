@@ -153,7 +153,10 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 				if merged != old {
 					try library.receive_cloud(merged)
 					// Cloud settings take effect when this app opens, after on-device consent and selection.
-					for entry in old.tools where merged.find(entry.id) == nil { sessions?.forget(entry.id) }
+					for entry in old.tools {
+						if merged.find(entry.id) == nil { sessions?.forget(entry.id) }
+						else if entry.document.is_standing && merged.find(entry.id)?.is_standing != true { _ = sessions?.set_standing(entry.document, enabled: false, groups: old.groups ?? []) }
+					}
 					for entry in merged.tools where entry.document.is_standing {
 						if old.find(entry.id) != entry.document || old.groups != merged.groups {
 							_ = sessions?.set_standing(entry.document, enabled: entry.document.enabled == true, groups: merged.groups ?? [])
