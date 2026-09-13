@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 // The front door, drawn like the web editor's My routines page: saved routines as cards, then app groups, then ready-made routines.
 struct HomeView: View {
+	@EnvironmentObject private var cloud: CloudController
 	@EnvironmentObject private var library: LibraryController
 	@EnvironmentObject private var sessions: SessionController
 	@State private var path: [String] = []
@@ -17,9 +18,11 @@ struct HomeView: View {
 			ScrollView {
 				VStack(alignment: .leading, spacing: 0) {
 					intro
+					AccountView()
 					Hairline()
-					section(number: "01", label: "My routines", heading: library.sorted_tools.isEmpty ? "Nothing here yet." : "Pick up where you left off.", supporting: library.sorted_tools.isEmpty ? "Choose a routine below and it becomes your first one. You can change every part of it afterwards." : nil) {
+					section(number: "01", label: "My routines", heading: library.sorted_tools.isEmpty ? "Nothing here yet." : "Pick up where you left off.", supporting: library.sorted_tools.isEmpty ? "Create a routine here, or sign in to bring in the routines you made on your computer." : nil) {
 						if library.storage_blocked { storage_warning }
+						Button { if let document = library.create_blank() { path = [document.id] } } label: { Label("New routine", systemImage: "plus") }.buttonStyle(PrimaryButtonStyle(accent: true))
 						ForEach(library.sorted_tools) { entry in routine_card(entry) }
 					}
 					Hairline()
@@ -37,21 +40,12 @@ struct HomeView: View {
 							}
 						}.buttonStyle(.plain).accessibilityIdentifier("home.groups")
 					}
-					Hairline()
-					section(number: "03", label: "Ready-made routines", heading: "Ready to use. Yours to change.", supporting: "Some run when you start them. Some switch themselves on at set times. All keep the apps you choose out of the way.") {
-						ForEach(library.routines) { routine in template_card(routine) }
-						Card(tinted: true, dashed: true) {
-							VStack(alignment: .leading, spacing: 10) {
-								Text("Blank routine").heading_font(15)
-								Text("Start from nothing and add the blocks you want.").supporting()
-								Button { if let document = library.create_blank() { path = [document.id] } } label: { Label("Start blank", systemImage: "plus") }.buttonStyle(QuietButtonStyle())
-							}
-						}
-					}
+
 					Hairline()
 					footer
 				}
 			}
+			.refreshable { await cloud.sync() }
 			.page()
 			.navigationTitle("My routines")
 			.navigationBarTitleDisplayMode(.inline)
@@ -92,7 +86,7 @@ struct HomeView: View {
 	private var intro: some View {
 		VStack(alignment: .leading, spacing: 8) {
 			Text("My routines").heading_font(28)
-			Text("Small iPhone routines that hold you to what you decided. Start from one that works, then make it yours.").supporting()
+			Text("Your own little tools. Create on your computer. Use them here.").supporting()
 			HStack(spacing: 8) {
 				Circle().fill(library.storage_blocked ? Theme.danger : Theme.success).frame(width: 6, height: 6)
 				Text(library.storage_blocked ? "Saved routines need attention" : "\(library.sorted_tools.count) saved on this iPhone").font(.system(size: 13)).foregroundStyle(library.storage_blocked ? Theme.danger : Theme.text_faint)
@@ -170,17 +164,6 @@ struct HomeView: View {
 					Button { _ = library.duplicate(document.id) } label: { Label("Duplicate", systemImage: "doc.on.doc") }.buttonStyle(TextButtonStyle())
 					Button { pending_delete = entry } label: { Label("Delete", systemImage: "trash") }.buttonStyle(TextButtonStyle(danger: true))
 				}
-			}
-		}
-	}
-
-	private func template_card(_ routine: Routine) -> some View {
-		Card(tinted: true) {
-			VStack(alignment: .leading, spacing: 10) {
-				Text(routine.name).heading_font(15)
-				Text(routine.tagline).supporting()
-				Button { if let document = library.create(from: routine) { path = [document.id] } } label: { HStack { Text("Use this routine"); Image(systemName: "arrow.right") } }
-					.buttonStyle(PrimaryButtonStyle(accent: true)).accessibilityIdentifier("routine.\(routine.template_id)")
 			}
 		}
 	}

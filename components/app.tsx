@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppDocument } from "@/lib/document";
 import { connect_cloud, current_account, fetch_library, push_library, sign_in_with_google, sign_out, watch_account, type Account, type Cloud } from "@/lib/cloud";
-import { add_group, delete_tool, duplicate_tool, empty_library, find_tool, import_tool, load_library, remove_group, rename_group, save_library, upsert_tool, type Library } from "@/lib/library";
+import { add_group, delete_tool, duplicate_tool, empty_library, find_tool, import_tool, load_library, remove_group, rename_group, save_library, upsert_tool, LIBRARY_KEY, library_schema, type Library } from "@/lib/library";
 import { merge_libraries, same_library } from "@/lib/sync";
 import { Home } from "./home";
 import { Workbench } from "./workbench";
@@ -32,6 +32,9 @@ export function PocketworkApp() {
 	const account_ref = useRef(account);
 	const syncing = useRef(false);
 	const last_pushed = useRef<string | null>(null);
+	const active_owner = useRef<string | null>(null);
+	const account_ready = useRef(false);
+	const storage = useCallback(() => ({ getItem: (key: string) => window.localStorage.getItem(active_owner.current ? `${key}.${active_owner.current}` : key), setItem: (key: string, value: string) => window.localStorage.setItem(active_owner.current ? `${key}.${active_owner.current}` : key, value) }), []);
 	useEffect(() => { library_ref.current = library; }, [library]);
 	useEffect(() => { account_ref.current = account; }, [account]);
 	useEffect(() => {
@@ -63,48 +66,60 @@ export function PocketworkApp() {
 		return () => { cancelled = true; stop(); };
 	}, []);
 
-	// Pull the account copy, reconcile with this device, and push back whatever the account was missing.
+	useEffect(() => {
+		const owner = account?.id ?? null;
+		if (active_owner.current === owner && account_ready.current) { return; }
+		account_ready.current = false;
+		try {
+			const previous_owner = active_owner.current;
+			active_owner.current = owner;
+			const raw = storage().getItem(LIBRARY_KEY);
+			const next = raw ? library_schema.parse(JSON.parse(raw)) : !previous_owner ? library_ref.current : empty_library;
+			library_ref.current = next; set_library(next); set_open_id(null);
+			save_library(storage(), next);
+			if (owner && !previous_owner) { window.localStorage.removeItem(LIBRARY_KEY); window.localStorage.removeItem("pocketwork.document.v1"); }
+			set_storage_blocked(false); last_pushed.current = null; account_ready.current = true;
+		} catch (failure) { set_storage_blocked(true); set_error(error_message(failure)); }
+	}, [account, storage]);
+
 	const sync_now = useCallback(async () => {
 		const connection = cloud; const who = account_ref.current;
-		if (!connection || !who || syncing.current) { return; }
+		if (!connection || !who || !account_ready.current || storage_blocked || syncing.current) { return; }
 		syncing.current = true; set_sync("syncing");
 		try {
-			const remote = await fetch_library(connection, who);
-			const local = library_ref.current;
-			const merged = remote ? merge_libraries(local, remote, Date.now()) : local;
-			if (!same_library(merged, local)) {
-				library_ref.current = merged; set_library(merged);
-				if (!storage_blocked) { save_library(window.localStorage, merged); }
+			for (let attempt = 0; attempt < 5; attempt++) {
+				const remote = await fetch_library(connection, who);
+				if (account_ref.current?.id !== who.id) { return; }
+				const merged = remote ? merge_libraries(library_ref.current, remote.library, Date.now()) : library_ref.current;
+				library_schema.parse(merged);
+				if (!same_library(merged, library_ref.current)) { library_ref.current = merged; set_library(merged); save_library(storage(), merged); }
+				if (remote && same_library(merged, remote.library) || await push_library(connection, who, merged, remote)) {
+					if (account_ref.current?.id !== who.id) { return; }
+					last_pushed.current = JSON.stringify(merged);
+					if (!same_library(merged, library_ref.current)) { continue; }
+					set_sync("synced"); return;
+				}
 			}
-			if (!remote || !same_library(merged, remote)) { await push_library(connection, who, merged); }
-			last_pushed.current = JSON.stringify(merged);
-			set_sync("synced");
+			throw new Error("Your other device is saving changes. Sync will retry shortly.");
 		} catch (failure) { set_sync("error"); set_error(error_message(failure)); }
 		finally { syncing.current = false; }
-	}, [cloud, storage_blocked]);
+	}, [cloud, storage_blocked, storage]);
 
 	useEffect(() => {
-		if (!account) { set_sync("off"); last_pushed.current = null; return; }
+		if (!account) { set_sync("off"); return; }
 		void sync_now();
 		const on_focus = () => { if (document.visibilityState === "visible") { void sync_now(); } };
+		const interval = window.setInterval(on_focus, 15000);
 		window.addEventListener("focus", on_focus);
-		document.addEventListener("visibilitychange", on_focus);
-		return () => { window.removeEventListener("focus", on_focus); document.removeEventListener("visibilitychange", on_focus); };
+		window.addEventListener("online", on_focus);
+		return () => { clearInterval(interval); window.removeEventListener("focus", on_focus); window.removeEventListener("online", on_focus); };
 	}, [account, sync_now]);
 
-	// Every local change goes up shortly after it is saved here.
 	useEffect(() => {
-		if (!cloud || !account || !ready) { return; }
-		const snapshot = JSON.stringify(library);
-		if (snapshot === last_pushed.current) { return; }
-		const timeout = window.setTimeout(async () => {
-			if (syncing.current) { return; }
-			set_sync("syncing");
-			try { await push_library(cloud, account, library); last_pushed.current = snapshot; set_sync("synced"); }
-			catch (failure) { set_sync("error"); set_error(error_message(failure)); }
-		}, 800);
+		if (!account || !ready || JSON.stringify(library) === last_pushed.current) { return; }
+		const timeout = window.setTimeout(() => { void sync_now(); }, 800);
 		return () => window.clearTimeout(timeout);
-	}, [library, cloud, account, ready]);
+	}, [library, account, ready, sync_now]);
 
 	// The URL carries which routine is open so the browser back button returns to My routines.
 	function navigate(id: string | null) {
@@ -119,7 +134,7 @@ export function PocketworkApp() {
 		library_ref.current = next;
 		set_library(next);
 		if (storage_blocked) { return; }
-		save_library(window.localStorage, next);
+		save_library(storage(), next);
 	}
 
 	function try_persist(next: Library) {
@@ -131,8 +146,8 @@ export function PocketworkApp() {
 		const next = upsert_tool(library_ref.current, document, Date.now());
 		library_ref.current = next;
 		set_library(next);
-		if (!storage_blocked) { save_library(window.localStorage, next); }
-	}, [storage_blocked]);
+		if (!storage_blocked) { save_library(storage(), next); }
+	}, [storage_blocked, storage]);
 
 	function create_tool(document: AppDocument) {
 		try { persist(upsert_tool(library, document, Date.now())); set_error(null); navigate(document.id); }
@@ -165,7 +180,7 @@ export function PocketworkApp() {
 	function replace_unreadable() {
 		if (!window.confirm("Discard the unreadable saved data and start with an empty list of routines?")) { return; }
 		set_storage_blocked(false); set_error(null);
-		try { save_library(window.localStorage, library); } catch (failure) { set_error(error_message(failure)); }
+		try { save_library(storage(), library); } catch (failure) { set_error(error_message(failure)); }
 	}
 
 	// Group operations validate before they persist, so the whole step sits inside the try.
@@ -181,14 +196,14 @@ export function PocketworkApp() {
 		attempt(() => remove_group(library, id));
 	}
 
-	async function start_sign_in() {
+	async function start_sign_in(provider: "apple" | "google") {
 		if (!cloud) { return; }
-		try { await sign_in_with_google(cloud); } catch (failure) { set_error(error_message(failure)); }
+		try { await sign_in_with_google(cloud, provider); } catch (failure) { set_error(error_message(failure)); }
 	}
 
 	async function finish_sign_out() {
 		if (!cloud) { return; }
-		try { await sign_out(cloud); set_account(null); set_notice("Signed out. Your routines stay on this browser."); }
+		try { await sign_out(cloud); set_account(null); set_notice("Signed out. Your account routines are kept separately on this browser."); }
 		catch (failure) { set_error(error_message(failure)); }
 	}
 
@@ -201,7 +216,7 @@ export function PocketworkApp() {
 	}
 
 	return <Home library={library} now={Date.now()} error={error} notice={notice} storage_blocked={storage_blocked}
-		cloud_available={cloud !== null} account={account} sync={sync} on_sign_in={() => { void start_sign_in(); }} on_sign_out={() => { void finish_sign_out(); }}
+		cloud_available={cloud !== null} account={account} sync={sync} on_sign_in={(provider) => { void start_sign_in(provider); }} on_sign_out={() => { void finish_sign_out(); }}
 		on_open={navigate} on_create={create_tool} on_delete={remove_tool} on_duplicate={copy_tool} on_import={add_imported} on_toggle={toggle_tool}
 		on_add_group={create_group} on_rename_group={change_group_name} on_remove_group={drop_group}
 		on_error={set_error} on_dismiss_error={() => set_error(null)} on_dismiss_notice={() => set_notice(null)} on_replace_unreadable={replace_unreadable} />;

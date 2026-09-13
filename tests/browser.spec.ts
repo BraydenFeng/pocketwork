@@ -77,7 +77,7 @@ test("unreadable storage is never silently overwritten", async ({ page }) => {
 	await page.addInitScript(() => localStorage.setItem("pocketwork.library.v1", "unreadable"));
 	await page.goto("/");
 	await expect(page.locator(".alert-banner")).toContainText("not been overwritten");
-	await page.getByRole("button", { name: "Use this routine" }).first().click();
+	await page.getByRole("button", { name: "New routine", exact: true }).click();
 	await page.getByRole("button", { name: "Add Note", exact: true }).click();
 	await page.waitForTimeout(500);
 	expect(await page.evaluate(() => localStorage.getItem("pocketwork.library.v1"))).toBe("unreadable");

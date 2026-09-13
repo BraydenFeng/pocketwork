@@ -23,6 +23,7 @@ struct ToolLibrary: Codable, Equatable {
 	var removed: [String: String]?
 	// App groups are named here and shared by every routine; which apps are in them is set on each phone.
 	var groups: [AppGroup]?
+	var groups_updated_at: String? = nil
 
 	static let empty = ToolLibrary(schema_version: 1, tools: [], removed: nil, groups: nil)
 	static let max_groups = 20
@@ -70,6 +71,7 @@ struct ToolLibrary: Codable, Equatable {
 		guard group(named: name) == nil else { throw DocumentError.invalid("There is already an app group called \"\(name)\".") }
 		guard (groups ?? []).count < Self.max_groups else { throw DocumentError.invalid("You can have up to \(Self.max_groups) app groups.") }
 		var next = self
+		next.groups_updated_at = Self.iso_formatter.string(from: .now)
 		next.groups = (groups ?? []) + [AppGroup(id: UUID().uuidString, name: name)]
 		return next
 	}
@@ -81,6 +83,7 @@ struct ToolLibrary: Codable, Equatable {
 		guard !name.isEmpty, name.utf16.count <= 40 else { throw DocumentError.invalid("Group names are 1 to 40 characters.") }
 		if let clash = group(named: name), clash.id != id { throw DocumentError.invalid("There is already an app group called \"\(name)\".") }
 		var next = self
+		next.groups_updated_at = Self.iso_formatter.string(from: now)
 		next.groups = (groups ?? []).map { $0.id == id ? AppGroup(id: id, name: name) : $0 }
 		next.tools = tools.map { entry in
 			guard entry.document.referenced_groups.contains(where: { $0.lowercased() == old.name.lowercased() }) else { return entry }
@@ -102,7 +105,8 @@ struct ToolLibrary: Codable, Equatable {
 		guard users.isEmpty else { throw DocumentError.invalid("\"\(old.name)\" is used by \(users.map { "\"\($0.name)\"" }.joined(separator: ", ")). Take it out of those routines first.") }
 		var next = self
 		let remaining = (groups ?? []).filter { $0.id != id }
-		next.groups = remaining.isEmpty ? nil : remaining
+		next.groups_updated_at = Self.iso_formatter.string(from: .now)
+		next.groups = remaining
 		return next
 	}
 

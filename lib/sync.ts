@@ -18,7 +18,7 @@ export function merge_libraries(local: Library, remote: Library, now: number): L
 	const tools: LibraryEntry[] = [];
 	for (const entry of by_id.values()) {
 		const tombstone = removed[entry.document.id];
-		if (tombstone && tombstone > entry.updated_at) { continue; }
+		if (tombstone && tombstone >= entry.updated_at) { continue; }
 		if (tombstone) { delete removed[entry.document.id]; }
 		tools.push(entry);
 	}
@@ -26,14 +26,19 @@ export function merge_libraries(local: Library, remote: Library, now: number): L
 	for (const [id, stamp] of Object.entries(removed)) { if (stamp < horizon) { delete removed[id]; } }
 	const merged: Library = { schema_version: 1, tools: tools.sort((left, right) => left.document.id.localeCompare(right.document.id)) };
 	if (Object.keys(removed).length) { merged.removed = removed; }
-	// Groups are small and rarely conflict: union by id, first name wins, and a name clash keeps the local one.
-	const groups = new Map<string, { id: string; name: string }>();
-	const names = new Set<string>();
-	for (const group of [...(local.groups ?? []), ...(remote.groups ?? [])]) {
-		if (groups.has(group.id) || names.has(group.name.toLowerCase())) { continue; }
-		groups.set(group.id, group); names.add(group.name.toLowerCase());
+	// Group-list edits are atomic so renames and deletions cannot return from an older device.
+	if (local.groups_updated_at || remote.groups_updated_at) {
+		const source = (local.groups_updated_at ?? "") > (remote.groups_updated_at ?? "") ? local : remote;
+		merged.groups = source.groups ?? [];
+		merged.groups_updated_at = source.groups_updated_at;
+	} else {
+		const groups = new Map<string, { id: string; name: string }>();
+		const names = new Set<string>();
+		for (const group of [...(local.groups ?? []), ...(remote.groups ?? [])]) {
+			if (!groups.has(group.id) && !names.has(group.name.toLowerCase())) { groups.set(group.id, group); names.add(group.name.toLowerCase()); }
+		}
+		if (groups.size) { merged.groups = [...groups.values()].sort((a, b) => a.id.localeCompare(b.id)); }
 	}
-	if (groups.size) { merged.groups = [...groups.values()].sort((left, right) => left.id.localeCompare(right.id)); }
 	return merged;
 }
 
@@ -42,5 +47,5 @@ export function same_library(left: Library, right: Library): boolean {
 }
 
 function normalize(library: Library) {
-	return { tools: [...library.tools].sort((left, right) => left.document.id.localeCompare(right.document.id)), removed: library.removed ?? {}, groups: [...(library.groups ?? [])].sort((left, right) => left.id.localeCompare(right.id)) };
+	return { groups_updated_at: library.groups_updated_at, tools: [...library.tools].sort((left, right) => left.document.id.localeCompare(right.document.id)), removed: library.removed ?? {}, groups: [...(library.groups ?? [])].sort((left, right) => left.id.localeCompare(right.id)) };
 }

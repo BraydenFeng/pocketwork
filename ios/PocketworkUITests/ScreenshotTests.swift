@@ -20,44 +20,18 @@ final class ScreenshotTests: XCTestCase {
 		XCTAssertTrue(app.navigationBars["My routines"].waitForExistence(timeout: 10))
 		try snap("01-home-empty")
 
-		element("routine.deep-work").tap()
-		XCTAssertTrue(app.navigationBars["Deep work"].waitForExistence(timeout: 10))
-		try snap("02-tool-deep-work")
-
+		XCTAssertFalse(app.buttons["Use this routine"].exists)
+		app.buttons["New routine"].tap()
+		XCTAssertTrue(app.navigationBars["My new routine"].waitForExistence(timeout: 10))
+		try snap("02-blank-routine")
 		element("tool.edit").tap()
 		XCTAssertTrue(app.navigationBars["Edit routine"].waitForExistence(timeout: 10))
 		try snap("03-editor")
-
-		element("block.timer").tap()
-		XCTAssertTrue(app.navigationBars["Focus timer"].waitForExistence(timeout: 10))
-		try snap("04-block-editor-timer")
-
-		app.navigationBars["Focus timer"].buttons.firstMatch.tap()
 		app.buttons["Cancel"].tap()
-		app.navigationBars["Deep work"].buttons.firstMatch.tap()
-		XCTAssertTrue(app.navigationBars["My routines"].waitForExistence(timeout: 10))
-		try snap("05-home-with-routine")
-
-		element("routine.bedtime").tap()
-		XCTAssertTrue(app.navigationBars["Phone-free bedtime"].waitForExistence(timeout: 10))
-		try snap("06-routine-bedtime-standing")
-
-		element("tool.edit").tap()
-		XCTAssertTrue(app.navigationBars["Edit routine"].waitForExistence(timeout: 10))
-		element("block.schedule").tap()
-		XCTAssertTrue(app.navigationBars["Schedule"].waitForExistence(timeout: 10))
-		try snap("07-block-editor-schedule")
-
-		app.navigationBars["Schedule"].buttons.firstMatch.tap()
-		element("block.screen_time").tap()
-		XCTAssertTrue(app.navigationBars["Screen Time"].waitForExistence(timeout: 10))
-		try snap("08-block-editor-screen-time")
-
-		app.navigationBars["Screen Time"].buttons.firstMatch.tap()
-		app.buttons["Cancel"].tap()
-		element("tool.groups").tap()
+		app.navigationBars["My new routine"].buttons.firstMatch.tap()
+		element("home.groups").tap()
 		XCTAssertTrue(app.navigationBars["App groups"].waitForExistence(timeout: 10))
-		try snap("09-app-groups")
+		try snap("04-app-groups")
 	}
 
 	// SwiftUI exposes list rows and toolbar items as different element types; a typed query per kind stays fast.

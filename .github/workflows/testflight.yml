@@ -11,6 +11,8 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 30
     env:
+      SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
       ASC_KEY_ID: JCD8ZK546C
       ASC_ISSUER_ID: f468a1c0-aa8d-4b2b-ba03-b085f9f307d0
     steps:
@@ -74,7 +76,9 @@ jobs:
           require 'yaml'
           path = 'ios/project.yml'
           project = YAML.load_file(path)
-          project['settings']['base']['CURRENT_PROJECT_VERSION'] = ENV.fetch('GITHUB_RUN_NUMBER')
+          project['settings']['base']['CURRENT_PROJECT_VERSION'] = (ENV.fetch('GITHUB_RUN_NUMBER').to_i + 10).to_s
+          project['settings']['base']['SUPABASE_URL'] = ENV.fetch('SUPABASE_URL')
+          project['settings']['base']['SUPABASE_ANON_KEY'] = ENV.fetch('SUPABASE_ANON_KEY')
           {'Pocketwork' => 'APP_PROFILE_NAME', 'FocusMonitor' => 'MONITOR_PROFILE_NAME'}.each do |target, variable|
             settings = project['targets'][target]['settings']['base']
             settings['CODE_SIGN_STYLE'] = 'Manual'

@@ -3,6 +3,8 @@ import SwiftUI
 @main
 struct PocketworkApp: App {
 	@StateObject private var library = LibraryController()
+	@Environment(\.scenePhase) private var scene_phase
+	@StateObject private var cloud = CloudController()
 	@StateObject private var sessions = SessionController()
 
 	// UI tests start from an empty library so screenshots are deterministic.
@@ -19,6 +21,9 @@ struct PocketworkApp: App {
 			HomeView()
 				.environmentObject(library)
 				.environmentObject(sessions)
+				.environmentObject(cloud)
+				.task { await cloud.attach(library, sessions) }
+				.onChange(of: scene_phase) { _, phase in if phase == .active { Task { await cloud.sync() } } }
 		}
 	}
 }

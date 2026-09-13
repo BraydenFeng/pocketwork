@@ -12,7 +12,7 @@ const entry_schema = z.object({ document: document_schema, updated_at: z.string(
 const group_schema = z.object({ id: z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/), name: group_name }).strict();
 
 // `removed` remembers deletions (id → when) so a routine deleted on one device does not come back from another.
-export const library_schema = z.object({ schema_version: z.literal(1), tools: z.array(entry_schema).max(MAX_TOOLS), removed: z.record(z.string(), z.string().datetime()).optional(), groups: z.array(group_schema).max(MAX_GROUPS).optional() }).strict().superRefine((library, context) => {
+export const library_schema = z.object({ schema_version: z.literal(1), tools: z.array(entry_schema).max(MAX_TOOLS), groups_updated_at: z.string().datetime().optional(), removed: z.record(z.string(), z.string().datetime()).optional(), groups: z.array(group_schema).max(MAX_GROUPS).optional() }).strict().superRefine((library, context) => {
 	const ids = new Set<string>();
 	for (const entry of library.tools) {
 		if (ids.has(entry.document.id)) { context.addIssue({ code: "custom", message: "Every routine needs a unique ID." }); }
@@ -94,7 +94,7 @@ export function add_group(library: Library, name: string): Library {
 	if (find_group(library, clean)) { throw new Error(`There is already an app group called "${clean}".`); }
 	const groups = library.groups ?? [];
 	if (groups.length >= MAX_GROUPS) { throw new Error(`You can have up to ${MAX_GROUPS} app groups.`); }
-	return { ...library, groups: [...groups, { id: new_id(), name: clean }] };
+	return { ...library, groups_updated_at: timestamp(Date.now()), groups: [...groups, { id: new_id(), name: clean }] };
 }
 
 // Renaming follows through to every routine that mentions the group, so nothing silently stops matching.
@@ -111,7 +111,7 @@ export function rename_group(library: Library, id: string, name: string, now: nu
 		const blocks = entry.document.blocks.map((block) => block.type === "screen_time" ? { ...block, groups: (block.groups ?? []).map((entry_name) => entry_name.toLowerCase() === group.name.toLowerCase() ? clean : entry_name) } : block);
 		return { document: { ...entry.document, blocks }, updated_at: timestamp(now) };
 	});
-	return { ...library, groups, tools };
+	return { ...library, groups, tools, groups_updated_at: timestamp(now) };
 }
 
 // A group can only go once no routine depends on it; the caller decides what to tell the person.
@@ -121,7 +121,7 @@ export function remove_group(library: Library, id: string): Library {
 	const users = routines_using_group(library, group.name);
 	if (users.length) { throw new Error(`"${group.name}" is used by ${users.map((entry) => `"${entry.name}"`).join(", ")}. Take it out of those routines first.`); }
 	const groups = (library.groups ?? []).filter((entry) => entry.id !== id);
-	return groups.length ? { ...library, groups } : (({ groups: _dropped, ...rest }) => rest)(library);
+	return { ...library, groups, groups_updated_at: timestamp(Date.now()) };
 }
 
 export function routines_using_group(library: Library, name: string): AppDocument[] {

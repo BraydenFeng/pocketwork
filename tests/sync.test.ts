@@ -52,3 +52,14 @@ describe("merging a device copy with the account copy", () => {
 		expect(same_library(one, upsert_tool(one, doc("c"), NOW))).toBe(false);
 	});
 });
+
+it("keeps a newer empty group list instead of resurrecting deleted groups", () => {
+	const local: Library = { ...empty_library, groups: [{ id: "social", name: "Social" }], groups_updated_at: "2026-09-12T10:00:00.000Z" };
+	const remote: Library = { ...empty_library, groups: [], groups_updated_at: "2026-09-12T11:00:00.000Z" };
+	expect(merge_libraries(local, remote, NOW).groups).toEqual([]);
+	expect(merge_libraries(remote, local, NOW).groups).toEqual([]);
+});
+it("deleting in the same millisecond does not resurrect the routine", () => {
+	const local = upsert_tool(empty_library, doc("a"), NOW);
+	expect(merge_libraries(local, delete_tool(local, "a", NOW), NOW).tools).toEqual([]);
+});

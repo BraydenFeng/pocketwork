@@ -32,6 +32,11 @@ targets:
       path: Pocketwork/Info.plist
       properties:
         CFBundleDisplayName: Pocketwork
+        SupabaseURL: $(SUPABASE_URL)
+        SupabaseAnonKey: $(SUPABASE_ANON_KEY)
+        ITSAppUsesNonExemptEncryption: false
+        CFBundleURLTypes:
+          - CFBundleURLSchemes: [com.braydenfeng.pocketwork]
         UILaunchScreen: {}
         PocketworkAppGroup: $(APP_GROUP)
         UISupportedInterfaceOrientations:

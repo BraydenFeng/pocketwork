@@ -129,7 +129,7 @@ describe("app groups", () => {
 		expect(library.tools[0].updated_at).toBe(new Date(NOW + 1000).toISOString());
 		expect(() => remove_group(library, id)).toThrow("used by");
 		const unused = add_group(empty_library, "Unused");
-		expect(remove_group(unused, unused.groups![0].id).groups).toBeUndefined();
+		expect(remove_group(unused, unused.groups![0].id).groups).toEqual([]);
 	});
 	it("creates groups a routine mentions but the library does not have yet", () => {
 		const routine = { ...copy(), blocks: copy().blocks.map((block) => block.type === "screen_time" ? { ...block, mode: "allow_only" as const, groups: ["Work", "Study"] } : block) };

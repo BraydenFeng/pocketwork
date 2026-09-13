@@ -10,13 +10,15 @@ final class LibraryController: ObservableObject {
 	@Published var error_message: String?
 	@Published private(set) var storage_blocked = false
 	private let defaults: UserDefaults
+	private var owner: String?
+	var on_local_change: (() -> Void)?
+	private var current_key: String { owner.map { Self.library_key + "." + $0 } ?? Self.library_key }
 	private let logger = Logger(subsystem: "Pocketwork", category: "LibraryController")
 	static let library_key = "tool_library.v1"
 	static let legacy_key = "personal_tool"
 
 	init(defaults: UserDefaults = .standard, bundle: Bundle = .main) {
 		self.defaults = defaults
-		do { routines = try RoutineCatalog.bundled(in: bundle).routines } catch { report(error) }
 		do { library = try Self.load(from: defaults) }
 		catch { storage_blocked = true; report(error) }
 	}
@@ -95,10 +97,29 @@ final class LibraryController: ObservableObject {
 		catch { report(error); return nil }
 	}
 
+	func switch_account(_ id: String?) throws {
+		guard owner != id else { return }
+		let old_owner = owner
+		let key = id.map { Self.library_key + "." + $0 } ?? Self.library_key
+		let next: ToolLibrary
+		if let data = defaults.data(forKey: key) { next = try ToolLibrary.decode(data) }
+		else { next = id != nil && old_owner == nil ? library : .empty }
+		defaults.set(try next.encoded(), forKey: key)
+		if id != nil && old_owner == nil { defaults.removeObject(forKey: Self.library_key); defaults.removeObject(forKey: Self.legacy_key) }
+		owner = id; storage_blocked = false; library = next
+	}
+
+	func receive_cloud(_ next: ToolLibrary) throws {
+		guard !storage_blocked else { throw DocumentError.invalid("Resolve the local storage error before syncing.") }
+		defaults.set(try next.encoded(), forKey: current_key)
+		library = next
+	}
+
 	private func persist(_ next: ToolLibrary) throws {
 		guard !storage_blocked else { throw DocumentError.invalid("Saved tools need attention before new changes can be kept. Choose Replace unreadable data from the menu.") }
-		defaults.set(try next.encoded(), forKey: Self.library_key)
+		defaults.set(try next.encoded(), forKey: current_key)
 		defaults.removeObject(forKey: Self.legacy_key)
 		library = next
+		on_local_change?()
 	}
 }

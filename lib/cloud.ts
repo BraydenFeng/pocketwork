@@ -28,9 +28,9 @@ export function watch_account(cloud: Cloud, on_change: (account: Account | null)
 	return () => data.subscription.unsubscribe();
 }
 
-export async function sign_in_with_google(cloud: Cloud): Promise<void> {
-	const { error } = await cloud.client.auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${window.location.origin}${window.location.pathname}` } });
-	if (error) { throw new Error(`Google sign-in did not start. ${error.message}`); }
+export async function sign_in_with_google(cloud: Cloud, provider: "apple" | "google" = "google"): Promise<void> {
+	const { error } = await cloud.client.auth.signInWithOAuth({ provider, options: { redirectTo: `${window.location.origin}${window.location.pathname}` } });
+	if (error) { throw new Error(`Sign-in did not start. ${error.message}`); }
 }
 
 export async function sign_out(cloud: Cloud): Promise<void> {
@@ -38,16 +38,22 @@ export async function sign_out(cloud: Cloud): Promise<void> {
 	if (error) { throw new Error(`Could not sign out. ${error.message}`); }
 }
 
-export async function fetch_library(cloud: Cloud, account: Account): Promise<Library | null> {
-	const { data, error } = await cloud.client.from("libraries").select("library").eq("user_id", account.id).maybeSingle();
-	if (error) { throw new Error(`Could not read your routines from your account. ${error.message}`); }
+export type CloudSnapshot = { library: Library; updated_at: string };
+
+export async function fetch_library(cloud: Cloud, account: Account): Promise<CloudSnapshot | null> {
+	const { data, error } = await cloud.client.from("libraries").select("library,updated_at").eq("user_id", account.id).maybeSingle();
+	if (error) { throw new Error(`Could not read your cloud routines. ${error.message}`); }
 	if (!data) { return null; }
-	const result = library_schema.safeParse(data.library);
-	if (!result.success) { throw new Error(`The routines saved to your account could not be read. ${result.error.issues[0].message}`); }
-	return result.data;
+	return { library: library_schema.parse(data.library), updated_at: data.updated_at };
 }
 
-export async function push_library(cloud: Cloud, account: Account, library: Library): Promise<void> {
-	const { error } = await cloud.client.from("libraries").upsert({ user_id: account.id, library: library_schema.parse(library) }, { onConflict: "user_id" });
-	if (error) { throw new Error(`Could not save your routines to your account. ${error.message}`); }
+export async function push_library(cloud: Cloud, account: Account, library: Library, previous: CloudSnapshot | null): Promise<boolean> {
+	const row = { user_id: account.id, library: library_schema.parse(library) };
+	const query = previous
+		? cloud.client.from("libraries").update(row).eq("user_id", account.id).eq("updated_at", previous.updated_at)
+		: cloud.client.from("libraries").insert(row);
+	const { data, error } = await query.select("user_id");
+	if (error?.code === "23505") { return false; }
+	if (error) { throw new Error(`Could not save your cloud routines. ${error.message}`); }
+	return Boolean(data?.length);
 }

@@ -1,22 +1,18 @@
 import { expect, test } from "@playwright/test";
 import { starter_document } from "../lib/document";
+import { templates } from "../lib/templates";
 import { seed_library, STARTER_URL } from "./helpers";
 
-test("a new browser goes from routine to editor to a saved tool card", async ({ page }) => {
+test("a new browser starts blank without a ready-made catalog", async ({ page }) => {
 	await page.goto("/");
 	await expect(page.getByRole("heading", { name: "Nothing here yet." })).toBeVisible();
-	await expect(page.locator(".tool-card:not(.is-template)")).toHaveCount(0);
-	const deep_work = page.getByRole("list", { name: "Routines" }).locator(".tool-card", { hasText: "Deep work" });
-	await deep_work.getByRole("button", { name: "Use this routine" }).click();
-	await expect(page.getByRole("heading", { name: "Deep work", exact: true })).toBeVisible();
-	await expect(page.getByLabel("Time remaining")).toHaveText("90:00");
+	await expect(page.getByRole("button", { name: "Use this routine" })).toHaveCount(0);
+	await page.getByRole("button", { name: "New routine", exact: true }).click();
 	await expect(page).toHaveURL(/\?routine=/);
 	await page.getByRole("button", { name: "My routines", exact: true }).click();
-	await expect(page).not.toHaveURL(/\?routine=/);
-	await expect(page.getByRole("button", { name: "Open Deep work", exact: true })).toBeVisible();
-	await expect(page.locator(".tool-card:not(.is-template)").first()).toContainText("90 min session · blocks Distractions · 3 tasks");
+	await expect(page.getByRole("button", { name: "Open My new routine", exact: true })).toBeVisible();
 	await page.reload();
-	await expect(page.getByRole("button", { name: "Open Deep work", exact: true })).toBeVisible();
+	await expect(page.getByRole("button", { name: "Open My new routine", exact: true })).toBeVisible();
 });
 
 test("the browser back button returns from the editor to my tools", async ({ page }) => {
@@ -76,9 +72,9 @@ test("an unknown tool link falls back to my tools", async ({ page }) => {
 });
 
 test("a scheduled routine gets a switch instead of a start button, on the card and in the preview", async ({ page }) => {
+	await seed_library(page, [templates.find((t) => t.id === "bedtime")!.build()]);
 	await page.goto("/");
-	const bedtime = page.getByRole("list", { name: "Routines" }).locator(".tool-card", { hasText: "Phone-free bedtime" });
-	await bedtime.getByRole("button", { name: "Use this routine" }).click();
+	await page.getByRole("button", { name: "Open Phone-free bedtime", exact: true }).click();
 	await expect(page.getByRole("heading", { name: "Phone-free bedtime", exact: true })).toBeVisible();
 	await expect(page.getByRole("button", { name: "Start focusing" })).toHaveCount(0);
 	await expect(page.getByText("Every day · 10 PM to 7 AM")).toBeVisible();
@@ -98,8 +94,9 @@ test("a scheduled routine gets a switch instead of a start button, on the card a
 });
 
 test("the editor refuses a timer next to a schedule and edits the window", async ({ page }) => {
+	await seed_library(page, [templates.find((t) => t.name === "Workday focus")!.build()]);
 	await page.goto("/");
-	await page.getByRole("list", { name: "Routines" }).locator(".tool-card", { hasText: "Workday focus" }).getByRole("button", { name: "Use this routine" }).click();
+	await page.getByRole("button", { name: "Open Workday focus", exact: true }).click();
 	await page.getByRole("button", { name: "Add Focus timer", exact: true }).click();
 	await expect(page.locator(".notice-banner")).toContainText("not both");
 	await page.getByRole("button", { name: "Edit Schedule", exact: true }).click();
@@ -109,12 +106,13 @@ test("the editor refuses a timer next to a schedule and edits the window", async
 });
 
 test("app groups are named on the home screen and used by routines", async ({ page }) => {
+	await seed_library(page, [templates.find((t) => t.name === "Workday focus")!.build()]);
 	await page.goto("/");
 	await page.getByLabel("New group name").fill("Social");
 	await page.getByRole("button", { name: "Add group", exact: true }).click();
 	await expect(page.getByRole("list", { name: "App groups" })).toContainText("Social");
 	await expect(page.getByRole("list", { name: "App groups" })).toContainText("not used yet");
-	await page.getByRole("list", { name: "Routines" }).locator(".tool-card", { hasText: "Workday focus" }).getByRole("button", { name: "Use this routine" }).click();
+	await page.getByRole("button", { name: "Open Workday focus", exact: true }).click();
 	await expect(page.locator(".preview-shield")).toContainText("Only Work");
 	await page.getByRole("button", { name: "Edit Screen Time", exact: true }).click();
 	await expect(page.getByRole("radio", { name: /Only these/ })).toHaveAttribute("aria-checked", "true");
