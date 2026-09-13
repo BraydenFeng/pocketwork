@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { home_policy_schema } from "./home-policy";
 
 const identifier = z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/);
 const short_text = z.string().trim().min(1).max(80);
@@ -29,7 +30,8 @@ function window_minutes(start: string, end: string): number {
 }
 
 export const document_schema = z.object({
-	schema_version: z.literal(1),
+	schema_version: z.union([z.literal(1), z.literal(2)]),
+	home_allowance: home_policy_schema.optional(),
 	id: identifier,
 	name: short_text,
 	description: z.string().max(200),
@@ -38,6 +40,8 @@ export const document_schema = z.object({
 	// Only meaningful for a standing routine: whether the person has switched it on.
 	enabled: z.boolean().optional(),
 }).strict().superRefine((document, context) => {
+	if ((document.schema_version === 2) !== Boolean(document.home_allowance)) { context.addIssue({ code: "custom", message: "Home allowances require routine format 2." }); }
+	if (document.home_allowance && (!document.blocks.some((b) => b.type === "schedule") || !document.rules.block_during_focus || !document.blocks.some((b) => b.type === "screen_time" && b.mode === "block" && b.groups?.length === 1))) { context.addIssue({ code: "custom", message: "Home allowances require a schedule and one distraction group in block mode." }); }
 	const ids = new Set<string>();
 	for (const block of document.blocks) {
 		for (const id of [block.id, ...(block.type === "checklist" ? block.items.map((item) => item.id) : [])]) {

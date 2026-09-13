@@ -19,7 +19,8 @@ struct ToolView: View {
 
 	var body: some View {
 		Group {
-			if let document = library.tool(document_id) {
+			if let document = library.tool(document_id), document.home_allowance != nil { HomeAllowanceView(document: document) }
+			else if let document = library.tool(document_id) {
 				ScrollView {
 					VStack(alignment: .leading, spacing: 20) {
 						HStack(spacing: 8) {

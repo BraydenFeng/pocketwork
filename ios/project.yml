@@ -37,6 +37,8 @@ targets:
         SupabaseURL: $(SUPABASE_URL)
         SupabaseAnonKey: $(SUPABASE_ANON_KEY)
         ITSAppUsesNonExemptEncryption: false
+        NSLocationWhenInUseUsageDescription: Choose your home so distraction rules apply only there.
+        NSLocationAlwaysAndWhenInUseUsageDescription: Detect arriving home and leaving so away screen time never uses your home allowance.
         CFBundleURLTypes:
           - CFBundleURLSchemes: [com.braydenfeng.pocketwork]
         UILaunchScreen: {}

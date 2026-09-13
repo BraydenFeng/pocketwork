@@ -96,7 +96,7 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 		do {
 			let code = SecItemDelete(keychain_query as CFDictionary)
 			guard code == errSecSuccess || code == errSecItemNotFound else { throw DocumentError.invalid("Could not clear the saved sign-in.") }
-			_ = sessions?.clear_everything()
+			for id in sessions?.clear_everything() ?? [] { library?.set_enabled(id, false) }
 			try library?.switch_account(nil)
 			generation += 1; session = nil; signed_in = false; email = nil; status = "Signed out. Your cloud routines are kept in your account."
 		} catch { fail(error) }

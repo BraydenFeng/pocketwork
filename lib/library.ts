@@ -13,6 +13,7 @@ const group_schema = z.object({ id: z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/), n
 
 // `removed` remembers deletions (id → when) so a routine deleted on one device does not come back from another.
 export const library_schema = z.object({ schema_version: z.literal(1), tools: z.array(entry_schema).max(MAX_TOOLS), groups_updated_at: z.string().datetime().optional(), removed: z.record(z.string(), z.string().datetime()).optional(), groups: z.array(group_schema).max(MAX_GROUPS).optional() }).strict().superRefine((library, context) => {
+	if (library.tools.filter((entry) => entry.document.home_allowance).length > 1) { context.addIssue({ code: "custom", message: "One home allowance can run on this iPhone." }); }
 	const ids = new Set<string>();
 	for (const entry of library.tools) {
 		if (ids.has(entry.document.id)) { context.addIssue({ code: "custom", message: "Every routine needs a unique ID." }); }
@@ -152,6 +153,7 @@ export function format_edited(updated_at: string, now: number): string {
 
 // A one-line, plain-language description of what a routine does, for cards.
 export function summarize_tool(document: AppDocument): string {
+	if (document.home_allowance) { return "Home only · shared daily distraction allowance"; }
 	const parts: string[] = [];
 	const timer = document.blocks.find((block) => block.type === "timer");
 	const schedule = document.blocks.find((block) => block.type === "schedule");

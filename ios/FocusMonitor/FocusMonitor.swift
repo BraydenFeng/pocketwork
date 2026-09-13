@@ -8,6 +8,10 @@ final class FocusMonitor: DeviceActivityMonitor {
 
 	override func intervalDidStart(for activity: DeviceActivityName) {
 		super.intervalDidStart(for: activity)
+		if activity.rawValue.hasPrefix(HomeEngine.prefix) {
+			if !activity.rawValue.hasPrefix(HomeEngine.prefix + "meter.") { do { try HomeEngine.clock_changed() } catch { logger.error("Home window failed: \(error.localizedDescription, privacy: .public)") } }
+			return
+		}
 		if let routine_id = SharedStore.standing_id(from: activity) { standing_window_opened(routine_id); return }
 		do {
 			let shared = try SharedStore()
@@ -26,6 +30,7 @@ final class FocusMonitor: DeviceActivityMonitor {
 
 	override func intervalDidEnd(for activity: DeviceActivityName) {
 		super.intervalDidEnd(for: activity)
+		if activity.rawValue.hasPrefix(HomeEngine.prefix) { do { try HomeEngine.clock_changed() } catch { logger.error("Home window failed: \(error.localizedDescription, privacy: .public)") }; return }
 		if let routine_id = SharedStore.standing_id(from: activity) { SharedStore.standing_store(routine_id).clearAllSettings(); return }
 		do {
 			let shared = try SharedStore()
@@ -56,6 +61,7 @@ final class FocusMonitor: DeviceActivityMonitor {
 	// A limited group used up its minutes inside the window: lock it for the rest of the window.
 	override func eventDidReachThreshold(_ event: DeviceActivityEvent.Name, activity: DeviceActivityName) {
 		super.eventDidReachThreshold(event, activity: activity)
+		if activity.rawValue.hasPrefix(HomeEngine.prefix) { do { try HomeEngine.reached(event, activity: activity) } catch { logger.error("Home checkpoint failed: \(error.localizedDescription, privacy: .public)") }; return }
 		do {
 			let shared = try SharedStore()
 			if let routine_id = SharedStore.standing_id(from: activity) {

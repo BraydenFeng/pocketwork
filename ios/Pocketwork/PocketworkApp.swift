@@ -2,8 +2,10 @@ import SwiftUI
 
 @main
 struct PocketworkApp: App {
+	@UIApplicationDelegateAdaptor(HomeAppDelegate.self) private var app_delegate
 	@StateObject private var library = LibraryController()
 	@Environment(\.scenePhase) private var scene_phase
+	@StateObject private var home = HomeLocationController.shared
 	@StateObject private var cloud = CloudController()
 	@StateObject private var sessions = SessionController()
 
@@ -22,6 +24,7 @@ struct PocketworkApp: App {
 				.environmentObject(library)
 				.environmentObject(sessions)
 				.environmentObject(cloud)
+				.environmentObject(home)
 				.task { await cloud.attach(library, sessions) }
 				.onChange(of: scene_phase) { _, phase in if phase == .active { Task { await cloud.sync() } } }
 		}

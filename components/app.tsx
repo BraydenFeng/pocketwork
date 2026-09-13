@@ -5,6 +5,7 @@ import type { AppDocument } from "@/lib/document";
 import { connect_cloud, current_account, fetch_library, push_library, sign_in_with_google, sign_out, watch_account, type Account, type Cloud } from "@/lib/cloud";
 import { add_group, delete_tool, duplicate_tool, empty_library, find_tool, import_tool, load_library, remove_group, rename_group, save_library, upsert_tool, LIBRARY_KEY, library_schema, type Library } from "@/lib/library";
 import { merge_libraries, same_library } from "@/lib/sync";
+import { HomeAllowance } from "./home-allowance";
 import { Home } from "./home";
 import { Workbench } from "./workbench";
 
@@ -121,6 +122,28 @@ export function PocketworkApp() {
 		return () => window.clearTimeout(timeout);
 	}, [library, account, ready, sync_now]);
 
+	useEffect(() => {
+		if (!ready || !account || storage_blocked || !account_ready.current || new URLSearchParams(window.location.search).get("seed") !== "home") { return; }
+		let cancelled = false;
+		void (async () => {
+			if (!cloud) { return; }
+			const { data, error } = await cloud.client.auth.getSession();
+			if (error || !data.session) { throw new Error("Sign in to seed your routine."); }
+			const response = await fetch("/api/mcp", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session.access_token}` }, body: JSON.stringify({ jsonrpc: "2.0", id: "seed-home", method: "tools/call", params: { name: "seed_home_allowance", arguments: {} } }) });
+			if (!response.ok) { throw new Error("Could not seed the routine. Please retry."); }
+			const reply = await response.json();
+			if (reply.error || reply.result?.isError) { throw new Error(reply.error?.message ?? reply.result.content[0].text); }
+			if (cancelled) { return; }
+			const remote = await fetch_library(cloud, account);
+			if (cancelled || !remote) { return; }
+			const next = merge_libraries(library_ref.current, remote.library, Date.now());
+			save_library(storage(), next); library_ref.current = next; set_library(next);
+			const url = new URL(window.location.href); url.searchParams.delete("seed"); window.history.replaceState(null, "", url);
+			set_open_id("home-distraction-allowance");
+		})().catch((failure) => set_error(error_message(failure)));
+		return () => { cancelled = true; };
+	}, [ready, account, storage_blocked, storage, cloud]);
+
 	// The URL carries which routine is open so the browser back button returns to My routines.
 	function navigate(id: string | null) {
 		const url = new URL(window.location.href);
@@ -202,6 +225,16 @@ export function PocketworkApp() {
 		try { await sign_in_with_google(cloud, provider); } catch (failure) { set_error(error_message(failure)); }
 	}
 
+	async function copy_agent_connection() {
+		if (!cloud) { return; }
+		try {
+			const { data, error } = await cloud.client.auth.getSession();
+			if (error || !data.session) { throw new Error("Sign in before connecting an agent."); }
+			await navigator.clipboard.writeText(JSON.stringify({ mcpServers: { pocketwork: { type: "http", url: `${window.location.origin}/api/mcp`, headers: { Authorization: `Bearer ${data.session.access_token}` } } } }, null, 2));
+			set_notice("Agent connection copied. It contains a private, short-lived account token. Paste it only into your own agent. Copy again when it expires.");
+		} catch (failure) { set_error(error_message(failure)); }
+	}
+
 	async function finish_sign_out() {
 		if (!cloud) { return; }
 		try { await sign_out(cloud); set_account(null); set_notice("Signed out. Your account routines are kept separately on this browser."); }
@@ -212,12 +245,13 @@ export function PocketworkApp() {
 
 	if (!ready) { return <div className="app-loading" role="status">Opening your routines…</div>; }
 
+	if (open_tool?.home_allowance) { return <HomeAllowance document={open_tool} on_back={() => navigate(null)} />; }
 	if (open_tool) {
 		return <Workbench key={open_tool.id} tool={open_tool} groups={library.groups ?? []} on_save={save_tool} on_back={() => navigate(null)} storage_blocked={storage_blocked} storage_error={error} on_replace_unreadable={replace_unreadable} on_dismiss_error={() => set_error(null)} sync={account ? sync : "off"} />;
 	}
 
 	return <Home library={library} now={Date.now()} error={error} notice={notice} storage_blocked={storage_blocked}
-		cloud_available={cloud !== null} account={account} sync={sync} on_sign_in={(provider) => { void start_sign_in(provider); }} on_sign_out={() => { void finish_sign_out(); }}
+		on_connect_agent={() => { void copy_agent_connection(); }} cloud_available={cloud !== null} account={account} sync={sync} on_sign_in={(provider) => { void start_sign_in(provider); }} on_sign_out={() => { void finish_sign_out(); }}
 		on_open={navigate} on_create={create_tool} on_delete={remove_tool} on_duplicate={copy_tool} on_import={add_imported} on_toggle={toggle_tool}
 		on_add_group={create_group} on_rename_group={change_group_name} on_remove_group={drop_group}
 		on_error={set_error} on_dismiss_error={() => set_error(null)} on_dismiss_notice={() => set_notice(null)} on_replace_unreadable={replace_unreadable} />;

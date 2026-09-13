@@ -154,7 +154,7 @@ struct HomeView: View {
 				.buttonStyle(.plain).accessibilityLabel("Open \(document.name)").accessibilityIdentifier("tool.\(document.id)")
 				Hairline()
 				HStack(spacing: 16) {
-					if document.is_standing {
+					if document.is_standing && document.home_allowance == nil {
 						Toggle("On", isOn: Binding(get: { document.enabled == true }, set: { enabled in
 							if sessions.set_standing(document, enabled: enabled, groups: library.groups) { library.set_enabled(document.id, enabled) }
 						})).labelsHidden().tint(Theme.success).accessibilityLabel("Switch \(document.name) on or off")

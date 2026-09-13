@@ -88,6 +88,7 @@ struct AppDocument: Codable, Equatable {
 	var rules: RuleDocument
 	// Only meaningful for a standing routine: whether the person has switched it on.
 	var enabled: Bool?
+	var home_allowance: HomePolicy? = nil
 
 	var focus_minutes: Int? { blocks.first(where: { $0.type == .timer })?.minutes }
 	var has_timer: Bool { blocks.contains(where: { $0.type == .timer }) }
@@ -166,7 +167,12 @@ struct AppDocument: Codable, Equatable {
 	}
 
 	func validate() throws {
-		guard schema_version == 1 else { throw DocumentError.invalid("Unsupported schema version. This host supports version 1.") }
+		guard (schema_version == 2) == (home_allowance != nil) else { throw DocumentError.invalid("Home allowances need routine format 2.") }
+		if let policy = home_allowance {
+			try policy.validate()
+			guard schedule != nil, rules.block_during_focus, shield?.shield_mode == .block, shield?.group_names.count == 1 else { throw DocumentError.invalid("Home allowances require one distraction group and a schedule.") }
+		}
+		guard schema_version == 1 || schema_version == 2 else { throw DocumentError.invalid("Unsupported schema version. This host supports version 1.") }
 		try Self.validate_id(id)
 		try Self.validate_text(name, maximum: 80, required: true)
 		try Self.validate_text(description, maximum: 200)

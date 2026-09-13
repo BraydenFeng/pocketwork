@@ -37,6 +37,7 @@ struct ToolLibrary: Codable, Equatable {
 	}
 
 	func validate() throws {
+		guard tools.filter({ $0.document.home_allowance != nil }).count <= 1 else { throw DocumentError.invalid("Only one home allowance can run on this iPhone.") }
 		guard schema_version == 1 else { throw DocumentError.invalid("Your saved tools use a newer format than this version of the app understands.") }
 		guard tools.count <= Self.max_tools else { throw DocumentError.invalid("Too many tools to open.") }
 		var ids = Set<String>()
@@ -159,6 +160,7 @@ struct ToolLibrary: Codable, Equatable {
 // Plain-language card copy, matching summarize_tool and format_edited in the web editor.
 enum ToolCopy {
 	static func summary(_ document: AppDocument) -> String {
+		if document.home_allowance != nil { return "Home only · shared daily distraction allowance" }
 		var parts: [String] = []
 		if let minutes = document.focus_minutes { parts.append("\(minutes) min session") }
 		if let schedule = document.schedule { parts.append(ScheduleWindow.describe(schedule)) }
