@@ -589,5 +589,221 @@
         "messages": 0
       }
     ]
+  },
+  {
+    "name": "unknown location never becomes an away reminder through NOT",
+    "graph": {
+      "nodes": [
+        {
+          "id": "place",
+          "kind": "location",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "",
+            "value": 1,
+            "minutes": 5,
+            "time": "18:00",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "message": "Goal reached",
+            "operator": "gte"
+          }
+        },
+        {
+          "id": "outside",
+          "kind": "not",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "",
+            "value": 1,
+            "minutes": 5,
+            "time": "18:00",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "message": "Goal reached",
+            "operator": "gte"
+          }
+        },
+        {
+          "id": "message",
+          "kind": "reminder",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "",
+            "value": 1,
+            "minutes": 5,
+            "time": "18:00",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "message": "Goal reached",
+            "operator": "gte"
+          }
+        }
+      ],
+      "connections": [
+        {
+          "from": "place",
+          "output": "present",
+          "to": "outside",
+          "input": "condition"
+        },
+        {
+          "from": "outside",
+          "output": "result",
+          "to": "message",
+          "input": "send"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "now": 1800000000,
+        "messages": 0
+      },
+      {
+        "now": 1800000001,
+        "location": true,
+        "messages": 0
+      },
+      {
+        "now": 1800000002,
+        "location": false,
+        "messages": 1
+      }
+    ]
+  },
+  {
+    "name": "restarting a delay cancels its older deadline",
+    "graph": {
+      "nodes": [
+        {
+          "id": "tap",
+          "kind": "button",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "",
+            "value": 1,
+            "minutes": 5,
+            "time": "18:00",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "message": "Goal reached",
+            "operator": "gte"
+          }
+        },
+        {
+          "id": "wait",
+          "kind": "delay",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "",
+            "value": 1,
+            "minutes": 5,
+            "time": "18:00",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "message": "Goal reached",
+            "operator": "gte"
+          }
+        },
+        {
+          "id": "message",
+          "kind": "reminder",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "",
+            "value": 1,
+            "minutes": 5,
+            "time": "18:00",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "message": "Goal reached",
+            "operator": "gte"
+          }
+        }
+      ],
+      "connections": [
+        {
+          "from": "tap",
+          "output": "pressed",
+          "to": "wait",
+          "input": "start"
+        },
+        {
+          "from": "wait",
+          "output": "done",
+          "to": "message",
+          "input": "send"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "now": 1800000000,
+        "tap": "tap",
+        "messages": 0
+      },
+      {
+        "now": 1800000100,
+        "tap": "tap",
+        "messages": 0
+      },
+      {
+        "now": 1800000301,
+        "messages": 0
+      },
+      {
+        "now": 1800000401,
+        "messages": 1
+      }
+    ]
   }
 ]

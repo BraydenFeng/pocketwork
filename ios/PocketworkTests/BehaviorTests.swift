@@ -35,4 +35,15 @@ final class BehaviorTests: XCTestCase {
 			XCTAssertEqual(result.signals["streak"]?["days"]?.value,expected)
 		}
 	}
+
+	func testFormatThreeLibraryRoundTrip() throws {
+		let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "behavior-fixtures", withExtension: "json"))
+		let fixtures = try JSONDecoder().decode([Fixture].self, from: Data(contentsOf: url))
+		var document = AppDocument.blank()
+		document.schema_version = 3; document.behaviors = fixtures[0].graph
+		let decoded = try AppDocument.decode(JSONEncoder().encode(document))
+		XCTAssertEqual(decoded, document)
+		let library = try ToolLibrary.empty.upserting(document, now: .now)
+		XCTAssertEqual(try ToolLibrary.decode(library.encoded()), library)
+	}
 }

@@ -438,3 +438,5 @@ kbd { font: inherit; font-size: var(--t-micro); padding-inline: var(--s-1); bord
 	.logic-node-list { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); align-items: start; gap: 0 var(--s-4); max-height: var(--canvas-min); }
 	.logic-category .logic-add { width: 100%; }
 }
+
+.logic-runtime-note { margin: 0; padding: var(--s-2) var(--s-4); background: var(--c-surface); color: var(--c-text-faint); font-size: var(--t-small); }

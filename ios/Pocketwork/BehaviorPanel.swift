@@ -25,6 +25,7 @@ struct BehaviorPanel: View {
 				Text("Connections run while this routine is open. Progress stays on this phone. Existing Screen Time schedules continue in the background.").supporting()
 				HStack { Button(paused ? "Resume" : "Pause") { paused.toggle() }.buttonStyle(TextButtonStyle()); Button("Allow notifications") { Task { do { let granted = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert,.sound]); if !granted { error = "Notifications are off. Messages still appear here." } } catch { self.error = error.localizedDescription } } }.buttonStyle(TextButtonStyle()) }
 				if graph.nodes.contains(where: { ["location","arrive","leave"].contains($0.kind) }) {
+					Text("One location is shared by all routines, including your home allowance.").supporting()
 					Button("Set location here") { home.set_here() }.buttonStyle(QuietButtonStyle())
 					Button("Allow location detection") { home.allow_background() }.buttonStyle(TextButtonStyle())
 					Text(home.status).supporting()
@@ -88,6 +89,6 @@ struct BehaviorPanel: View {
 				let content = UNMutableNotificationContent(); content.title = document.name; content.body = effect.message; content.sound = .default
 				try await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "behavior." + document.id + "." + effect.id + "." + String(state.sequence), content: content, trigger: nil))
 			} }
-		} catch { self.error = "Could not run behavior: " + error.localizedDescription }
+		} catch { self.error = "Could not run behavior: " + error.localizedDescription; paused = true }
 	}
 }
