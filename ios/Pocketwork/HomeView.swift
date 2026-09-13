@@ -9,6 +9,7 @@ struct HomeView: View {
 	@EnvironmentObject private var library: LibraryController
 	@EnvironmentObject private var sessions: SessionController
 	@State private var path: [String] = []
+	@State private var edit_on_open: String?
 	@State private var showing_groups = false
 	@State private var showing_import = false
 	@State private var pending_delete: LibraryEntry?
@@ -53,7 +54,7 @@ struct HomeView: View {
 			.page()
 			.navigationTitle("My routines")
 			.navigationBarTitleDisplayMode(.inline)
-			.navigationDestination(for: String.self) { id in ToolView(document_id: id) }
+			.navigationDestination(for: String.self) { id in ToolView(document_id: id, edit_on_open: edit_on_open == id) }
 			.navigationDestination(isPresented: $showing_groups) { GroupsView() }
 			.toolbar {
 				ToolbarItem(placement: .topBarLeading) { brand }
@@ -141,7 +142,7 @@ struct HomeView: View {
 		let document = entry.document
 		return Card {
 			VStack(alignment: .leading, spacing: 8) {
-				Button { path = [document.id] } label: {
+				Button { edit_on_open = nil; path = [document.id] } label: {
 					VStack(alignment: .leading, spacing: 8) {
 						HStack(spacing: 8) {
 							Text(document.name).heading_font(17)
@@ -171,7 +172,7 @@ struct HomeView: View {
 						Text(document.enabled == true ? "On" : "Off").font(.system(size: 13)).foregroundStyle(Theme.text_dim)
 						Spacer()
 					}
-					Button { editing = RoutineDraft(document: document, is_new: false) } label: { Label("Edit", systemImage: "pencil") }.buttonStyle(TextButtonStyle()).accessibilityLabel("Edit \(document.name)").accessibilityIdentifier("home.edit.\(document.id)").disabled(sessions.is_busy || sessions.is_running(document))
+					Button { edit_on_open = document.id; path = [document.id] } label: { Label("Edit", systemImage: "pencil") }.buttonStyle(TextButtonStyle()).accessibilityLabel("Edit \(document.name)").accessibilityIdentifier("home.edit.\(document.id)").disabled(sessions.is_busy || sessions.is_running(document))
 					Spacer()
 					Menu {
 						Button("Duplicate", systemImage: "doc.on.doc") { _ = library.duplicate(document.id) }.disabled(document.home_allowance != nil)

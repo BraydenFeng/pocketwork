@@ -52,3 +52,6 @@ My tools home with routines, duplicate, delete, and import; editable blocks and 
 ## Phone workspace, September 13
 
 Brayden requested a Notion/Obsidian-inspired phone interface and direct home-screen editing. The native direction is a minimal document workspace: cool paper, graphite type, quiet rules, one blue save action. Preserve the original home hierarchy while removing repeated explanations and schema labels. Three repeated structures: a page title with a small document glyph, ruled document rows with separate Edit actions, and a bottom editing bar for adding blocks. New routine opens an unsaved page draft. Cancel discards it; Save validates and stores it. Home allowance editing preserves its daily/shared-window semantics. App groups expose a direct Choose apps action and visible permission errors.
+
+
+Phone editing follow-up: Edit opens the actual routine page in place. Preserve its heading rail, timer and counter cards, checklist rows, and note typography. Text becomes editable where it already lives; only configuration controls replace live actions. A quiet bottom bar offers Cancel, Add block, and behavior settings. Save returns to the same running page. Home allowances likewise keep their existing page and edit budgets inside its schedule cards. No block list or separate inspector is the default editing destination.
