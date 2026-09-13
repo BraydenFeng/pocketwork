@@ -15,7 +15,13 @@ struct PocketworkApp: App {
 			UserDefaults.standard.removeObject(forKey: LibraryController.library_key)
 			UserDefaults.standard.removeObject(forKey: LibraryController.legacy_key)
 		}
-		if CommandLine.arguments.contains("--ui-testing") { UIView.setAnimationsEnabled(false) }
+		if CommandLine.arguments.contains("--ui-testing") {
+			UIView.setAnimationsEnabled(false)
+			if let fixture = ProcessInfo.processInfo.environment["POCKETWORK_UI_LIBRARY"], let data = fixture.data(using: .utf8) {
+				do { _ = try ToolLibrary.decode(data); UserDefaults.standard.set(data, forKey: LibraryController.library_key) }
+				catch { assertionFailure("Invalid UI test library: \(error)") }
+			}
+		}
 	}
 
 	var body: some Scene {

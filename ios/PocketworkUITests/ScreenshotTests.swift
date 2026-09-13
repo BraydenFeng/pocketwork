@@ -19,19 +19,60 @@ final class ScreenshotTests: XCTestCase {
 	func test_walkthrough_screens() throws {
 		XCTAssertTrue(app.navigationBars["My routines"].waitForExistence(timeout: 10))
 		try snap("01-home-empty")
-
 		XCTAssertFalse(app.buttons["Use this routine"].exists)
 		app.buttons["New routine"].tap()
-		XCTAssertTrue(app.navigationBars["My new routine"].waitForExistence(timeout: 10))
-		try snap("02-blank-routine")
-		element("tool.edit").tap()
-		XCTAssertTrue(app.navigationBars["Edit routine"].waitForExistence(timeout: 10))
-		try snap("03-editor")
+		XCTAssertTrue(app.navigationBars["New routine"].waitForExistence(timeout: 10))
+		XCTAssertTrue(app.textFields["editor.name"].exists || app.textViews["editor.name"].exists)
+		try snap("02-new-page")
 		app.buttons["Cancel"].tap()
-		app.navigationBars["My new routine"].buttons.firstMatch.tap()
+		XCTAssertFalse(app.buttons["Open My new routine"].exists)
+		app.buttons["New routine"].tap()
+		element("editor.add-block").tap()
+		XCTAssertTrue(app.navigationBars["Add block"].waitForExistence(timeout: 10))
+		try snap("03-block-picker")
+		element("add.checklist").tap()
+		XCTAssertTrue(app.buttons["block.checklist"].waitForExistence(timeout: 10))
+		try snap("04-page-editor")
+		app.buttons["Save"].tap()
+		XCTAssertTrue(app.buttons["Open My new routine"].waitForExistence(timeout: 10))
+		try snap("05-home-with-routine")
+		app.buttons["Edit My new routine"].tap()
+		XCTAssertTrue(app.navigationBars["Edit routine"].waitForExistence(timeout: 10))
+		app.buttons["Cancel"].tap()
+		app.swipeUp()
 		element("home.groups").tap()
 		XCTAssertTrue(app.navigationBars["App groups"].waitForExistence(timeout: 10))
-		try snap("04-app-groups")
+		try snap("06-app-groups")
+		let name = app.textFields["groups.new"]
+		name.tap(); name.typeText("Distractions")
+		app.buttons["Add"].tap()
+		app.swipeDown()
+		let group = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "group.")).firstMatch
+		XCTAssertTrue(group.waitForExistence(timeout: 10)); group.tap()
+		XCTAssertTrue(app.navigationBars["Distractions"].waitForExistence(timeout: 10))
+		try snap("07-choose-apps")
+	}
+
+	func test_home_allowance_can_be_edited() throws {
+		app.terminate()
+		app.launchEnvironment["POCKETWORK_UI_LIBRARY"] = """
+		{"schema_version":1,"tools":[{"updated_at":"2026-09-13T00:00:00.000Z","document":{"schema_version":2,"id":"home-distraction-allowance","name":"Home distraction allowance","description":"Only distraction time at home counts.","enabled":false,"rules":{"block_during_focus":true,"notify_on_complete":false},"blocks":[{"id":"heading","type":"heading","title":"Home allowance","subtitle":""},{"id":"schedule","type":"schedule","title":"Weekly windows","days":[1,2,3,4,5,6,7],"start":"00:00","end":"23:59"},{"id":"shield","type":"screen_time","title":"Distractions","mode":"block","groups":["Distractions"]}],"home_allowance":{"timezone":"America/Los_Angeles","away_usage_counts":false,"outside_windows":"block_at_home","rules":[{"days":[2,3,4,5],"allowance_minutes":30,"windows":[{"start":"18:00","end":"18:30"},{"start":"19:00","end":"20:50"}]},{"days":[6],"allowance_minutes":120,"windows":[{"start":"14:30","end":"20:20"}]},{"days":[1,7],"allowance_minutes":180,"windows":[{"start":"06:30","end":"20:30"}]}]}}}],"groups":[{"id":"distractions","name":"Distractions"}]}
+		"""
+		app.launch()
+		element("home.edit.home-distraction-allowance").tap()
+		XCTAssertTrue(app.navigationBars["Edit home allowance"].waitForExistence(timeout: 10))
+		try snap("08-home-allowance-editor")
+		let allowance = app.buttons["home.allowance.2-Increment"]
+		allowance.tap()
+		XCTAssertEqual(allowance.value as? String, "35 minutes")
+		app.buttons["Save"].tap()
+		element("home.edit.home-distraction-allowance").tap()
+		XCTAssertTrue(allowance.waitForExistence(timeout: 10))
+		XCTAssertEqual(allowance.value as? String, "35 minutes")
+		app.buttons["Cancel"].tap()
+		app.swipeUp()
+		element("home.group.distractions").tap()
+		XCTAssertTrue(app.navigationBars["Distractions"].waitForExistence(timeout: 10))
 	}
 
 	// SwiftUI exposes list rows and toolbar items as different element types; a typed query per kind stays fast.

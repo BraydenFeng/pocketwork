@@ -124,6 +124,7 @@ struct AppDocument: Codable, Equatable {
 
 	func can_add(_ kind: BlockKind) -> Bool {
 		guard blocks.count < 20 else { return false }
+		if (kind == .timer && is_standing) || (kind == .schedule && has_timer) { return false }
 		if kind == .timer || kind == .screen_time || kind == .schedule { return !blocks.contains(where: { $0.type == kind }) }
 		return true
 	}

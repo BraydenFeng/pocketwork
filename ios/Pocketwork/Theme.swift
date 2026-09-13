@@ -141,3 +141,43 @@ extension View {
 	func supporting() -> some View { font(.system(size: 13)).foregroundStyle(Theme.text_faint) }
 	func mono_caption() -> some View { font(.system(size: 10, weight: .medium, design: .monospaced)).tracking(1).foregroundStyle(Theme.text_dim) }
 }
+
+struct DocumentHeading: View {
+	let title: String
+	var subtitle: String? = nil
+	var icon = "doc.text"
+	var body: some View {
+		VStack(alignment: .leading, spacing: Theme.gap) {
+			Image(systemName: icon).font(.system(size: 26, weight: .light)).foregroundStyle(Theme.text_dim)
+			Text(title).heading_font(30)
+			if let subtitle { Text(subtitle).supporting().fixedSize(horizontal: false, vertical: true) }
+		}.frame(maxWidth: .infinity, alignment: .leading)
+	}
+}
+
+struct DocumentRow<Content: View>: View {
+	let icon: String
+	@ViewBuilder let content: Content
+	var body: some View {
+		HStack(alignment: .top, spacing: Theme.gap) {
+			Image(systemName: icon).font(.system(size: 17, weight: .regular)).foregroundStyle(Theme.text_faint).frame(width: 24, height: 24)
+			content.frame(maxWidth: .infinity, alignment: .leading)
+		}.padding(.vertical, Theme.gap).contentShape(Rectangle())
+	}
+}
+
+struct EditorBar<Content: View>: View {
+	@ViewBuilder let content: Content
+	var body: some View {
+		VStack(spacing: 0) {
+			Hairline()
+			HStack(spacing: Theme.gap) { content }.padding(.horizontal, Theme.pad).frame(minHeight: 56)
+		}.background(Theme.surface)
+	}
+}
+
+extension View {
+	func paper_page() -> some View {
+		background(Theme.surface.ignoresSafeArea()).toolbarBackground(Theme.surface, for: .navigationBar).toolbarBackground(.visible, for: .navigationBar).toolbarColorScheme(.light, for: .navigationBar).tint(Theme.text)
+	}
+}
