@@ -62,8 +62,8 @@ final class ScreenshotTests: XCTestCase {
 		element("home.edit.home-distraction-allowance").tap()
 		XCTAssertTrue(app.navigationBars["Edit home allowance"].waitForExistence(timeout: 10))
 		try snap("08-home-allowance-editor")
-		let allowance = app.steppers["home.allowance.2"]
-		allowance.buttons["Increment"].tap()
+		let allowance = app.buttons["home.allowance.2-Increment"]
+		allowance.tap()
 		XCTAssertEqual(allowance.value as? String, "35 minutes")
 		app.buttons["Save"].tap()
 		element("home.edit.home-distraction-allowance").tap()
