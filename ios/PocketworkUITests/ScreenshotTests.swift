@@ -53,6 +53,26 @@ final class ScreenshotTests: XCTestCase {
 		try snap("07-choose-apps")
 	}
 
+	func test_home_allowance_can_be_edited() throws {
+		app.terminate()
+		app.launchEnvironment["POCKETWORK_UI_LIBRARY"] = """
+		{"schema_version":1,"tools":[{"updated_at":"2026-09-13T00:00:00.000Z","document":{"schema_version":2,"id":"home-distraction-allowance","name":"Home distraction allowance","description":"Only distraction time at home counts.","enabled":false,"rules":{"block_during_focus":true,"notify_on_complete":false},"blocks":[{"id":"heading","type":"heading","title":"Home allowance","subtitle":""},{"id":"schedule","type":"schedule","title":"Weekly windows","days":[1,2,3,4,5,6,7],"start":"00:00","end":"23:59"},{"id":"shield","type":"screen_time","title":"Distractions","mode":"block","groups":["Distractions"]}],"home_allowance":{"timezone":"America/Los_Angeles","away_usage_counts":false,"outside_windows":"block_at_home","rules":[{"days":[2,3,4,5],"allowance_minutes":30,"windows":[{"start":"18:00","end":"18:30"},{"start":"19:00","end":"20:50"}]},{"days":[6],"allowance_minutes":120,"windows":[{"start":"14:30","end":"20:20"}]},{"days":[1,7],"allowance_minutes":180,"windows":[{"start":"06:30","end":"20:30"}]}]}}}],"groups":[{"id":"distractions","name":"Distractions"}]}
+		"""
+		app.launch()
+		element("home.edit.home-distraction-allowance").tap()
+		XCTAssertTrue(app.navigationBars["Edit home allowance"].waitForExistence(timeout: 10))
+		try snap("08-home-allowance-editor")
+		app.steppers.buttons["Increment"].firstMatch.tap()
+		XCTAssertTrue(app.staticTexts["35 minutes total"].exists)
+		app.buttons["Save"].tap()
+		element("home.edit.home-distraction-allowance").tap()
+		XCTAssertTrue(app.staticTexts["35 minutes total"].waitForExistence(timeout: 10))
+		app.buttons["Cancel"].tap()
+		app.swipeUp()
+		element("home.group.distractions").tap()
+		XCTAssertTrue(app.navigationBars["Distractions"].waitForExistence(timeout: 10))
+	}
+
 	// SwiftUI exposes list rows and toolbar items as different element types; a typed query per kind stays fast.
 	private func element(_ identifier: String) -> XCUIElement {
 		let candidates = [app.buttons[identifier], app.cells[identifier], app.otherElements[identifier], app.staticTexts[identifier]]
