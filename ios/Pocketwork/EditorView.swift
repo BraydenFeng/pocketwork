@@ -10,11 +10,12 @@ struct EditorView: View {
 	@State private var showing_behavior = false
 	@State private var saving = false
 	let is_new: Bool
+	private let original: AppDocument
 
 	init(document: AppDocument, is_new: Bool = false) {
 		var initial = document
 		if is_new { initial.blocks[0].title = "Heading"; initial.blocks[0].subtitle = "" }
-		_draft = State(initialValue: initial); self.is_new = is_new
+		_draft = State(initialValue: initial); self.is_new = is_new; original = document
 	}
 	struct KindOption: Identifiable { let kind: BlockKind; let label: String; let icon: String; var id: BlockKind { kind } }
 	static let kinds: [KindOption] = [
@@ -130,6 +131,10 @@ struct EditorView: View {
 		saving = true
 		Task {
 			defer { saving = false }
+			if original.enabled == true && cleaned.enabled != true {
+				guard await sessions.set_routine(original, enabled: false, groups: library.groups) else { validation_message = sessions.error_message; return }
+				library.set_enabled(original.id, false)
+			}
 			guard library.save(cleaned) else { validation_message = library.error_message; return }
 			if cleaned.enabled == true, !(await sessions.set_routine(cleaned, enabled: true, groups: library.groups)) { library.set_enabled(cleaned.id, false); draft.enabled = false; validation_message = sessions.error_message; return }
 			dismiss()
