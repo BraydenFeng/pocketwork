@@ -32,6 +32,8 @@ targets:
       path: Pocketwork/Info.plist
       properties:
         CFBundleDisplayName: Pocketwork
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: "1.0"
         SupabaseURL: $(SUPABASE_URL)
         SupabaseAnonKey: $(SUPABASE_ANON_KEY)
         ITSAppUsesNonExemptEncryption: false
@@ -74,6 +76,8 @@ targets:
       path: FocusMonitor/Info.plist
       properties:
         CFBundleDisplayName: Pocketwork Focus Monitor
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: "1.0"
         PocketworkAppGroup: $(APP_GROUP)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.deviceactivity.monitor-extension

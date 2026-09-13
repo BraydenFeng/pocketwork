@@ -103,7 +103,9 @@ jobs:
       - name: Upload to TestFlight
         run: |
           set -euo pipefail
-          xcrun altool --upload-app --type ios --file "$RUNNER_TEMP/export/Pocketwork.ipa" --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+          xcrun altool --upload-app --type ios --file "$RUNNER_TEMP/export/Pocketwork.ipa" --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID" 2>&1 | tee "$RUNNER_TEMP/upload.log"
+          if grep -Ei 'ERROR:|Failed to upload' "$RUNNER_TEMP/upload.log"; then exit 1; fi
+          grep -Ei 'UPLOAD SUCCEEDED|No errors uploading|successfully uploaded' "$RUNNER_TEMP/upload.log"
       - name: Keep build logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -112,6 +114,7 @@ jobs:
           path: |
             ${{ runner.temp }}/archive.log
             ${{ runner.temp }}/export.log
+            ${{ runner.temp }}/upload.log
           if-no-files-found: ignore
       - name: Remove signing material
         if: always()
