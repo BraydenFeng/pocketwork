@@ -138,7 +138,7 @@ export function PocketworkApp() {
 			if (cancelled || !remote) { return; }
 			const next = merge_libraries(library_ref.current, remote.library, Date.now());
 			save_library(storage(), next); library_ref.current = next; set_library(next);
-			const url = new URL(window.location.href); url.searchParams.delete("seed"); window.history.replaceState(null, "", url);
+			const url = new URL(window.location.href); url.searchParams.delete("seed"); url.searchParams.set("routine", "home-distraction-allowance"); window.history.replaceState(null, "", url);
 			set_open_id("home-distraction-allowance");
 		})().catch((failure) => set_error(error_message(failure)));
 		return () => { cancelled = true; };

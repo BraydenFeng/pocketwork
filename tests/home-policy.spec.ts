@@ -20,6 +20,8 @@ test("home allowance shows all windows and honest phone setup", async ({ page })
 test("MCP refuses unauthenticated and cross-origin requests", async ({ request }) => {
 	const unauthenticated = await request.post("/api/mcp", { data: { jsonrpc: "2.0", id: 1, method: "tools/list" } });
 	expect(unauthenticated.status()).toBe(401);
+	const same_origin = await request.post("/api/mcp", { headers: { Origin: new URL(unauthenticated.url()).origin }, data: {} });
+	expect(same_origin.status()).toBe(401);
 	const foreign = await request.post("/api/mcp", { headers: { Origin: "https://untrusted.example" }, data: {} });
 	expect(foreign.status()).toBe(403);
 });

@@ -3,7 +3,10 @@ import { call_mcp_tool, mcp_tools } from "@/lib/mcp";
 export const runtime = "nodejs";
 export async function POST(request: Request) {
 	const origin = request.headers.get("origin");
-	if (origin && origin !== new URL(request.url).origin) { return new Response("Origin not allowed", { status: 403 }); }
+	// Next may normalize request.url to localhost even when the browser uses 127.0.0.1.
+	const incoming_url = new URL(request.url);
+	const request_origin = `${incoming_url.protocol}//${request.headers.get("host") ?? incoming_url.host}`;
+	if (origin && origin !== request_origin) { return new Response("Origin not allowed", { status: 403 }); }
 	const authorization = request.headers.get("authorization");
 	if (!authorization?.startsWith("Bearer ")) { return new Response("Sign in first", { status: 401 }); }
 	const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
