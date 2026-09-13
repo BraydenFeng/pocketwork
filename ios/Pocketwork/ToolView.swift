@@ -2,7 +2,7 @@ import Combine
 import FamilyControls
 import SwiftUI
 
-// Runs one tool: the same blocks the editor shows, with real timers, checklists, counters, and Screen Time.
+// Runs one routine, drawn like the phone preview in the web editor: the same blocks, with real timers, checklists, counters, and Screen Time.
 struct ToolView: View {
 	let document_id: String
 	@EnvironmentObject private var library: LibraryController
@@ -21,12 +21,18 @@ struct ToolView: View {
 		Group {
 			if let document = library.tool(document_id) {
 				ScrollView {
-					VStack(alignment: .leading, spacing: 24) {
+					VStack(alignment: .leading, spacing: 20) {
+						HStack(spacing: 8) {
+							RoundedRectangle(cornerRadius: 3).fill(Theme.text).frame(width: 12, height: 12)
+							Text(document.name).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text_dim)
+						}
 						ForEach(document.blocks) { block in block_view(block, in: document) }
-						Text("Runs on this iPhone · local data only").font(.caption).foregroundStyle(.secondary)
+						Text("Made for you. By you.").mono_caption().padding(.top, 8)
 					}
-					.padding(24)
+					.padding(Theme.pad)
+					.padding(.bottom, 24)
 				}
+				.page()
 				.navigationTitle(document.name)
 				.navigationBarTitleDisplayMode(.inline)
 				.toolbar {
@@ -35,7 +41,7 @@ struct ToolView: View {
 						Menu {
 							Button("Reset checklist and counters", systemImage: "arrow.counterclockwise") { sessions.reset_progress(for: document) }
 							Button(role: .destructive) { clear_everything() } label: { Label("Clear all focus restrictions", systemImage: "lock.open") }.disabled(sessions.is_busy)
-						} label: { Image(systemName: "ellipsis.circle") }
+						} label: { Image(systemName: "ellipsis") }
 					}
 				}
 				.sheet(isPresented: $showing_editor) { EditorView(document: document) }
@@ -51,10 +57,15 @@ struct ToolView: View {
 					}
 				}
 			} else {
-				ContentUnavailableView("This routine was deleted", systemImage: "square.stack.3d.up", description: Text("Go back to My routines to pick another."))
+				VStack(spacing: 12) {
+					Image(systemName: "square.stack.3d.up").font(.system(size: 28)).foregroundStyle(Theme.text_faint)
+					Text("This routine was deleted").heading_font(17)
+					Text("Go back to My routines to pick another.").supporting()
+				}
+				.frame(maxWidth: .infinity, maxHeight: .infinity)
+				.page()
 			}
 		}
-		.tint(.primary)
 		.onReceive(clock) { _ in
 			if !frozen, let session = sessions.session, session.has_ended(at: .now) { sessions.refresh() }
 		}
@@ -74,98 +85,129 @@ struct ToolView: View {
 
 	@ViewBuilder private func block_view(_ block: BlockDocument, in document: AppDocument) -> some View {
 		switch block.type {
-		case .schedule:
-			let enabled = document.enabled == true
-			VStack(alignment: .leading, spacing: 12) {
-				HStack {
-					Label(block.title, systemImage: "calendar.badge.clock").font(.headline)
-					Spacer()
-					Toggle(enabled ? "On" : "Off", isOn: Binding(get: { enabled }, set: { set_standing(document, $0) }))
-						.labelsHidden().accessibilityLabel("Switch \(block.title) on or off").accessibilityIdentifier("tool.switch")
-				}
-				Text(ScheduleWindow.describe(block)).font(.system(size: 28, weight: .semibold, design: .rounded))
-				TimelineView(.periodic(from: .now, by: frozen ? 3600 : 30)) { timeline in
-					Text(ScheduleWindow.describe_status(block, enabled: enabled, at: timeline.date)).font(.subheadline).foregroundStyle(.secondary)
-				}
-				Text(enabled ? "Switch it off to edit this routine." : "Runs by itself once it is on, even with the app closed.").font(.caption).foregroundStyle(.secondary)
-			}
-			.padding(20).background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
 		case .heading:
-			VStack(alignment: .leading, spacing: 12) {
-				Text(block.title).font(.largeTitle.weight(.semibold))
-				Text(block.subtitle ?? "").font(.subheadline).foregroundStyle(.secondary)
+			VStack(alignment: .leading, spacing: 8) {
+				Text("Your space, your pace").mono_caption().textCase(.uppercase)
+				Text(block.title).font(.system(size: 30, weight: .semibold)).tracking(-1).foregroundStyle(Theme.text).fixedSize(horizontal: false, vertical: true)
+				Text(block.subtitle ?? "").font(.system(size: 15)).foregroundStyle(Theme.text_faint)
 			}
+			.padding(.leading, 12)
+			.overlay(alignment: .leading) { Rectangle().fill(Theme.border).frame(width: 2) }
 		case .timer:
 			let running = sessions.is_running(document)
 			let other_running = sessions.session != nil && !running
-			VStack(alignment: .leading, spacing: 12) {
-				Text(block.title).font(.headline)
-				TimelineView(.periodic(from: .now, by: frozen ? 3600 : 1)) { timeline in
-					let seconds = running ? (sessions.session?.remaining(at: timeline.date) ?? 0) : (block.minutes ?? 25) * 60
-					Text(String(format: "%02d:%02d", seconds / 60, seconds % 60)).font(.system(size: 56, weight: .medium, design: .rounded)).monospacedDigit()
+			Card(tinted: true) {
+				VStack(alignment: .leading, spacing: 12) {
+					Text(block.title).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text_dim)
+					TimelineView(.periodic(from: .now, by: frozen ? 3600 : 1)) { timeline in
+						let seconds = running ? (sessions.session?.remaining(at: timeline.date) ?? 0) : (block.minutes ?? 25) * 60
+						Text(String(format: "%02d:%02d", seconds / 60, seconds % 60)).font(.system(size: 56, weight: .medium, design: .monospaced)).tracking(-2).foregroundStyle(Theme.text)
+					}
+					Text(running ? "One thing at a time." : "A fresh start is one tap away.").supporting()
+					Button {
+						if running { sessions.stop() } else { Task { await sessions.start(document, groups: library.groups) } }
+					} label: {
+						Label(sessions.is_busy ? "Preparing…" : running ? "End session" : "Start focusing", systemImage: running ? "pause.fill" : "play.fill")
+					}
+					.buttonStyle(PrimaryButtonStyle()).disabled(sessions.is_busy || other_running)
+					if other_running { Text("Another routine is running a session. End it first.").supporting() }
 				}
-				Button {
-					if running { sessions.stop() } else { Task { await sessions.start(document, groups: library.groups) } }
-				} label: {
-					Label(sessions.is_busy ? "Preparing…" : running ? "End session" : "Start focusing", systemImage: running ? "stop.fill" : "play.fill").frame(maxWidth: .infinity).padding(.vertical, 8)
-				}
-				.buttonStyle(.borderedProminent).disabled(sessions.is_busy || other_running)
-				Text(other_running ? "Another tool is running a session. End it first." : "You can end a session at any time.").font(.caption).foregroundStyle(.secondary)
 			}
-			.padding(20).background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
+		case .schedule:
+			let enabled = document.enabled == true
+			Card(tinted: true) {
+				VStack(alignment: .leading, spacing: 10) {
+					HStack {
+						Label(block.title, systemImage: "calendar.badge.clock").font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text_dim)
+						Spacer()
+						Text(enabled ? "On" : "Off").font(.system(size: 13)).foregroundStyle(Theme.text_dim)
+						Toggle(enabled ? "On" : "Off", isOn: Binding(get: { enabled }, set: { set_standing(document, $0) }))
+							.labelsHidden().tint(Theme.success).accessibilityLabel("Switch \(block.title) on or off").accessibilityIdentifier("tool.switch")
+					}
+					Text(ScheduleWindow.describe(block)).heading_font(22)
+					TimelineView(.periodic(from: .now, by: frozen ? 3600 : 30)) { timeline in
+						Text(ScheduleWindow.describe_status(block, enabled: enabled, at: timeline.date)).supporting()
+					}
+					Text(enabled ? "Switch it off to edit this routine." : "Runs by itself once it is on, even with the app closed.").font(.system(size: 11)).foregroundStyle(Theme.text_faint)
+				}
+			}
 		case .checklist:
-			VStack(alignment: .leading, spacing: 12) {
-				Text(block.title).font(.headline)
-				ForEach(block.items ?? []) { item in
+			let items = block.items ?? []
+			let done_count = items.filter { sessions.completed($0.id, in: document) }.count
+			VStack(alignment: .leading, spacing: 0) {
+				HStack {
+					Text(block.title).heading_font(15)
+					Spacer()
+					Text("\(done_count)/\(items.count)").mono_caption()
+				}
+				.padding(.bottom, 8)
+				ForEach(items) { item in
 					let done = sessions.completed(item.id, in: document)
 					Button { sessions.toggle_task(item.id, in: document) } label: {
 						HStack(alignment: .top, spacing: 12) {
-							Image(systemName: done ? "checkmark.square.fill" : "square")
-							Text(item.text).strikethrough(done).multilineTextAlignment(.leading)
+							Image(systemName: done ? "checkmark.square.fill" : "square").foregroundStyle(done ? Theme.text : Theme.border_hi)
+							Text(item.text).font(.system(size: 15)).foregroundStyle(done ? Theme.text_faint : Theme.text).strikethrough(done).multilineTextAlignment(.leading)
 							Spacer(minLength: 0)
-						}.padding(.vertical, 8).contentShape(Rectangle())
-					}.buttonStyle(.plain).accessibilityValue(done ? "Complete" : "Incomplete")
-					Divider()
+						}
+						.padding(.vertical, 10).contentShape(Rectangle())
+					}
+					.buttonStyle(.plain).accessibilityValue(done ? "Complete" : "Incomplete")
+					Hairline()
 				}
 			}
 		case .screen_time:
 			let running = sessions.is_running(document)
 			let standing_active = document.enabled == true && document.schedule.map { ScheduleWindow.status($0, at: .now).active } == true
 			let active = (running && sessions.session?.blocks_apps == true) || standing_active
-			VStack(alignment: .leading, spacing: 12) {
-				Label(block.title, systemImage: "shield.lefthalf.filled").font(.headline)
-				Text(block.shield_description).font(.subheadline.weight(.medium))
-				if block.group_names.isEmpty {
-					Text(active ? "Focus restrictions are active." : "\(sessions.selected_count(for: document)) apps, categories, or websites selected for this routine.").font(.subheadline).foregroundStyle(.secondary)
-					Button("Choose apps privately") {
-						Task { if await sessions.authorize_screen_time() { draft_selection = sessions.selection(for: document); showing_picker = true } }
-					}.buttonStyle(.bordered).disabled(running || sessions.is_busy || document.enabled == true)
-				} else {
-					ForEach(block.group_names, id: \.self) { name in
-						let group = library.groups.first { $0.name.lowercased() == name.lowercased() }
-						let count = group.map { sessions.group_count($0) } ?? 0
-						HStack {
-							Text(name)
-							Spacer()
-							Text(group == nil ? "not created yet" : count == 0 ? "no apps yet" : "\(count) selected").font(.subheadline).foregroundStyle(group == nil || count == 0 ? .orange : .secondary)
+			Card {
+				VStack(alignment: .leading, spacing: 10) {
+					HStack(spacing: 10) {
+						Image(systemName: active ? "checkmark.shield.fill" : "shield").font(.system(size: 18)).foregroundStyle(active ? Theme.success : Theme.text_dim)
+						VStack(alignment: .leading, spacing: 2) {
+							Text(block.title).heading_font(15)
+							Text(block.shield_description).supporting()
 						}
 					}
-					Text(active ? "Focus restrictions are active." : block.shield_mode == .limit ? "Locks after \(block.limit_minutes ?? 0) minutes of use inside this routine." : block.shield_mode == .allow_only ? "Everything except these groups is locked while this runs." : "These groups are locked while this runs.").font(.caption).foregroundStyle(.secondary)
-					Button("Set up app groups", systemImage: "square.grid.2x2") { showing_groups = true }.buttonStyle(.bordered).accessibilityIdentifier("tool.groups")
+					if block.group_names.isEmpty {
+						Text(active ? "Focus restrictions are active." : "\(sessions.selected_count(for: document)) apps, categories, or websites selected for this routine.").supporting()
+						Button("Choose apps privately") {
+							Task { if await sessions.authorize_screen_time() { draft_selection = sessions.selection(for: document); showing_picker = true } }
+						}.buttonStyle(QuietButtonStyle()).disabled(running || sessions.is_busy || document.enabled == true)
+					} else {
+						Hairline()
+						ForEach(block.group_names, id: \.self) { name in
+							let group = library.groups.first { $0.name.lowercased() == name.lowercased() }
+							let count = group.map { sessions.group_count($0) } ?? 0
+							HStack {
+								Text(name).font(.system(size: 14, weight: .medium)).foregroundStyle(Theme.text)
+								Spacer()
+								Text(group == nil ? "not created yet" : count == 0 ? "no apps yet" : "\(count) selected").font(.system(size: 12)).foregroundStyle(group == nil || count == 0 ? Theme.warning : Theme.text_faint)
+							}
+						}
+						Text(active ? "Focus restrictions are active." : block.shield_mode == .limit ? "Locks after \(block.limit_minutes ?? 0) minutes of use inside this routine." : block.shield_mode == .allow_only ? "Everything except these groups is locked while this runs." : "These groups are locked while this runs.").font(.system(size: 11)).foregroundStyle(Theme.text_faint)
+						Button { showing_groups = true } label: { Label("Set up app groups", systemImage: "square.grid.2x2") }.buttonStyle(QuietButtonStyle()).accessibilityIdentifier("tool.groups")
+					}
 				}
 			}
 		case .counter:
 			let value = sessions.count(block, in: document)
-			VStack(alignment: .leading, spacing: 12) {
-				Text(block.title).font(.headline)
-				HStack {
-					Text("\(value) / \(block.target ?? 1)").font(.title2).monospacedDigit()
-					Spacer()
-					Button("Add one", systemImage: "plus") { sessions.increment(block, in: document) }.buttonStyle(.bordered).disabled(value >= (block.target ?? 1))
+			let target = block.target ?? 1
+			Card {
+				VStack(alignment: .leading, spacing: 10) {
+					Text(block.title).heading_font(15)
+					HStack(alignment: .firstTextBaseline) {
+						Text("\(value)").font(.system(size: 32, weight: .semibold, design: .monospaced)).foregroundStyle(Theme.text)
+						Text("/ \(target)").font(.system(size: 14)).foregroundStyle(Theme.text_faint)
+						Spacer()
+						Button { sessions.increment(block, in: document) } label: { Label(value >= target ? "Done" : "Add one", systemImage: value >= target ? "checkmark" : "plus") }.buttonStyle(QuietButtonStyle()).disabled(value >= target)
+					}
 				}
 			}
 		case .note:
-			VStack(alignment: .leading, spacing: 8) { Text(block.title).font(.headline); Text(block.text ?? "").foregroundStyle(.secondary) }
+			VStack(alignment: .leading, spacing: 6) {
+				Text(block.title).heading_font(15)
+				Text(block.text ?? "").font(.system(size: 15)).foregroundStyle(Theme.text_dim)
+			}
 		}
 	}
 }

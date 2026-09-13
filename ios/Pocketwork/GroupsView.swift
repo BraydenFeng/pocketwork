@@ -13,34 +13,32 @@ struct GroupsView: View {
 	@State private var pending_delete: AppGroup?
 
 	var body: some View {
-		List {
-			Section {
+		ScrollView {
+			VStack(alignment: .leading, spacing: 20) {
+				VStack(alignment: .leading, spacing: 6) {
+					SectionLabel(number: "02", text: "App groups")
+					Text("Name the apps once. Every routine can use them.").heading_font(20)
+					Text("Tap a group to choose its apps with Apple's private picker. Which apps are in a group stays on this iPhone. Routines can block a group, allow only a group, or limit it to so many minutes.").supporting()
+				}
 				if library.groups.isEmpty {
-					Text("Name a group like Social or Work, then choose which apps belong in it. Routines can block a group, allow only a group, or limit it to so many minutes.").foregroundStyle(.secondary)
+					Card(tinted: true, dashed: true) { Text("No groups yet. Name one below, then tap it to choose its apps.").supporting() }
 				}
-				ForEach(library.groups) { group in
-					Button { choose_apps(for: group) } label: { group_row(group) }
-						.accessibilityIdentifier("group.\(group.id)")
-						.swipeActions(edge: .trailing) {
-							Button(role: .destructive) { pending_delete = group } label: { Label("Delete", systemImage: "trash") }
-							Button { renaming = group; rename_text = group.name } label: { Label("Rename", systemImage: "pencil") }.tint(.secondary)
+				ForEach(library.groups) { group in group_card(group) }
+				Card(tinted: true) {
+					VStack(alignment: .leading, spacing: 10) {
+						Text("New group").heading_font(15)
+						HStack(spacing: 8) {
+							Field(label: "Name") { TextField("Social, Games, Work…", text: $new_name).accessibilityIdentifier("groups.new").onSubmit(add) }
+							Button { add() } label: { Label("Add", systemImage: "plus") }.buttonStyle(QuietButtonStyle()).disabled(new_name.trimmingCharacters(in: .whitespaces).isEmpty).padding(.top, 18)
 						}
-						.contextMenu {
-							Button("Choose apps", systemImage: "checklist") { choose_apps(for: group) }
-							Button("Rename", systemImage: "pencil") { renaming = group; rename_text = group.name }
-							Button("Delete", systemImage: "trash", role: .destructive) { pending_delete = group }
-						}
+						Text("Up to \(ToolLibrary.max_groups) groups. Routines that mention a new group create it here automatically.").supporting()
+					}
 				}
-			} header: { Text("Your groups") } footer: {
-				if !library.groups.isEmpty { Text("Tap a group to choose its apps. Which apps are in a group stays on this iPhone.") }
 			}
-			Section {
-				HStack {
-					TextField("New group, e.g. Social", text: $new_name).accessibilityIdentifier("groups.new").onSubmit(add)
-					Button("Add") { add() }.disabled(new_name.trimmingCharacters(in: .whitespaces).isEmpty)
-				}
-			} footer: { Text("Up to \(ToolLibrary.max_groups) groups. Routines that mention a new group create it here automatically.") }
+			.padding(Theme.pad)
+			.padding(.bottom, 24)
 		}
+		.page()
 		.navigationTitle("App groups")
 		.navigationBarTitleDisplayMode(.inline)
 		.sheet(item: $picking) { group in
@@ -70,19 +68,32 @@ struct GroupsView: View {
 		} message: { Text(library.error_message ?? "") }
 	}
 
-	private func group_row(_ group: AppGroup) -> some View {
+	private func group_card(_ group: AppGroup) -> some View {
 		let count = sessions.group_count(group)
 		let users = library.library.routines_using(group: group.name).count
-		return HStack {
-			VStack(alignment: .leading, spacing: 4) {
-				Text(group.name).font(.headline)
-				Text(count == 0 ? "No apps yet · tap to choose" : "\(count) app\(count == 1 ? "" : "s"), categories, or sites").font(.subheadline).foregroundStyle(count == 0 ? .orange : .secondary)
-				Text(users == 0 ? "Not used by a routine yet" : "Used by \(users) routine\(users == 1 ? "" : "s")").font(.caption).foregroundStyle(.tertiary)
+		return Card {
+			VStack(alignment: .leading, spacing: 8) {
+				Button { choose_apps(for: group) } label: {
+					HStack(spacing: 10) {
+						Image(systemName: count == 0 ? "shield" : "checkmark.shield.fill").font(.system(size: 18)).foregroundStyle(count == 0 ? Theme.warning : Theme.success)
+						VStack(alignment: .leading, spacing: 2) {
+							Text(group.name).heading_font(17)
+							Text(count == 0 ? "No apps yet · tap to choose" : "\(count) app\(count == 1 ? "" : "s"), categories, or sites").font(.system(size: 13)).foregroundStyle(count == 0 ? Theme.warning : Theme.text_dim)
+							Text(users == 0 ? "Not used by a routine yet" : "Used by \(users) routine\(users == 1 ? "" : "s")").font(.system(size: 11)).foregroundStyle(Theme.text_faint)
+						}
+						Spacer()
+						Image(systemName: "arrow.right").foregroundStyle(Theme.text_faint)
+					}
+					.contentShape(Rectangle())
+				}
+				.buttonStyle(.plain).accessibilityIdentifier("group.\(group.id)")
+				Hairline()
+				HStack(spacing: 16) {
+					Button { renaming = group; rename_text = group.name } label: { Label("Rename", systemImage: "pencil") }.buttonStyle(TextButtonStyle())
+					Button { pending_delete = group } label: { Label("Delete", systemImage: "trash") }.buttonStyle(TextButtonStyle(danger: true))
+				}
 			}
-			Spacer()
-			Image(systemName: "chevron.right").foregroundStyle(.tertiary)
 		}
-		.contentShape(Rectangle())
 	}
 
 	private func add() {
