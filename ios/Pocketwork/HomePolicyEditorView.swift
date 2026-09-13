@@ -53,7 +53,7 @@ private struct HomeRuleEditor: View {
 			Text(rule.days.map { days[$0] }.joined(separator: ", ")).heading_font(20)
 			Stepper(value: $rule.allowance_minutes, in: 1...180, step: 5) {
 				VStack(alignment: .leading, spacing: 4) { Text("\(rule.allowance_minutes) minutes total").heading_font(17); Text("Shared daily allowance").supporting() }
-			}
+			}.accessibilityIdentifier("home.allowance.\(rule.days.first ?? 0)").accessibilityLabel("Daily allowance for " + rule.days.map { days[$0] }.joined(separator: ", ")).accessibilityValue("\(rule.allowance_minutes) minutes")
 			ForEach(Array(rule.windows.indices), id: \.self) { index in
 				HStack(spacing: 12) {
 					DatePicker("From", selection: clock(index, \.start), displayedComponents: .hourAndMinute).labelsHidden().accessibilityLabel("Window \(index + 1) starts")
