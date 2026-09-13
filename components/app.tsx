@@ -143,11 +143,12 @@ export function PocketworkApp() {
 	}
 
 	const save_tool = useCallback((document: AppDocument) => {
+		if (active_owner.current !== (account?.id ?? null)) { return; }
 		const next = upsert_tool(library_ref.current, document, Date.now());
 		library_ref.current = next;
 		set_library(next);
 		if (!storage_blocked) { save_library(storage(), next); }
-	}, [storage_blocked, storage]);
+	}, [storage_blocked, storage, account?.id]);
 
 	function create_tool(document: AppDocument) {
 		try { persist(upsert_tool(library, document, Date.now())); set_error(null); navigate(document.id); }
