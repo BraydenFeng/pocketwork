@@ -5,10 +5,13 @@ import SwiftUI
 // Runs one routine, drawn like the phone preview in the web editor: the same blocks, with real timers, checklists, counters, and Screen Time.
 struct ToolView: View {
 	let document_id: String
+	var edit_on_open = false
 	@EnvironmentObject private var library: LibraryController
 	@EnvironmentObject private var sessions: SessionController
 	@Environment(\.scenePhase) private var scene_phase
-	@State private var showing_editor = false
+	@StateObject private var editor = RoutinePageEditing()
+	@State private var opened = false
+	@State private var showing_behavior = false
 	@State private var showing_picker = false
 	@State private var draft_selection = FamilyActivitySelection()
 	@State private var showing_groups = false
@@ -19,33 +22,52 @@ struct ToolView: View {
 
 	var body: some View {
 		Group {
-			if let document = library.tool(document_id), document.home_allowance != nil { HomeAllowanceView(document: document) }
-			else if let document = library.tool(document_id) {
+			if let document = library.tool(document_id), document.home_allowance != nil { HomeAllowanceView(document: document, edit_on_open: edit_on_open) }
+			else if let document = editor.draft ?? library.tool(document_id) {
 				ScrollView {
 					VStack(alignment: .leading, spacing: 20) {
 						HStack(spacing: 8) {
 							RoundedRectangle(cornerRadius: 3).fill(Theme.text).frame(width: 12, height: 12)
-							Text(document.name).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text_dim)
+							if editor.active {
+								TextField("Routine name", text: Binding(get: { editor.draft?.name ?? "" }, set: { editor.draft?.name = $0 })).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text_dim).accessibilityIdentifier("page.name")
+							} else { Text(document.name).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text_dim) }
 						}
-						ForEach(document.blocks) { block in block_view(block, in: document) }
+						ForEach(document.blocks) { block in
+							if editor.active {
+								InlineRoutineBlock(block: editor.block(block), groups: library.groups)
+									.contextMenu {
+										Button("Move up", systemImage: "arrow.up") { editor.move(block.id, by: -1) }.disabled(document.blocks.first?.id == block.id)
+										Button("Move down", systemImage: "arrow.down") { editor.move(block.id, by: 1) }.disabled(document.blocks.last?.id == block.id)
+										Button("Remove block", systemImage: "trash", role: .destructive) { editor.draft = editor.draft?.removing_block(block.id) }.disabled(document.blocks.count == 1)
+									}
+							} else { block_view(block, in: document) }
+						}
 						Text("Made for you. By you.").mono_caption().padding(.top, 8)
 					}
 					.padding(Theme.pad)
-					.padding(.bottom, 24)
+					.padding(.bottom, 24).disabled(editor.saving)
 				}
 				.page()
-				.navigationTitle(document.name)
+				.navigationTitle(library.tool(document_id)?.name ?? document.name)
+				.navigationBarBackButtonHidden(editor.active)
+				.scrollDismissesKeyboard(.interactively)
 				.navigationBarTitleDisplayMode(.inline)
 				.toolbar {
-					ToolbarItem(placement: .topBarTrailing) { Button("Edit") { showing_editor = true }.disabled(sessions.is_running(document) || document.enabled == true).accessibilityIdentifier("tool.edit") }
+					ToolbarItem(placement: .topBarTrailing) {
+						if editor.active { Button("Save") { Task { await editor.save(library: library, sessions: sessions) } }.fontWeight(.semibold).foregroundStyle(Theme.accent).disabled(editor.saving || sessions.is_busy) }
+						else { Button("Edit") { editor.begin(document) }.disabled(sessions.is_running(document) || sessions.is_busy).accessibilityIdentifier("tool.edit") }
+					}
 					ToolbarItem(placement: .topBarTrailing) {
 						Menu {
 							Button("Reset checklist and counters", systemImage: "arrow.counterclockwise") { sessions.reset_progress(for: document) }
 							Button(role: .destructive) { clear_everything() } label: { Label("Clear all focus restrictions", systemImage: "lock.open") }.disabled(sessions.is_busy)
-						} label: { Image(systemName: "ellipsis") }
+						} label: { Image(systemName: "ellipsis") }.disabled(editor.active)
 					}
 				}
-				.sheet(isPresented: $showing_editor) { EditorView(document: document) }
+				.safeAreaInset(edge: .bottom) { if editor.active { editing_bar } }
+				.sheet(isPresented: $showing_behavior) { behavior }
+				.onAppear { if !opened { opened = true; if edit_on_open { editor.begin(document) } } }
+				.alert("Couldn’t save changes", isPresented: Binding(get: { editor.failure != nil }, set: { if !$0 { editor.failure = nil } })) { Button("OK") { editor.failure = nil } } message: { Text(editor.failure ?? "") }
 				.navigationDestination(isPresented: $showing_groups) { GroupsView() }
 				.sheet(isPresented: $showing_picker) {
 					NavigationStack {
@@ -74,6 +96,28 @@ struct ToolView: View {
 		.alert("Couldn’t complete that action", isPresented: Binding(get: { sessions.error_message != nil }, set: { if !$0 { sessions.error_message = nil } })) {
 			Button("OK") { sessions.error_message = nil }
 		} message: { Text(sessions.error_message ?? "") }
+	}
+
+	private var editing_bar: some View {
+		EditorBar {
+			Button("Cancel") { editor.cancel() }.buttonStyle(TextButtonStyle()).frame(minHeight: 44)
+			Spacer()
+			if editor.saving { ProgressView() }
+			Menu {
+				ForEach(EditorView.kinds) { option in Button(option.label, systemImage: option.icon) { editor.add(option.kind) }.disabled(editor.draft?.can_add(option.kind) != true) }
+			} label: { Label("Add block", systemImage: "plus").frame(minHeight: 44).contentShape(Rectangle()) }.buttonStyle(TextButtonStyle()).accessibilityIdentifier("page.add-block")
+			Button { showing_behavior = true } label: { Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44) }.buttonStyle(TextButtonStyle()).accessibilityLabel("Routine behavior")
+		}.disabled(editor.saving)
+	}
+	private var behavior: some View {
+		NavigationStack {
+			VStack(alignment: .leading, spacing: Theme.gap) {
+				ToggleRow(title: "Block apps while running", is_on: Binding(get: { editor.draft?.rules.block_during_focus ?? false }, set: { editor.draft?.rules.block_during_focus = $0 }), disabled: editor.draft?.has_engine != true || editor.draft?.has_screen_time != true)
+				Hairline()
+				ToggleRow(title: "Notify when finished", is_on: Binding(get: { editor.draft?.rules.notify_on_complete ?? false }, set: { editor.draft?.rules.notify_on_complete = $0 }), disabled: editor.draft?.has_timer != true)
+				Spacer()
+			}.padding(Theme.pad).paper_page().navigationTitle("Behavior").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showing_behavior = false } } }
+		}.presentationDetents([.medium])
 	}
 
 	private func clear_everything() {
@@ -129,7 +173,7 @@ struct ToolView: View {
 					TimelineView(.periodic(from: .now, by: frozen ? 3600 : 30)) { timeline in
 						Text(ScheduleWindow.describe_status(block, enabled: enabled, at: timeline.date)).supporting()
 					}
-					Text(enabled ? "Switch it off to edit this routine." : "Runs by itself once it is on, even with the app closed.").font(.system(size: 11)).foregroundStyle(Theme.text_faint)
+					Text("Runs by itself once it is on, even with the app closed.").font(.system(size: 11)).foregroundStyle(Theme.text_faint)
 				}
 			}
 		case .checklist:

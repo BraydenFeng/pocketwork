@@ -45,7 +45,7 @@ struct HomePolicyEditorView: View {
 	}
 }
 
-private struct HomeRuleEditor: View {
+struct HomeRuleEditor: View {
 	@Binding var rule: HomeDayRule
 	private let days = ["", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 	var body: some View {
