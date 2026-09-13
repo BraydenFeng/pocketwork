@@ -15,6 +15,22 @@ jobs:
       ASC_ISSUER_ID: f468a1c0-aa8d-4b2b-ba03-b085f9f307d0
     steps:
       - uses: actions/checkout@v4
+      - name: Select an upload-supported Xcode
+        run: |
+          set -euo pipefail
+          XCODE=$(python3 - <<'PY'
+          import glob, re
+          candidates = glob.glob('/Applications/Xcode_*.app')
+          def version(path):
+              return tuple(int(part) for part in re.findall(r'\d+', path))
+          supported = [path for path in candidates if version(path)[0] >= 26]
+          if not supported:
+              raise SystemExit('This runner has no Xcode 26 or newer: ' + ', '.join(candidates))
+          print(max(supported, key=version))
+          PY
+          )
+          sudo xcode-select -s "$XCODE/Contents/Developer"
+          xcodebuild -version
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Import signing material

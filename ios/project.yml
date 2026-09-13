@@ -36,6 +36,7 @@ targets:
         PocketworkAppGroup: $(APP_GROUP)
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         UIFileSharingEnabled: false
@@ -67,6 +68,7 @@ targets:
     info:
       path: FocusMonitor/Info.plist
       properties:
+        CFBundleDisplayName: Pocketwork Focus Monitor
         PocketworkAppGroup: $(APP_GROUP)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.deviceactivity.monitor-extension
