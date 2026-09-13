@@ -155,11 +155,11 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 					// Cloud settings take effect when this app opens, after on-device consent and selection.
 					for entry in old.tools {
 						if merged.find(entry.id) == nil { sessions?.forget(entry.id) }
-						else if entry.document.is_standing && merged.find(entry.id)?.is_standing != true { _ = sessions?.set_standing(entry.document, enabled: false, groups: old.groups ?? []) }
+						else if entry.document.is_standing && merged.find(entry.id)?.is_standing != true { _ = await sessions?.set_routine(entry.document, enabled: false, groups: old.groups ?? []) }
 					}
 					for entry in merged.tools where entry.document.is_standing {
 						if old.find(entry.id) != entry.document || old.groups != merged.groups {
-							_ = sessions?.set_standing(entry.document, enabled: entry.document.enabled == true, groups: merged.groups ?? [])
+							_ = await sessions?.set_routine(entry.document, enabled: entry.document.enabled == true, groups: merged.groups ?? [])
 						}
 					}
 				}

@@ -29,8 +29,9 @@ struct HomeAllowanceView: View {
 				if !home.always_allowed { Button("Allow background home detection") { home.allow_background() }.buttonStyle(QuietButtonStyle()) }
 				Button("Choose Distractions") { Task { if await sessions.authorize_screen_time(), let group = library.groups.first(where: { $0.name == document.shield?.group_names.first }) { selection = sessions.group_selection(group); showing_picker = true } } }.buttonStyle(QuietButtonStyle())
 				Toggle("Enable home allowance", isOn: Binding(get: { document.enabled == true }, set: { enabled in
-					if sessions.set_standing(document, enabled: enabled, groups: library.groups) { library.set_enabled(document.id, enabled); refresh() }
-				})).disabled(!home.has_home || !home.always_allowed).tint(Theme.success)
+					Task { if await sessions.set_routine(document, enabled: enabled, groups: library.groups) { library.set_enabled(document.id, enabled); refresh() } }
+				})).disabled(sessions.is_busy || !home.has_home || !home.always_allowed).tint(Theme.success)
+				if sessions.is_busy { ProgressView("Updating home allowance…") }
 				Button("Refresh remaining time") { refresh() }.buttonStyle(TextButtonStyle())
 				Text("Outside the windows, distractions are blocked at home. Away from home, they are unrestricted. Home uses a 150 m boundary. iOS may detect crossings late. Usage is saved in whole minutes; a final partial minute may not count when you leave.").supporting()
 				if let error = home.error_message ?? sessions.error_message { Text(error).foregroundStyle(Theme.danger).font(.system(size: 13)) }
@@ -39,10 +40,10 @@ struct HomeAllowanceView: View {
 		.onAppear { home.restore(); refresh() }
 		.sheet(isPresented: $showing_picker) { NavigationStack { FamilyActivityPicker(selection: $selection).navigationTitle("Distractions").toolbar {
 			ToolbarItem(placement: .confirmationAction) { Button("Done") {
-				if let group = library.groups.first(where: { $0.name == document.shield?.group_names.first }) { sessions.save_group_selection(selection, for: group); if document.enabled == true { _ = sessions.set_standing(document, enabled: true, groups: library.groups) } }
+				if let group = library.groups.first(where: { $0.name == document.shield?.group_names.first }) { sessions.save_group_selection(selection, for: group); if document.enabled == true { Task { _ = await sessions.set_routine(document, enabled: true, groups: library.groups) } } }
 				showing_picker = false
 			} }
 		} } }
 	}
-	private func refresh() { do { let state = try HomeEngine.snapshot(); let used = state.ledger.day == document.home_allowance?.day_key(.now) ? state.ledger.used_minutes : 0; remaining = max(0, (document.home_allowance?.rule(at: .now)?.allowance_minutes ?? 0) - used) } catch { sessions.report(error) } }
+	private func refresh() { Task { do { let state = try await HomeWorker.run { try HomeEngine.snapshot() }; let used = state.ledger.day == document.home_allowance?.day_key(.now) ? state.ledger.used_minutes : 0; remaining = max(0, (document.home_allowance?.rule(at: .now)?.allowance_minutes ?? 0) - used) } catch { sessions.report(error) } } }
 }
