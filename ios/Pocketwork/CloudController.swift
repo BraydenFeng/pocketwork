@@ -93,6 +93,9 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 
 	func sign_out() {
 		guard !syncing, !busy else { return }
+		busy = true
+		Task {
+		defer { busy = false }
 		do {
 			let code = SecItemDelete(keychain_query as CFDictionary)
 			guard code == errSecSuccess || code == errSecItemNotFound else { throw DocumentError.invalid("Could not clear the saved sign-in.") }
@@ -100,6 +103,7 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 			try library?.switch_account(nil)
 			generation += 1; session = nil; signed_in = false; email = nil; status = "Signed out. Your cloud routines are kept in your account."
 		} catch { fail(error) }
+		}
 	}
 
 	private func store(_ value: CloudSession) throws {
