@@ -16,7 +16,7 @@ struct BehaviorNode: Codable, Equatable, Identifiable {
 	var y: Double
 	var config: BehaviorConfig
 }
-struct BehaviorEdge: Codable, Equatable { var from: String; var output: String; var to: String; var input: String }
+struct BehaviorEdge: Codable, Equatable, Hashable { var from: String; var output: String; var to: String; var input: String }
 struct BehaviorGraph: Codable, Equatable {
 	var nodes: [BehaviorNode]
 	var connections: [BehaviorEdge]
@@ -139,5 +139,20 @@ extension AppDocument {
 		for block in blocks { if block.type == .timer { ports[block.id] = ["active":"boolean", "finished":"boolean"] }; if block.type == .schedule { ports[block.id] = ["active":"boolean", "outside":"boolean"] } }
 		if home_allowance != nil { ports["home-condition"] = ["present":"boolean"]; ports["usage-meter"] = ["used":"number"]; ports["daily-allowance"] = ["reached":"boolean"] }
 		return ports
+	}
+}
+
+extension BehaviorState {
+	mutating func reconcile(from old: BehaviorGraph, to next: BehaviorGraph) {
+		let live = Set(next.nodes.filter { node in old.nodes.contains { $0.id == node.id && $0.kind == node.kind } }.map(\.id))
+		let stable = Set(next.nodes.filter { node in
+			guard let previous = old.nodes.first(where: { $0.id == node.id && $0.kind == node.kind }) else { return false }
+			var before = previous.config; var after = node.config; before.label = ""; after.label = ""
+			return before == after && Set(old.connections.filter { $0.to == node.id }) == Set(next.connections.filter { $0.to == node.id })
+		}.map(\.id))
+		values = values.filter { live.contains($0.key) }; days = days.filter { live.contains($0.key) }
+		fired = fired.filter { stable.contains(String($0.key.split(separator: ".").first ?? "")) }
+		pending = pending.filter { stable.contains($0.id) }
+		at_location = nil
 	}
 }

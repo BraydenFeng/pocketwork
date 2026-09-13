@@ -49,7 +49,7 @@ struct BehaviorPanel: View {
 	private func load(_ graph: BehaviorGraph) {
 		do {
 			state = BehaviorState(); outputs = [:]; messages = []; error = nil
-			if let data = UserDefaults.standard.data(forKey: storage_key) { let saved = try JSONDecoder().decode(SavedBehaviors.self, from: data); if saved.graph == graph { state = saved.state } }
+			if let data = UserDefaults.standard.data(forKey: storage_key) { let saved = try JSONDecoder().decode(SavedBehaviors.self, from: data); state = saved.state; state.reconcile(from: saved.graph, to: graph) }
 			// A stale location from a previous visit is not a new boundary crossing.
 			state.at_location = nil
 		} catch { self.error = "Could not load behavior progress: " + error.localizedDescription; paused = true }

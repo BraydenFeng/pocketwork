@@ -46,4 +46,16 @@ final class BehaviorTests: XCTestCase {
 		let library = try ToolLibrary.empty.upserting(document, now: .now)
 		XCTAssertEqual(try ToolLibrary.decode(library.encoded()), library)
 	}
+
+	func testGraphEditsPreserveProgressAndRemoveDetachedState() throws {
+		let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "behavior-fixtures", withExtension: "json"))
+		let old = try JSONDecoder().decode([Fixture].self, from: Data(contentsOf: url))[0].graph
+		var next = old; next.nodes[1].config.label = "Gym visits"; next.nodes[1].x = 100
+		var state = BehaviorState(); state.values["count"] = 7; state.days["tap"] = "2026-09-13"; state.fired["count.increment"] = "4"
+		state.reconcile(from: old, to: next)
+		XCTAssertEqual(state.values["count"], 7); XCTAssertEqual(state.days["tap"], "2026-09-13"); XCTAssertEqual(state.fired["count.increment"], "4")
+		next.nodes.removeAll { $0.id == "count" }; next.connections.removeAll { $0.from == "count" || $0.to == "count" }
+		state.reconcile(from: old, to: next)
+		XCTAssertNil(state.values["count"]); XCTAssertNil(state.fired["count.increment"])
+	}
 }
