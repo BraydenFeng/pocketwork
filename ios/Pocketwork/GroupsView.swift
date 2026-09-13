@@ -7,7 +7,7 @@ struct GroupsView: View {
 	@EnvironmentObject private var sessions: SessionController
 	@State private var new_name = ""
 	@State private var picking: AppGroup?
-		@State private var renaming: AppGroup?
+	@State private var renaming: AppGroup?
 	@State private var rename_text = ""
 	@State private var pending_delete: AppGroup?
 

@@ -118,7 +118,7 @@ struct HomeView: View {
 		HStack {
 			HStack(spacing: 8) { Circle().fill(Theme.border_hi).frame(width: 6, height: 6); Text("Your own little tools.") }
 			Spacer()
-			Text(cloud.signed_in ? "SYNCED WORKSPACE" : "ON THIS IPHONE")
+			Text("PERSONAL WORKSPACE")
 		}
 		.mono_caption()
 		.padding(Theme.pad)
@@ -173,8 +173,10 @@ struct HomeView: View {
 					}
 					Button { editing = RoutineDraft(document: document, is_new: false) } label: { Label("Edit", systemImage: "pencil") }.buttonStyle(TextButtonStyle()).accessibilityLabel("Edit \(document.name)").accessibilityIdentifier("home.edit.\(document.id)").disabled(sessions.is_busy || sessions.is_running(document))
 					Spacer()
-					Button { _ = library.duplicate(document.id) } label: { Label("Duplicate", systemImage: "doc.on.doc") }.buttonStyle(TextButtonStyle())
-					Button { pending_delete = entry } label: { Label("Delete", systemImage: "trash") }.buttonStyle(TextButtonStyle(danger: true))
+					Menu {
+						Button("Duplicate", systemImage: "doc.on.doc") { _ = library.duplicate(document.id) }.disabled(document.home_allowance != nil)
+						Button("Delete", systemImage: "trash", role: .destructive) { pending_delete = entry }
+					} label: { Image(systemName: "ellipsis").frame(width: 44, height: 44).foregroundStyle(Theme.text_faint) }.accessibilityLabel("More options for \(document.name)")
 				}
 			}
 		}
