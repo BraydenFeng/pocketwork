@@ -100,13 +100,13 @@ struct ToolView: View {
 
 	private var editing_bar: some View {
 		EditorBar {
-			Button("Cancel") { editor.cancel() }.buttonStyle(TextButtonStyle())
+			Button("Cancel") { editor.cancel() }.buttonStyle(TextButtonStyle()).frame(minHeight: 44)
 			Spacer()
 			if editor.saving { ProgressView() }
 			Menu {
 				ForEach(EditorView.kinds) { option in Button(option.label, systemImage: option.icon) { editor.add(option.kind) }.disabled(editor.draft?.can_add(option.kind) != true) }
-			} label: { Label("Add block", systemImage: "plus") }.accessibilityIdentifier("page.add-block")
-			Button { showing_behavior = true } label: { Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44) }.accessibilityLabel("Routine behavior")
+			} label: { Label("Add block", systemImage: "plus").frame(minHeight: 44).contentShape(Rectangle()) }.buttonStyle(TextButtonStyle()).accessibilityIdentifier("page.add-block")
+			Button { showing_behavior = true } label: { Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44) }.buttonStyle(TextButtonStyle()).accessibilityLabel("Routine behavior")
 		}.disabled(editor.saving)
 	}
 	private var behavior: some View {
