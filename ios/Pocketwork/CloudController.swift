@@ -93,13 +93,17 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 
 	func sign_out() {
 		guard !syncing, !busy else { return }
+		busy = true
+		Task {
+		defer { busy = false }
 		do {
 			let code = SecItemDelete(keychain_query as CFDictionary)
 			guard code == errSecSuccess || code == errSecItemNotFound else { throw DocumentError.invalid("Could not clear the saved sign-in.") }
-			for id in sessions?.clear_everything() ?? [] { library?.set_enabled(id, false) }
+			for id in await sessions?.clear_everything() ?? [] { library?.set_enabled(id, false) }
 			try library?.switch_account(nil)
 			generation += 1; session = nil; signed_in = false; email = nil; status = "Signed out. Your cloud routines are kept in your account."
 		} catch { fail(error) }
+		}
 	}
 
 	private func store(_ value: CloudSession) throws {
@@ -154,12 +158,12 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 					try library.receive_cloud(merged)
 					// Cloud settings take effect when this app opens, after on-device consent and selection.
 					for entry in old.tools {
-						if merged.find(entry.id) == nil { sessions?.forget(entry.id) }
-						else if entry.document.is_standing && merged.find(entry.id)?.is_standing != true { _ = sessions?.set_standing(entry.document, enabled: false, groups: old.groups ?? []) }
+						if merged.find(entry.id) == nil { await sessions?.forget(entry.id) }
+						else if entry.document.is_standing && merged.find(entry.id)?.is_standing != true { _ = await sessions?.set_routine(entry.document, enabled: false, groups: old.groups ?? []) }
 					}
 					for entry in merged.tools where entry.document.is_standing {
 						if old.find(entry.id) != entry.document || old.groups != merged.groups {
-							_ = sessions?.set_standing(entry.document, enabled: entry.document.enabled == true, groups: merged.groups ?? [])
+							_ = await sessions?.set_routine(entry.document, enabled: entry.document.enabled == true, groups: merged.groups ?? [])
 						}
 					}
 				}

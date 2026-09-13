@@ -57,14 +57,14 @@ struct HomeView: View {
 					Menu {
 						Button("App groups", systemImage: "square.grid.2x2") { showing_groups = true }
 						Button("Add from file", systemImage: "square.and.arrow.down") { showing_import = true }
-						Button(role: .destructive) { for id in sessions.clear_everything() { library.set_enabled(id, false) } } label: { Label("Clear all focus restrictions", systemImage: "lock.open") }.disabled(sessions.is_busy)
+						Button(role: .destructive) { Task { for id in await sessions.clear_everything() { library.set_enabled(id, false) } } } label: { Label("Clear all focus restrictions", systemImage: "lock.open") }.disabled(sessions.is_busy)
 					} label: { Image(systemName: "ellipsis") }
 				}
 			}
 			.fileImporter(isPresented: $showing_import, allowedContentTypes: [.json]) { result in import_file(result) }
 			.confirmationDialog("Delete \"\(pending_delete?.document.name ?? "this routine")\"? This cannot be undone.", isPresented: Binding(get: { pending_delete != nil }, set: { if !$0 { pending_delete = nil } }), titleVisibility: .visible) {
 				Button("Delete", role: .destructive) {
-					if let entry = pending_delete { sessions.forget(entry.document.id); library.delete(entry.document.id) }
+					if let entry = pending_delete { Task { await sessions.forget(entry.document.id); library.delete(entry.document.id) } }
 					pending_delete = nil
 				}
 				Button("Cancel", role: .cancel) { pending_delete = nil }

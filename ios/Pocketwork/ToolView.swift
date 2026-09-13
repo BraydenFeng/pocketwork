@@ -77,7 +77,7 @@ struct ToolView: View {
 	}
 
 	private func clear_everything() {
-		for id in sessions.clear_everything() { library.set_enabled(id, false) }
+		Task { for id in await sessions.clear_everything() { library.set_enabled(id, false) } }
 	}
 
 	private func set_standing(_ document: AppDocument, _ enabled: Bool) {

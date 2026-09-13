@@ -96,24 +96,33 @@ final class SessionController: ObservableObject {
 		do { try SharedStore().save_selection(value, for: document.id); objectWillChange.send() } catch { report(error) }
 	}
 
-	func forget(_ document_id: String) {
-		do { if try HomeEngine.snapshot().document?.id == document_id { try HomeEngine.disable() } } catch { report(error) }
+	func forget(_ document_id: String) async {
+		do { try await HomeWorker.run { if try HomeEngine.snapshot().document?.id == document_id { try HomeEngine.disable() } } } catch { report(error) }
 		if session?.document_id == document_id { stop() }
 		release_standing(document_id)
 		progress.removeValue(forKey: document_id)
 		do { try SharedStore().remove_selection(for: document_id); try SharedStore().set_standing(document_id, enabled: false); try persist_progress() } catch { report(error) }
 	}
 
+	func set_routine(_ document: AppDocument, enabled: Bool, groups: [AppGroup]) async -> Bool {
+		guard document.home_allowance != nil else { return set_standing(document, enabled: enabled, groups: groups) }
+		guard !is_busy else { return false }
+		is_busy = true
+		defer { is_busy = false }
+		do {
+			let shield_plan = enabled ? try plan(for: document, groups: groups) : nil
+			try await HomeWorker.run {
+				if let shield_plan { try HomeEngine.configure(document, plan: shield_plan, enabled: true) }
+				else { try HomeEngine.disable() }
+				try SharedStore().set_standing(document.id, enabled: enabled)
+			}
+			return true
+		} catch { report(error); return false }
+	}
+
 	// Standing routines: one repeating DeviceActivity per chosen weekday. iOS fires the monitor extension at each window edge.
 	func set_standing(_ document: AppDocument, enabled: Bool, groups: [AppGroup]) -> Bool {
-		if document.home_allowance != nil {
-			do {
-				if !enabled { try HomeEngine.disable(); try SharedStore().set_standing(document.id, enabled: false); return true }
-				try HomeEngine.configure(document, plan: plan(for: document, groups: groups), enabled: true)
-				try SharedStore().set_standing(document.id, enabled: true)
-				return true
-			} catch { report(error); return false }
-		}
+		guard document.home_allowance == nil else { error_message = "Open Home allowance to change this routine."; return false }
 		guard let schedule = document.schedule, let days = schedule.days, let start = schedule.start, let end = schedule.end,
 			let from = ScheduleWindow.minutes(start), let to = ScheduleWindow.minutes(end) else { return false }
 		guard !enabled else {
@@ -153,8 +162,8 @@ final class SessionController: ObservableObject {
 	}
 
 	// The emergency exit: every shield this app has ever applied comes off. Returns the standing routines that were switched off.
-	func clear_everything() -> [String] {
-		do { try HomeEngine.disable() } catch { report(error) }
+	func clear_everything() async -> [String] {
+		do { try await HomeWorker.run { try HomeEngine.disable() } } catch { report(error) }
 		stop()
 		let ids = (try? SharedStore().standing_ids()) ?? []
 		for id in ids { release_standing(id); _ = try? SharedStore().set_standing(id, enabled: false) }
