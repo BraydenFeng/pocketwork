@@ -387,7 +387,7 @@ kbd { font: inherit; font-size: var(--t-micro); padding-inline: var(--s-1); bord
 .logic-inspector-empty > svg { width: var(--icon-large); color: var(--c-text-faint); }
 .logic-settings { display: grid; gap: var(--s-4); margin: var(--s-4) 0 var(--s-5); }
 .logic-settings label { display: grid; gap: var(--s-1); font-size: var(--t-small); color: var(--c-text-dim); }
-.logic-settings input, .logic-settings select { min-width: 0; width: 100%; min-height: var(--control-h); padding: var(--s-2); border: var(--hairline); border-radius: var(--r-1); background: var(--c-surface); color: var(--c-text); font: inherit; font-size: var(--t-body); }
+.logic-settings input, .logic-settings select, .logic-settings textarea { min-width: 0; width: 100%; min-height: var(--control-h); padding: var(--s-2); border: var(--hairline); border-radius: var(--r-1); background: var(--c-surface); color: var(--c-text); font: inherit; font-size: var(--t-body); }
 .logic-settings input[type="checkbox"] { width: var(--icon); min-height: var(--icon); margin: 0; }
 .logic-days { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-2); }
 .logic-days label { display: flex; align-items: center; gap: var(--s-2); }
@@ -412,4 +412,29 @@ kbd { font: inherit; font-size: var(--t-micro); padding-inline: var(--s-1); bord
 	.logic-stage { height: var(--canvas-min); }
 	.logic-settings { grid-template-columns: minmax(0, 1fr); }
 	.logic-footer > span { flex-basis: 100%; }
+}
+
+.logic-search { width: 100%; padding: var(--s-2); border: var(--hairline); background: var(--c-surface); color: var(--c-text); border-radius: var(--r-1); }
+.logic-node-list { max-height: var(--logic-stage); overflow-y: auto; }
+.behavior-test { padding: var(--s-4); border-top: var(--hairline); }
+.behavior-controls { display: flex; flex-wrap: wrap; gap: var(--s-3); align-items: center; margin-block: var(--s-3); }
+.behavior-controls label { display: flex; gap: var(--s-2); align-items: center; }
+.behavior-test dl > div { display: flex; justify-content: space-between; gap: var(--s-3); padding-block: var(--s-2); border-bottom: var(--hairline); }
+
+
+.logic-search { margin-block: var(--s-3); min-height: var(--control-h); font: inherit; font-size: var(--t-small); }
+.logic-category { border-bottom: var(--hairline); }
+.logic-category summary { display: flex; align-items: center; gap: var(--s-2); padding-block: var(--s-3); cursor: pointer; font-size: var(--t-small); font-weight: var(--w-semi); list-style: none; }
+.logic-category summary::before { content: "›"; font-size: var(--t-body); color: var(--c-text-faint); }
+.logic-category[open] summary::before { content: "⌄"; }
+.logic-category summary > span { margin-left: auto; color: var(--c-text-faint); font-weight: var(--w-regular); }
+.logic-category .logic-add { padding: var(--s-2); align-items: center; border: 0; gap: var(--s-2); }
+.logic-category .logic-add strong { font-size: var(--t-small); }
+.logic-category .logic-add > svg { margin-top: 0; width: var(--icon-small); }
+.logic-category .logic-add:hover:not(:disabled) { background: var(--c-surface-hi); }
+@media (max-width: 760px) {
+	.logic-library { display: block; overflow: visible; }
+	.logic-search { margin-top: 0; }
+	.logic-node-list { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); align-items: start; gap: 0 var(--s-4); max-height: var(--canvas-min); }
+	.logic-category .logic-add { width: 100%; }
 }

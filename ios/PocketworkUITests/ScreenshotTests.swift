@@ -111,4 +111,20 @@ final class ScreenshotTests: XCTestCase {
 		add(attachment)
 		if let output { try screenshot.pngRepresentation.write(to: output.appendingPathComponent("\(name).png")) }
 	}
+
+	func test_connected_behaviors() throws {
+		app.terminate()
+		let fixture = #"""
+{"schema_version": 1, "tools": [{"document": {"schema_version": 3, "id": "behavior-test-id", "name": "Gym check-ins", "description": "", "blocks": [{"id": "heading", "type": "heading", "title": "Gym check-ins", "subtitle": ""}], "rules": {"block_during_focus": false, "notify_on_complete": false}, "behaviors": {"nodes": [{"id": "tap", "kind": "check_in", "x": 0, "y": 0, "config": {"label": "Check in", "value": 1, "minutes": 5, "time": "18:00", "days": [1, 2, 3, 4, 5, 6, 7], "message": "Goal reached", "operator": "gte"}}, {"id": "count", "kind": "count", "x": 0, "y": 0, "config": {"label": "Visits", "value": 1, "minutes": 5, "time": "18:00", "days": [1, 2, 3, 4, 5, 6, 7], "message": "Goal reached", "operator": "gte"}}, {"id": "goal", "kind": "goal", "x": 0, "y": 0, "config": {"label": "Visit goal", "value": 2, "minutes": 5, "time": "18:00", "days": [1, 2, 3, 4, 5, 6, 7], "message": "Goal reached", "operator": "gte"}}, {"id": "message", "kind": "reminder", "x": 0, "y": 0, "config": {"label": "Reminder", "value": 1, "minutes": 5, "time": "18:00", "days": [1, 2, 3, 4, 5, 6, 7], "message": "Goal reached", "operator": "gte"}}], "connections": [{"from": "tap", "output": "done", "to": "count", "input": "increment"}, {"from": "count", "output": "value", "to": "goal", "input": "value"}, {"from": "goal", "output": "reached", "to": "message", "input": "send"}]}}, "updated_at": "2026-09-13T12:00:00Z"}]}
+"""#.replacingOccurrences(of: "behavior-test-id", with: UUID().uuidString)
+		app.launchEnvironment["POCKETWORK_UI_LIBRARY"] = fixture
+		app.launch()
+		XCTAssertTrue(app.buttons["Open Gym check-ins"].waitForExistence(timeout: 10))
+		app.buttons["Open Gym check-ins"].tap()
+		XCTAssertTrue(app.buttons["behavior.tap"].waitForExistence(timeout: 10))
+		app.buttons["behavior.tap"].tap()
+		app.buttons["behavior.tap"].tap()
+		XCTAssertTrue(app.staticTexts["Goal reached"].waitForExistence(timeout: 10))
+		try snap("11-connected-behaviors")
+	}
 }

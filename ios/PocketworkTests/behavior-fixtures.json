@@ -1,0 +1,593 @@
+[
+  {
+    "name": "check-ins increment a counter and announce the goal once",
+    "graph": {
+      "nodes": [
+        {
+          "id": "tap",
+          "kind": "check_in",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "",
+            "value": 1,
+            "minutes": 5,
+            "time": "18:00",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "message": "Goal reached",
+            "operator": "gte"
+          }
+        },
+        {
+          "id": "count",
+          "kind": "count",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "",
+            "value": 1,
+            "minutes": 5,
+            "time": "18:00",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "message": "Goal reached",
+            "operator": "gte"
+          }
+        },
+        {
+          "id": "goal",
+          "kind": "goal",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "",
+            "value": 2,
+            "minutes": 5,
+            "time": "18:00",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "message": "Goal reached",
+            "operator": "gte"
+          }
+        },
+        {
+          "id": "message",
+          "kind": "reminder",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "",
+            "value": 1,
+            "minutes": 5,
+            "time": "18:00",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "message": "Goal reached",
+            "operator": "gte"
+          }
+        }
+      ],
+      "connections": [
+        {
+          "from": "tap",
+          "output": "done",
+          "to": "count",
+          "input": "increment"
+        },
+        {
+          "from": "count",
+          "output": "value",
+          "to": "goal",
+          "input": "value"
+        },
+        {
+          "from": "goal",
+          "output": "reached",
+          "to": "message",
+          "input": "send"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "now": 1800000000,
+        "tap": "tap",
+        "values": {
+          "count": 1
+        },
+        "messages": 0
+      },
+      {
+        "now": 1800000001,
+        "tap": "tap",
+        "values": {
+          "count": 2
+        },
+        "messages": 1
+      },
+      {
+        "now": 1800000002,
+        "values": {
+          "count": 2
+        },
+        "messages": 0
+      }
+    ]
+  },
+  {
+    "name": "arrival delay runs once after its deadline",
+    "graph": {
+      "nodes": [
+        {
+          "id": "arrival",
+          "kind": "arrive",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "",
+            "value": 1,
+            "minutes": 5,
+            "time": "18:00",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "message": "Goal reached",
+            "operator": "gte"
+          }
+        },
+        {
+          "id": "wait",
+          "kind": "delay",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "",
+            "value": 1,
+            "minutes": 1,
+            "time": "18:00",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "message": "Goal reached",
+            "operator": "gte"
+          }
+        },
+        {
+          "id": "message",
+          "kind": "reminder",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "",
+            "value": 1,
+            "minutes": 5,
+            "time": "18:00",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "message": "Goal reached",
+            "operator": "gte"
+          }
+        }
+      ],
+      "connections": [
+        {
+          "from": "arrival",
+          "output": "arrived",
+          "to": "wait",
+          "input": "start"
+        },
+        {
+          "from": "wait",
+          "output": "done",
+          "to": "message",
+          "input": "send"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "now": 1800000000,
+        "location": false,
+        "messages": 0
+      },
+      {
+        "now": 1800000001,
+        "location": true,
+        "messages": 0
+      },
+      {
+        "now": 1800000030,
+        "location": true,
+        "messages": 0
+      },
+      {
+        "now": 1800000062,
+        "location": true,
+        "messages": 1
+      },
+      {
+        "now": 1800000063,
+        "location": true,
+        "messages": 0
+      }
+    ]
+  },
+  {
+    "name": "unknown location is not arrival and leaving produces a reminder",
+    "graph": {
+      "nodes": [
+        {
+          "id": "arrival",
+          "kind": "arrive",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "",
+            "value": 1,
+            "minutes": 5,
+            "time": "18:00",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "message": "Goal reached",
+            "operator": "gte"
+          }
+        },
+        {
+          "id": "leave",
+          "kind": "leave",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "",
+            "value": 1,
+            "minutes": 5,
+            "time": "18:00",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "message": "Goal reached",
+            "operator": "gte"
+          }
+        },
+        {
+          "id": "either",
+          "kind": "or",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "",
+            "value": 1,
+            "minutes": 5,
+            "time": "18:00",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "message": "Goal reached",
+            "operator": "gte"
+          }
+        },
+        {
+          "id": "message",
+          "kind": "reminder",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "",
+            "value": 1,
+            "minutes": 5,
+            "time": "18:00",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "message": "Goal reached",
+            "operator": "gte"
+          }
+        }
+      ],
+      "connections": [
+        {
+          "from": "arrival",
+          "output": "arrived",
+          "to": "either",
+          "input": "a"
+        },
+        {
+          "from": "leave",
+          "output": "left",
+          "to": "either",
+          "input": "b"
+        },
+        {
+          "from": "either",
+          "output": "result",
+          "to": "message",
+          "input": "send"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "now": 1800000000,
+        "location": true,
+        "messages": 0
+      },
+      {
+        "now": 1800000001,
+        "location": false,
+        "messages": 1
+      },
+      {
+        "now": 1800000002,
+        "location": false,
+        "messages": 0
+      }
+    ]
+  },
+  {
+    "name": "usage threshold combines with comparison and branches",
+    "graph": {
+      "nodes": [
+        {
+          "id": "usage",
+          "kind": "app_usage",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "",
+            "value": 20,
+            "minutes": 5,
+            "time": "18:00",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "message": "Goal reached",
+            "operator": "gte"
+          }
+        },
+        {
+          "id": "limit",
+          "kind": "variable",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "",
+            "value": 5,
+            "minutes": 5,
+            "time": "18:00",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "message": "Goal reached",
+            "operator": "gte"
+          }
+        },
+        {
+          "id": "compare",
+          "kind": "compare",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "",
+            "value": 3,
+            "minutes": 5,
+            "time": "18:00",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "message": "Goal reached",
+            "operator": "gt"
+          }
+        },
+        {
+          "id": "both",
+          "kind": "and",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "",
+            "value": 1,
+            "minutes": 5,
+            "time": "18:00",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "message": "Goal reached",
+            "operator": "gte"
+          }
+        },
+        {
+          "id": "branch",
+          "kind": "branch",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "",
+            "value": 1,
+            "minutes": 5,
+            "time": "18:00",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "message": "Goal reached",
+            "operator": "gte"
+          }
+        },
+        {
+          "id": "message",
+          "kind": "reminder",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "",
+            "value": 1,
+            "minutes": 5,
+            "time": "18:00",
+            "days": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "message": "Goal reached",
+            "operator": "gte"
+          }
+        }
+      ],
+      "connections": [
+        {
+          "from": "limit",
+          "output": "value",
+          "to": "compare",
+          "input": "value"
+        },
+        {
+          "from": "usage",
+          "output": "reached",
+          "to": "both",
+          "input": "a"
+        },
+        {
+          "from": "compare",
+          "output": "result",
+          "to": "both",
+          "input": "b"
+        },
+        {
+          "from": "both",
+          "output": "result",
+          "to": "branch",
+          "input": "condition"
+        },
+        {
+          "from": "branch",
+          "output": "yes",
+          "to": "message",
+          "input": "send"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "now": 1800000000,
+        "usage": 10,
+        "messages": 0
+      },
+      {
+        "now": 1800000001,
+        "usage": 20,
+        "messages": 1
+      },
+      {
+        "now": 1800000002,
+        "usage": 25,
+        "messages": 0
+      }
+    ]
+  }
+]

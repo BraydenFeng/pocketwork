@@ -31,6 +31,7 @@ struct HomeAllowanceView: View {
 					}
 				}
 				Group {
+				if document.behaviors != nil { BehaviorPanel(document: document) }
 				Text(home.status).heading_font(15)
 				if let remaining { Text("\(remaining) minutes left today").supporting() }
 				Button(home.has_home ? "Update home to here" : "Set home here") { home.set_here() }.buttonStyle(QuietButtonStyle())

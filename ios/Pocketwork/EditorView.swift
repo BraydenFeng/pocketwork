@@ -19,7 +19,7 @@ struct EditorView: View {
 	}
 	struct KindOption: Identifiable { let kind: BlockKind; let label: String; let icon: String; var id: BlockKind { kind } }
 	static let kinds: [KindOption] = [
-		KindOption(kind: .heading, label: "Heading", icon: "textformat"), KindOption(kind: .timer, label: "Focus timer", icon: "timer"), KindOption(kind: .checklist, label: "Checklist", icon: "checklist"),
+		KindOption(kind: .heading, label: "Heading", icon: "textformat"), KindOption(kind: .timer, label: "Timer", icon: "timer"), KindOption(kind: .checklist, label: "Checklist", icon: "checklist"),
 		KindOption(kind: .counter, label: "Counter", icon: "number"), KindOption(kind: .note, label: "Note", icon: "note.text"), KindOption(kind: .screen_time, label: "Screen Time", icon: "shield"), KindOption(kind: .schedule, label: "Schedule", icon: "calendar")
 	]
 	var body: some View {
@@ -109,7 +109,7 @@ struct EditorView: View {
 					DocumentHeading(title: "How it works", subtitle: "Choose what happens when this routine runs.", icon: "slider.horizontal.3")
 					ToggleRow(title: draft.is_standing ? "Block on schedule" : "Block during focus", description: draft.has_engine && draft.has_screen_time ? "Uses your Screen Time block" : "Add a timer or schedule and a Screen Time block", is_on: $draft.rules.block_during_focus, disabled: !(draft.has_engine && draft.has_screen_time))
 					Hairline()
-					ToggleRow(title: "Notify when finished", description: "For routines with a focus timer", is_on: $draft.rules.notify_on_complete, disabled: !draft.has_timer)
+					ToggleRow(title: "Notify when finished", description: "For routines with a timer", is_on: $draft.rules.notify_on_complete, disabled: !draft.has_timer)
 				}.padding(24)
 			}.paper_page().navigationTitle("Behavior").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showing_behavior = false } } }
 		}.presentationDetents([.medium, .large])

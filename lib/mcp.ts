@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { behavior_catalog } from "./behaviors";
 import { document_schema } from "./document";
 import { empty_library, upsert_tool, delete_tool } from "./library";
 import { fetch_library, push_library, type Account, type Cloud } from "./cloud";
@@ -17,7 +18,7 @@ export const mcp_tools = [
 ];
 function content(value: unknown) { return { content: [{ type: "text", text: JSON.stringify(value) }] }; }
 export async function call_mcp_tool(cloud: Cloud, account: Account, name: string, args: unknown) {
-	if (name === "get_capabilities") { return content({ graph_schema: z.toJSONSchema(graph_schema), graph_nodes: node_catalog, document_schema: z.toJSONSchema(document_schema, { unrepresentable: "any" }), home_allowance: "One home allowance per phone, daily shared windows, home-only whole-minute usage checkpoints; a final partial minute may be lost at departure. Home geofence is 150 m and OS callbacks may be delayed. Phone setup/permissions required. Cloud changes apply when the phone app opens." }); }
+	if (name === "get_capabilities") { return content({ graph_schema: z.toJSONSchema(graph_schema), graph_nodes: node_catalog, behaviors: behavior_catalog, execution: "New behaviors require the format-3 phone update. They run while the routine is open, including location transitions and allowance-meter usage. Existing Screen Time enforcement remains background capable. Browser Test logic simulates events. Progress is device-local; no AI API is used.", document_schema: z.toJSONSchema(document_schema, { unrepresentable: "any" }), home_allowance: "One home allowance per phone, daily shared windows, home-only whole-minute usage checkpoints; a final partial minute may be lost at departure. Home geofence is 150 m and OS callbacks may be delayed. Phone setup/permissions required. Cloud changes apply when the phone app opens." }); }
 	if (name === "get_routine_graph") {
 		const { id } = z.object({ id: z.string() }).strict().parse(args);
 		const document = (await fetch_library(cloud, account))?.library.tools.find((entry) => entry.document.id === id)?.document;

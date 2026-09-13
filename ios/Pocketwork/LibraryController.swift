@@ -11,6 +11,7 @@ final class LibraryController: ObservableObject {
 	@Published private(set) var storage_blocked = false
 	private let defaults: UserDefaults
 	private var owner: String?
+	var behavior_owner_key: String { owner ?? "local" }
 	var on_local_change: (() -> Void)?
 	private var current_key: String { owner.map { Self.library_key + "." + $0 } ?? Self.library_key }
 	private let logger = Logger(subsystem: "Pocketwork", category: "LibraryController")

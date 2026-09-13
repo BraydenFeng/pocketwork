@@ -39,7 +39,7 @@ describe("executable logic graphs", () => {
 	});
 	it("rejects duplicate engines and forged node blocks", () => {
 		const graph = graph_from_document(starter_document); graph.nodes.push(make_node("timer"));
-		expect(() => compile_graph(starter_document, graph)).toThrow("one focus timer");
+		expect(() => compile_graph(starter_document, graph)).toThrow("one timer");
 		graph.nodes.pop(); graph.nodes[0].block = { id: graph.nodes[0].id, type: "note", title: "Wrong", text: "" };
 		expect(() => compile_graph(starter_document, graph)).toThrow("matching page block");
 	});

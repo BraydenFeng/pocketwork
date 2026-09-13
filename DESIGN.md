@@ -60,3 +60,7 @@ Phone editing follow-up: Edit opens the actual routine page in place. Preserve i
 ## Connected logic workspace
 
 Brayden selected a Supabase-diagram-like node canvas alongside the Page view. Repeat three structures: compact node cards with labelled input/output ports, graphite connection wires with one selected accent, and a separate inspector for node settings. Node positions are workspace geometry; connections translate into the existing executable native routine schema. Unsupported combinations must fail explicitly rather than imply arbitrary code execution. Keep Page and Logic visibly accessible for home allowances as well as ordinary routines. Native capability boundaries remain visible, and draft graphs require Apply before their rules sync.
+
+## Behavior library organization
+
+Brayden requested less clutter and room for future data features on 2026-09-13. Show four collapsed sections: Time & location, Data, Logic, Actions. Search opens matching groups. Entries are compact names; descriptions belong in node settings. New nodes occupy free canvas space. Keep the graph, settings and optional Test logic distinct. Version-3 behaviors currently execute while a routine is open; do not imply arbitrary background execution or cloud-synced progress.

@@ -42,6 +42,7 @@ struct ToolView: View {
 									}
 							} else { block_view(block, in: document) }
 						}
+						if !editor.active, document.behaviors != nil { BehaviorPanel(document: document) }
 						Text("Made for you. By you.").mono_caption().padding(.top, 8)
 					}
 					.padding(Theme.pad)

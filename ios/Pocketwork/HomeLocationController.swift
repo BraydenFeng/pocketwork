@@ -9,6 +9,7 @@ final class HomeLocationController: NSObject, ObservableObject, CLLocationManage
 	@Published var status = "Set home while you are there."
 	@Published var error_message: String?
 	@Published var has_home = false
+	@Published var at_location: Bool?
 	@Published var always_allowed = false
 	private let manager = CLLocationManager()
 	private var setting_home = false
@@ -55,6 +56,7 @@ final class HomeLocationController: NSObject, ObservableObject, CLLocationManage
 	func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) { error_message = error.localizedDescription; setting_home = false }
 	func locationManager(_ manager: CLLocationManager, monitoringDidFailFor region: CLRegion?, withError error: Error) { error_message = error.localizedDescription; update(false) }
 	private func update(_ at_home: Bool) {
+		at_location = always_allowed ? at_home : nil
 		Task { do { try await HomeWorker.run { try HomeEngine.location_changed(at_home) }; status = at_home ? "At home · home rules apply" : "Away or location unknown · usage does not count" }
 		catch { error_message = error.localizedDescription } }
 	}

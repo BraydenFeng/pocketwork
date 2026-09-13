@@ -97,7 +97,7 @@ test("the editor refuses a timer next to a schedule and edits the window", async
 	await seed_library(page, [templates.find((t) => t.name === "Workday focus")!.build()]);
 	await page.goto("/");
 	await page.getByRole("button", { name: "Open Workday focus", exact: true }).click();
-	await page.getByRole("button", { name: "Add Focus timer", exact: true }).click();
+	await page.getByRole("button", { name: "Add Timer", exact: true }).click();
 	await expect(page.locator(".notice-banner")).toContainText("not both");
 	await page.getByRole("button", { name: "Edit Schedule", exact: true }).click();
 	await page.getByRole("group", { name: "Days of the week" }).getByRole("button", { name: "Sat" }).click();
