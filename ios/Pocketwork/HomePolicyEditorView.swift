@@ -25,7 +25,7 @@ struct HomePolicyEditorView: View {
 			}.paper_page().navigationTitle("Edit home allowance").navigationBarTitleDisplayMode(.inline)
 			.toolbar {
 				ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(saving) }
-				ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.fontWeight(.semibold).foregroundStyle(Theme.accent).disabled(saving) }
+				ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.fontWeight(.semibold).foregroundStyle(Theme.accent).disabled(saving || sessions.is_busy) }
 			}
 			.interactiveDismissDisabled(saving)
 			.safeAreaInset(edge: .bottom) { if saving { EditorBar { ProgressView("Applying your changes…"); Spacer() } } }

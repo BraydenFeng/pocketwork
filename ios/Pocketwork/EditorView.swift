@@ -11,7 +11,11 @@ struct EditorView: View {
 	@State private var saving = false
 	let is_new: Bool
 
-	init(document: AppDocument, is_new: Bool = false) { _draft = State(initialValue: document); self.is_new = is_new }
+	init(document: AppDocument, is_new: Bool = false) {
+		var initial = document
+		if is_new { initial.blocks[0].title = "Heading"; initial.blocks[0].subtitle = "" }
+		_draft = State(initialValue: initial); self.is_new = is_new
+	}
 	struct KindOption: Identifiable { let kind: BlockKind; let label: String; let icon: String; var id: BlockKind { kind } }
 	static let kinds: [KindOption] = [
 		KindOption(kind: .heading, label: "Heading", icon: "textformat"), KindOption(kind: .timer, label: "Focus timer", icon: "timer"), KindOption(kind: .checklist, label: "Checklist", icon: "checklist"),
@@ -38,7 +42,7 @@ struct EditorView: View {
 			.navigationTitle(is_new ? "New routine" : "Edit routine").navigationBarTitleDisplayMode(.inline)
 			.toolbar {
 				ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(saving) }
-				ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.fontWeight(.semibold).foregroundStyle(Theme.accent).disabled(saving) }
+				ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.fontWeight(.semibold).foregroundStyle(Theme.accent).disabled(saving || sessions.is_busy) }
 			}
 			.safeAreaInset(edge: .bottom) {
 				EditorBar {
@@ -113,7 +117,8 @@ struct EditorView: View {
 	private func add_block(_ kind: BlockKind) {
 		guard draft.can_add(kind) else { return }
 		draft.blocks.append(BlockDocument.make(kind))
-		if kind == .schedule { draft.enabled = false; if draft.has_screen_time { draft.rules.block_during_focus = true } }
+		if kind == .schedule { draft.enabled = false }
+		if draft.has_engine && draft.has_screen_time { draft.rules.block_during_focus = true }
 	}
 	private func save() {
 		var cleaned = draft

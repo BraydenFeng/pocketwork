@@ -24,7 +24,7 @@ struct AppGroupSelectionSheet: View {
 			}.paper_page().navigationTitle(group.name).navigationBarTitleDisplayMode(.inline)
 			.toolbar {
 				ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(saving) }
-				ToolbarItem(placement: .confirmationAction) { Button("Done") { save() }.disabled(!authorized || saving) }
+				ToolbarItem(placement: .confirmationAction) { Button("Done") { save() }.disabled(!authorized || saving || sessions.is_busy) }
 			}
 			.overlay { if saving { ProgressView("Updating routines…").padding().background(Theme.surface) } }
 			.interactiveDismissDisabled(saving)

@@ -2,6 +2,16 @@ import XCTest
 @testable import Pocketwork
 
 final class LibraryTests: XCTestCase {
+	func test_block_palette_excludes_conflicting_engines() {
+		var page = AppDocument.blank()
+		XCTAssertTrue(page.can_add(.timer)); XCTAssertTrue(page.can_add(.schedule))
+		page.blocks.append(BlockDocument.make(.timer))
+		XCTAssertFalse(page.can_add(.schedule))
+		page.blocks.removeLast(); page.blocks.append(BlockDocument.make(.schedule))
+		XCTAssertFalse(page.can_add(.timer))
+		XCTAssertTrue(page.can_add(.checklist))
+	}
+
 	private let now = Date(timeIntervalSince1970: 1_800_000_000)
 
 	private func starter() throws -> AppDocument {
