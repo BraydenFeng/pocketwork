@@ -96,8 +96,8 @@ final class SessionController: ObservableObject {
 		do { try SharedStore().save_selection(value, for: document.id); objectWillChange.send() } catch { report(error) }
 	}
 
-	func forget(_ document_id: String) {
-		Task { do { try await HomeWorker.run { if try HomeEngine.snapshot().document?.id == document_id { try HomeEngine.disable() } } } catch { report(error) } }
+	func forget(_ document_id: String) async {
+		do { try await HomeWorker.run { if try HomeEngine.snapshot().document?.id == document_id { try HomeEngine.disable() } } } catch { report(error) }
 		if session?.document_id == document_id { stop() }
 		release_standing(document_id)
 		progress.removeValue(forKey: document_id)
@@ -162,8 +162,8 @@ final class SessionController: ObservableObject {
 	}
 
 	// The emergency exit: every shield this app has ever applied comes off. Returns the standing routines that were switched off.
-	func clear_everything() -> [String] {
-		Task { do { try await HomeWorker.run { try HomeEngine.disable() } } catch { report(error) } }
+	func clear_everything() async -> [String] {
+		do { try await HomeWorker.run { try HomeEngine.disable() } } catch { report(error) }
 		stop()
 		let ids = (try? SharedStore().standing_ids()) ?? []
 		for id in ids { release_standing(id); _ = try? SharedStore().set_standing(id, enabled: false) }
