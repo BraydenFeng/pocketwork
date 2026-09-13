@@ -12,6 +12,7 @@ struct HomeAllowanceView: View {
 	@StateObject private var editor = RoutinePageEditing()
 	@State private var opened = false
 	@State private var remaining: Int?
+	private let ui_testing = CommandLine.arguments.contains("--ui-testing")
 	private let days = ["", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 	var body: some View {
 		ScrollView {
@@ -45,7 +46,7 @@ struct HomeAllowanceView: View {
 				if let error = home.error_message ?? sessions.error_message { Text(error).foregroundStyle(Theme.danger).font(.system(size: 13)) }
 			}.padding(Theme.pad).disabled(editor.saving)
 		}.page().navigationTitle("Home allowance").navigationBarTitleDisplayMode(.inline)
-		.onAppear { home.restore(); refresh(); if !opened { opened = true; if edit_on_open { editor.begin(document) } } }
+		.onAppear { if !ui_testing { home.restore(); refresh() }; if !opened { opened = true; if edit_on_open { editor.begin(document) } } }
 		.navigationBarBackButtonHidden(editor.active)
 		.scrollDismissesKeyboard(.interactively)
 		.toolbar { ToolbarItem(placement: .topBarTrailing) {
@@ -57,5 +58,5 @@ struct HomeAllowanceView: View {
 		.sheet(item: $picking_group) { group in AppGroupSelectionSheet(group: group) }
 	}
 
-	private func refresh() { Task { do { let state = try await HomeWorker.run { try HomeEngine.snapshot() }; let used = state.ledger.day == document.home_allowance?.day_key(.now) ? state.ledger.used_minutes : 0; remaining = max(0, (document.home_allowance?.rule(at: .now)?.allowance_minutes ?? 0) - used) } catch { sessions.report(error) } } }
+	private func refresh() { guard !ui_testing else { return }; Task { do { let state = try await HomeWorker.run { try HomeEngine.snapshot() }; let used = state.ledger.day == document.home_allowance?.day_key(.now) ? state.ledger.used_minutes : 0; remaining = max(0, (document.home_allowance?.rule(at: .now)?.allowance_minutes ?? 0) - used) } catch { sessions.report(error) } } }
 }
