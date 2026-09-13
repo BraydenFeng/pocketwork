@@ -77,9 +77,11 @@ struct BehaviorPanel: View {
 			let location = home.always_allowed ? home.at_location : nil
 			if document.home_allowance != nil {
 				external["home-condition"] = ["present":signal(location == true,String(location == true))]
-				external["usage-meter"] = ["used":BehaviorSignal(value: used ?? 0, token: String(used ?? 0), type: "number")]
+				external["home-condition"]?["present"]?.available = location != nil
+				external["usage-meter"] = ["used":BehaviorSignal(value: used ?? 0, token: String(used ?? 0), type: "number", available: used != nil)]
 				let reached = used.map { $0 >= Double(document.home_allowance?.rule(at: now)?.allowance_minutes ?? 0) } ?? false
 				external["daily-allowance"] = ["reached":signal(reached,String(reached))]
+				external["daily-allowance"]?["reached"]?.available = used != nil
 			}
 			let result = try BehaviorRuntime.run(graph, state: state, context: BehaviorContext(now: now, at_location: location, usage_minutes: used, tap: tap, external: external))
 			let data = try JSONEncoder().encode(SavedBehaviors(graph: graph, state: result.state))
