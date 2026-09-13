@@ -7,8 +7,7 @@ struct GroupsView: View {
 	@EnvironmentObject private var sessions: SessionController
 	@State private var new_name = ""
 	@State private var picking: AppGroup?
-	@State private var draft_selection = FamilyActivitySelection()
-	@State private var renaming: AppGroup?
+		@State private var renaming: AppGroup?
 	@State private var rename_text = ""
 	@State private var pending_delete: AppGroup?
 
@@ -17,8 +16,8 @@ struct GroupsView: View {
 			VStack(alignment: .leading, spacing: 20) {
 				VStack(alignment: .leading, spacing: 6) {
 					SectionLabel(number: "02", text: "App groups")
-					Text("Name the apps once. Every routine can use them.").heading_font(20)
-					Text("Tap a group to choose its apps with Apple's private picker. Which apps are in a group stays on this iPhone. Routines can block a group, allow only a group, or limit it to so many minutes.").supporting()
+					Text("Your apps, grouped.").heading_font(20)
+					Text("Choose apps once. Use the group in any routine. Your app selections stay on this iPhone.").supporting()
 				}
 				if library.groups.isEmpty {
 					Card(tinted: true, dashed: true) { Text("No groups yet. Name one below, then tap it to choose its apps.").supporting() }
@@ -41,16 +40,7 @@ struct GroupsView: View {
 		.page()
 		.navigationTitle("App groups")
 		.navigationBarTitleDisplayMode(.inline)
-		.sheet(item: $picking) { group in
-			NavigationStack {
-				FamilyActivityPicker(selection: $draft_selection)
-					.navigationTitle(group.name)
-					.toolbar {
-						ToolbarItem(placement: .cancellationAction) { Button("Cancel") { picking = nil } }
-						ToolbarItem(placement: .confirmationAction) { Button("Done") { sessions.save_group_selection(draft_selection, for: group); picking = nil } }
-					}
-			}
-		}
+		.sheet(item: $picking) { group in AppGroupSelectionSheet(group: group) }
 		.alert("Rename group", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
 			TextField("Name", text: $rename_text)
 			Button("Save") { if let group = renaming { library.rename_group(group.id, to: rename_text) }; renaming = nil }
@@ -102,9 +92,5 @@ struct GroupsView: View {
 		if library.add_group(name) != nil { new_name = "" }
 	}
 
-	private func choose_apps(for group: AppGroup) {
-		Task {
-			if await sessions.authorize_screen_time() { draft_selection = sessions.group_selection(group); picking = group }
-		}
-	}
+	private func choose_apps(for group: AppGroup) { picking = group }
 }

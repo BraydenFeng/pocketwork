@@ -48,3 +48,7 @@ Keep the existing workbench, not a separate onboarding wizard. A dismissible, re
 ## Done for this slice
 
 My tools home with routines, duplicate, delete, and import; editable blocks and rules; interactive preview; persisted drafts; undo/redo; validated JSON import/export; native file import and permission-aware session runner; isolated tests; production web build; design lint; browser checks. Native device verification remains explicitly pending on Windows.
+
+## Phone workspace, September 13
+
+Brayden requested a Notion/Obsidian-inspired phone interface and direct home-screen editing. The native direction is a minimal document workspace: cool paper, graphite type, quiet rules, one blue save action. Preserve the original home hierarchy while removing repeated explanations and schema labels. Three repeated structures: a page title with a small document glyph, ruled document rows with separate Edit actions, and a bottom editing bar for adding blocks. New routine opens an unsaved page draft. Cancel discards it; Save validates and stores it. Home allowance editing preserves its daily/shared-window semantics. App groups expose a direct Choose apps action and visible permission errors.

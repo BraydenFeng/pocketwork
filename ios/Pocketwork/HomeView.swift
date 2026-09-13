@@ -1,3 +1,4 @@
+import FamilyControls
 import OSLog
 import SwiftUI
 import UniformTypeIdentifiers
@@ -11,6 +12,9 @@ struct HomeView: View {
 	@State private var showing_groups = false
 	@State private var showing_import = false
 	@State private var pending_delete: LibraryEntry?
+	@State private var editing: RoutineDraft?
+	@State private var picking_group: AppGroup?
+	@State private var showing_account = false
 	private let logger = Logger(subsystem: "Pocketwork", category: "FileImport")
 
 	var body: some View {
@@ -18,27 +22,27 @@ struct HomeView: View {
 			ScrollView {
 				VStack(alignment: .leading, spacing: 0) {
 					intro
-					AccountView()
+					if !cloud.signed_in { AccountView() }
 					Hairline()
 					section(number: "01", label: "My routines", heading: library.sorted_tools.isEmpty ? "Nothing here yet." : "Pick up where you left off.", supporting: library.sorted_tools.isEmpty ? "Create a routine here, or sign in to bring in the routines you made on your computer." : nil) {
 						if library.storage_blocked { storage_warning }
-						Button { if let document = library.create_blank() { path = [document.id] } } label: { Label("New routine", systemImage: "plus") }.buttonStyle(PrimaryButtonStyle(accent: true))
+						Button { editing = RoutineDraft(document: AppDocument.blank(), is_new: true) } label: { Label("New routine", systemImage: "plus") }.buttonStyle(PrimaryButtonStyle(accent: true))
 						ForEach(library.sorted_tools) { entry in routine_card(entry) }
 					}
 					Hairline()
-					section(number: "02", label: "App groups", heading: "Name the apps once. Every routine can use them.", supporting: "Groups like Social or Work are named here and filled with real apps on this iPhone, privately.") {
-						Button { showing_groups = true } label: {
-							Card {
-								HStack {
-									VStack(alignment: .leading, spacing: 4) {
-										Text(library.groups.isEmpty ? "Set up app groups" : library.groups.map(\.name).joined(separator: ", ")).heading_font(15).lineLimit(2)
-										Text(library.groups.isEmpty ? "None yet" : "\(library.groups.count) group\(library.groups.count == 1 ? "" : "s") · tap to choose their apps").supporting()
+					section(number: "02", label: "App groups", heading: "Your apps, grouped.", supporting: nil) {
+						ForEach(library.groups) { group in
+							Button { picking_group = group } label: {
+								DocumentRow(icon: "square.grid.2x2") {
+									HStack {
+										VStack(alignment: .leading, spacing: 4) { Text(group.name).heading_font(15); Text("\(sessions.group_count(group)) selected · choose apps").supporting() }
+										Spacer(); Image(systemName: "chevron.right").foregroundStyle(Theme.text_faint)
 									}
-									Spacer()
-									Image(systemName: "arrow.right").foregroundStyle(Theme.text_faint)
 								}
-							}
-						}.buttonStyle(.plain).accessibilityIdentifier("home.groups")
+							}.buttonStyle(.plain).accessibilityIdentifier("home.group.\(group.id)")
+							Hairline()
+						}
+						Button { showing_groups = true } label: { Label(library.groups.isEmpty ? "Create an app group" : "Manage app groups", systemImage: "plus") }.buttonStyle(QuietButtonStyle()).accessibilityIdentifier("home.groups")
 					}
 
 					Hairline()
@@ -55,12 +59,16 @@ struct HomeView: View {
 				ToolbarItem(placement: .topBarLeading) { brand }
 				ToolbarItem(placement: .topBarTrailing) {
 					Menu {
+						Button("Account & sync", systemImage: "person.crop.circle") { showing_account = true }
 						Button("App groups", systemImage: "square.grid.2x2") { showing_groups = true }
 						Button("Add from file", systemImage: "square.and.arrow.down") { showing_import = true }
 						Button(role: .destructive) { Task { for id in await sessions.clear_everything() { library.set_enabled(id, false) } } } label: { Label("Clear all focus restrictions", systemImage: "lock.open") }.disabled(sessions.is_busy)
 					} label: { Image(systemName: "ellipsis") }
 				}
 			}
+			.sheet(item: $editing) { item in RoutineEditorSheet(item: item) }
+			.sheet(item: $picking_group) { group in AppGroupSelectionSheet(group: group) }
+			.sheet(isPresented: $showing_account) { NavigationStack { AccountView().navigationTitle("Account & sync").toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showing_account = false } } } } }
 			.fileImporter(isPresented: $showing_import, allowedContentTypes: [.json]) { result in import_file(result) }
 			.confirmationDialog("Delete \"\(pending_delete?.document.name ?? "this routine")\"? This cannot be undone.", isPresented: Binding(get: { pending_delete != nil }, set: { if !$0 { pending_delete = nil } }), titleVisibility: .visible) {
 				Button("Delete", role: .destructive) {
@@ -86,7 +94,7 @@ struct HomeView: View {
 	private var intro: some View {
 		VStack(alignment: .leading, spacing: 8) {
 			Text("My routines").heading_font(28)
-			Text("Your own little tools. Create on your computer. Use them here.").supporting()
+			Text("Your own little tools.").supporting()
 			HStack(spacing: 8) {
 				Circle().fill(library.storage_blocked ? Theme.danger : Theme.success).frame(width: 6, height: 6)
 				Text(library.storage_blocked ? "Saved routines need attention" : "\(library.sorted_tools.count) saved on this iPhone").font(.system(size: 13)).foregroundStyle(library.storage_blocked ? Theme.danger : Theme.text_faint)
@@ -108,9 +116,9 @@ struct HomeView: View {
 
 	private var footer: some View {
 		HStack {
-			HStack(spacing: 8) { Circle().fill(Theme.border_hi).frame(width: 6, height: 6); Text("Your own little routines.") }
+			HStack(spacing: 8) { Circle().fill(Theme.border_hi).frame(width: 6, height: 6); Text("Your own little tools.") }
 			Spacer()
-			Text("SCHEMA V1")
+			Text(cloud.signed_in ? "SYNCED WORKSPACE" : "ON THIS IPHONE")
 		}
 		.mono_caption()
 		.padding(Theme.pad)
@@ -143,7 +151,9 @@ struct HomeView: View {
 						}
 						Text(ToolCopy.summary(document)).mono_caption().textCase(.uppercase)
 						if !document.description.isEmpty { Text(document.description).supporting() }
-						if let schedule = document.schedule {
+						if document.home_allowance != nil {
+							Text(document.enabled == true ? "Home allowance on" : "Home allowance off").supporting()
+						} else if let schedule = document.schedule {
 							Text(ScheduleWindow.describe_status(schedule, enabled: document.enabled == true, at: .now)).font(.system(size: 11)).foregroundStyle(Theme.text_faint)
 						} else {
 							Text(ToolCopy.edited(entry, now: .now)).font(.system(size: 11)).foregroundStyle(Theme.text_faint)
@@ -161,6 +171,8 @@ struct HomeView: View {
 						Text(document.enabled == true ? "On" : "Off").font(.system(size: 13)).foregroundStyle(Theme.text_dim)
 						Spacer()
 					}
+					Button { editing = RoutineDraft(document: document, is_new: false) } label: { Label("Edit", systemImage: "pencil") }.buttonStyle(TextButtonStyle()).accessibilityLabel("Edit \(document.name)").accessibilityIdentifier("home.edit.\(document.id)").disabled(sessions.is_busy || sessions.is_running(document))
+					Spacer()
 					Button { _ = library.duplicate(document.id) } label: { Label("Duplicate", systemImage: "doc.on.doc") }.buttonStyle(TextButtonStyle())
 					Button { pending_delete = entry } label: { Label("Delete", systemImage: "trash") }.buttonStyle(TextButtonStyle(danger: true))
 				}
