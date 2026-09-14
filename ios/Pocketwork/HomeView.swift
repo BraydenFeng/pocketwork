@@ -69,6 +69,8 @@ struct HomeView: View {
 			}
 			.sheet(item: $editing) { item in RoutineEditorSheet(item: item) }
 			.sheet(item: $picking_group) { group in AppGroupSelectionSheet(group: group) }
+			// A widget tap arrives as com.braydenfeng.pocketwork://routine/<id>; the sign-in callback uses a different host and is handled elsewhere.
+			.onOpenURL { url in if let id = WidgetSnapshot.routine_id(from: url), library.tool(id) != nil { path = [RoutineRoute(id: id)] } }
 			.sheet(isPresented: $showing_account) { NavigationStack { AccountView().navigationTitle("Account & sync").toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showing_account = false } } } } }
 			.fileImporter(isPresented: $showing_import, allowedContentTypes: [.json]) { result in import_file(result) }
 			.confirmationDialog("Delete \"\(pending_delete?.document.name ?? "this routine")\"? This cannot be undone.", isPresented: Binding(get: { pending_delete != nil }, set: { if !$0 { pending_delete = nil } }), titleVisibility: .visible) {

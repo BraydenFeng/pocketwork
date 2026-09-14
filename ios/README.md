@@ -20,6 +20,10 @@ The host renders the same version-1 JSON document as the web editor. It contains
 
 The developer needs the signing account; end users of a future App Store release would not need their own developer account. This source project does not provide sideloading, a public beta, or App Store distribution.
 
+## Home screen widget and Live Activity
+
+`PocketworkWidgets` is a WidgetKit extension with two pieces. The **Routine** widget (small and medium) shows one routine chosen when the widget is added: name, summary, status, and a live countdown while it runs; tapping opens that routine through `com.braydenfeng.pocketwork://routine/<id>`. The app writes a `WidgetSnapshot` into the App Group whenever the library or session changes (`HomeScreenBridge.publish`), so the widget never reads the library. The **Live Activity** shows a running session on the lock screen and Dynamic Island with an End button; `EndFocusSessionIntent` is a `LiveActivityIntent`, so it runs in the app process and calls `SessionController.shared.stop()`. Live Activities need `NSSupportsLiveActivities` (set in `project.yml`) and the person's permission under Settings → Pocketwork → Live Activities.
+
 ## Behavior and safety limits
 
 - One focus session at a time, 15–120 minutes. No recurring schedules, calendar triggers, or arbitrary background code yet.

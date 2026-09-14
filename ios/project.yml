@@ -37,6 +37,7 @@ targets:
         SupabaseURL: $(SUPABASE_URL)
         SupabaseAnonKey: $(SUPABASE_ANON_KEY)
         ITSAppUsesNonExemptEncryption: false
+        NSSupportsLiveActivities: true
         NSHealthShareUsageDescription: Read the health metrics you choose as inputs to your personal routines.
         NSLocationWhenInUseUsageDescription: Choose your home so distraction rules apply only there.
         NSLocationAlwaysAndWhenInUseUsageDescription: Detect arriving home and leaving so away screen time never uses your home allowance.
@@ -63,6 +64,8 @@ targets:
     dependencies:
       - target: FocusMonitor
         embed: true
+      - target: PocketworkWidgets
+        embed: true
     scheme:
       testTargets: [PocketworkTests, PocketworkUITests]
   FocusMonitor:
@@ -71,7 +74,8 @@ targets:
     sources:
       - path: FocusMonitor
         excludes: [Info.plist, FocusMonitor.entitlements]
-      - Shared
+      - path: Shared
+        excludes: [FocusActivity.swift, WidgetSnapshot.swift]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.braydenfeng.pocketwork.FocusMonitor
@@ -90,6 +94,33 @@ targets:
       path: FocusMonitor/FocusMonitor.entitlements
       properties:
         com.apple.developer.family-controls: true
+        com.apple.security.application-groups:
+          - $(APP_GROUP)
+  PocketworkWidgets:
+    # Home screen widget per routine plus the running-session Live Activity. Reads only the widget snapshot in the App Group.
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Widgets
+        excludes: [Info.plist, PocketworkWidgets.entitlements]
+      - Shared/WidgetSnapshot.swift
+      - Shared/FocusActivity.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.braydenfeng.pocketwork.Widgets
+        APPLICATION_EXTENSION_API_ONLY: true
+    info:
+      path: Widgets/Info.plist
+      properties:
+        CFBundleDisplayName: Pocketwork
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: "1.0"
+        PocketworkAppGroup: $(APP_GROUP)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: Widgets/PocketworkWidgets.entitlements
+      properties:
         com.apple.security.application-groups:
           - $(APP_GROUP)
   PocketworkTests:
