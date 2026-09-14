@@ -39,6 +39,7 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         NSSupportsLiveActivities: true
         NSHealthShareUsageDescription: Read the health metrics you choose as inputs to your personal routines.
+        NSHealthUpdateUsageDescription: Pocketwork only reads health data; it never writes to Health. Apple requires this text whenever HealthKit is enabled.
         NSLocationWhenInUseUsageDescription: Choose your home so distraction rules apply only there.
         NSLocationAlwaysAndWhenInUseUsageDescription: Detect arriving home and leaving so away screen time never uses your home allowance.
         CFBundleURLTypes:
