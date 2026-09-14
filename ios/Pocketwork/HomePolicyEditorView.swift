@@ -57,7 +57,7 @@ struct HomeRuleEditor: View {
 				Text("At home, during the hours below, you get \(rule.allowance_minutes) minutes. Then the apps lock until the next window.").supporting()
 			}
 			ChipRow(label: "Minutes per day", options: Array(Set(Self.minute_options + [rule.allowance_minutes])).sorted(), selected: rule.allowance_minutes, text: { "\($0) min" }) { rule.allowance_minutes = $0 }
-				.accessibilityIdentifier("home.allowance.\(rule.days.first ?? 0)").accessibilityLabel("Daily allowance for " + rule.days.map { days[$0] }.joined(separator: ", ")).accessibilityValue("\(rule.allowance_minutes) minutes")
+				.accessibilityElement(children: .contain).accessibilityIdentifier("home.allowance.\(rule.days.first ?? 0)").accessibilityLabel("Daily allowance for " + rule.days.map { days[$0] }.joined(separator: ", ")).accessibilityValue("\(rule.allowance_minutes) minutes")
 			VStack(alignment: .leading, spacing: 8) {
 				Text(rule.windows.count == 1 ? "Hours" : "Hours (two windows)").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.text_dim)
 				ForEach(Array(rule.windows.indices), id: \.self) { index in

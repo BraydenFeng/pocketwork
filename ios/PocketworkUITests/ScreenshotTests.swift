@@ -43,12 +43,12 @@ final class ScreenshotTests: XCTestCase {
 		try snap("09-routine-inline-edit")
 		// The fixed footer is visible; bypass XCTest trying to scroll its accessibility node.
 		app.buttons["page.add-block"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-		app.buttons["Note"].tap()
+		element("add.note").tap()
 		app.buttons["Cancel"].tap()
 		XCTAssertFalse(app.staticTexts["A note to myself"].exists)
 		app.buttons["tool.edit"].tap()
 		app.buttons["page.add-block"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-		app.buttons["Note"].tap()
+		element("add.note").tap()
 		app.buttons["Save"].tap()
 		XCTAssertTrue(app.staticTexts["A note to myself"].waitForExistence(timeout: 10))
 		try snap("10-routine-after-save")
@@ -76,23 +76,36 @@ final class ScreenshotTests: XCTestCase {
 		element("home.edit.home-distraction-allowance").tap()
 		XCTAssertTrue(app.navigationBars["Home allowance"].waitForExistence(timeout: 10))
 		try snap("08-home-allowance-editor")
-		let allowance = app.buttons["home.allowance.2-Increment"]
-		allowance.tap()
-		XCTAssertEqual(allowance.value as? String, "35 minutes")
+		let allowance = app.otherElements["home.allowance.2"].firstMatch.exists ? app.otherElements["home.allowance.2"].firstMatch : app.descendants(matching: .any)["home.allowance.2"].firstMatch
+		XCTAssertTrue(app.buttons["45 min"].firstMatch.waitForExistence(timeout: 10))
+		app.buttons["45 min"].firstMatch.tap()
+		XCTAssertEqual(allowance.value as? String, "45 minutes")
 		app.buttons["Save"].tap()
 		XCTAssertTrue(app.buttons["tool.edit"].waitForExistence(timeout: 10))
 		app.buttons["tool.edit"].tap()
-		XCTAssertTrue(allowance.waitForExistence(timeout: 10))
-		XCTAssertEqual(allowance.value as? String, "35 minutes")
-		allowance.tap()
+		XCTAssertTrue(app.buttons["60 min"].firstMatch.waitForExistence(timeout: 10))
+		XCTAssertEqual(allowance.value as? String, "45 minutes")
+		app.buttons["60 min"].firstMatch.tap()
 		app.buttons["Cancel"].tap()
 		app.buttons["tool.edit"].tap()
-		XCTAssertEqual(allowance.value as? String, "35 minutes")
+		XCTAssertTrue(app.buttons["45 min"].firstMatch.waitForExistence(timeout: 10))
+		XCTAssertEqual(allowance.value as? String, "45 minutes")
 		app.buttons["Cancel"].tap()
 		app.navigationBars["Home allowance"].buttons["My routines"].tap()
 		app.swipeUp()
 		element("home.group.distractions").tap()
 		XCTAssertTrue(app.navigationBars["Distractions"].waitForExistence(timeout: 10))
+	}
+
+	// Advanced logic sits behind the ⋯ menu; open the menu, then the item.
+	private func open_logic() {
+		let item = app.buttons["editor.logic"]
+		if !item.waitForExistence(timeout: 2) {
+			let menus = app.navigationBars.buttons.matching(NSPredicate(format: "label == %@ OR identifier == %@", "More", "ellipsis"))
+			(menus.count > 0 ? menus.element(boundBy: menus.count - 1) : app.navigationBars.buttons.element(boundBy: app.navigationBars.buttons.count - 1)).tap()
+			XCTAssertTrue(item.waitForExistence(timeout: 10), "Advanced logic menu item")
+		}
+		item.tap()
 	}
 
 	// SwiftUI exposes list rows and toolbar items as different element types; a typed query per kind stays fast.
@@ -129,7 +142,7 @@ final class ScreenshotTests: XCTestCase {
 	}
 	func test_build_logic_on_phone() throws {
 		app.buttons["New routine"].tap()
-		element("editor.logic").tap()
+		open_logic()
 		XCTAssertTrue(app.navigationBars["Logic"].waitForExistence(timeout: 10))
 		for (kind, title) in [("button", "Button"), ("reminder", "Reminder")] {
 			element("logic.add").tap()
@@ -153,7 +166,7 @@ final class ScreenshotTests: XCTestCase {
 		let tap = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "behavior.")).firstMatch
 		XCTAssertTrue(tap.waitForExistence(timeout: 10)); tap.tap()
 		XCTAssertTrue(app.staticTexts["Time for your routine."].waitForExistence(timeout: 10))
-		app.buttons["tool.edit"].tap(); element("editor.logic").tap()
+		app.buttons["tool.edit"].tap(); open_logic()
 		XCTAssertTrue(app.staticTexts["2 blocks · 1 connections"].waitForExistence(timeout: 10))
 		app.buttons["Find a block"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap(); app.buttons["Reminder"].tap()
 		try snap("13-native-logic-find-block")
