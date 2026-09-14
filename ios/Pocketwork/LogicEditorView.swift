@@ -23,8 +23,8 @@ struct LogicEditorView: View {
 		let graph = LogicEditing(document: document.wrappedValue)
 		initial = graph; _graph = State(initialValue: graph)
 	}
-	private var width: Double { max(800, (graph.nodes.map { position($0).x + 290 }.max() ?? 0)) }
-	private var height: Double { max(700, (graph.nodes.map { position($0).y + $0.height + 60 }.max() ?? 0)) }
+	private var width: Double { max(800, (graph.nodes.map { Double(position($0).x) + 290 }.max() ?? 0)) }
+	private var height: Double { max(700, (graph.nodes.map { Double(position($0).y) + $0.height + 60 }.max() ?? 0)) }
 	private func position(_ node: LogicItem) -> CGPoint {
 		let min_x = min(0, graph.nodes.map(\.x).min() ?? 0); let min_y = min(0, graph.nodes.map(\.y).min() ?? 0)
 		return CGPoint(x: min(16000, max(0, node.x - min_x)), y: min(16000, max(0, node.y - min_y)))
@@ -87,7 +87,9 @@ struct LogicEditorView: View {
 	}
 	private func endpoint(_ node: LogicItem, _ name: String, output: Bool) -> CGPoint {
 		let keys = (output ? node.outputs : node.inputs).keys.sorted()
-		return CGPoint(x: position(node).x + (output ? 248 : 0), y: position(node).y + 66 + Double(keys.firstIndex(of: name) ?? 0) * 44 + 22)
+		let origin = position(node)
+		let row = CGFloat(keys.firstIndex(of: name) ?? 0)
+		return CGPoint(x: origin.x + (output ? CGFloat(248) : 0), y: origin.y + 88 + row * 44)
 	}
 	private func card(_ node: LogicItem) -> some View {
 		VStack(spacing: 0) {
@@ -96,8 +98,8 @@ struct LogicEditorView: View {
 					.contentShape(Rectangle()).gesture(DragGesture(minimumDistance: 8).onChanged { value in
 						guard let index = graph.nodes.firstIndex(where: { $0.id == node.id }) else { return }
 						if drag_start == nil { drag_start = CGPoint(x: graph.nodes[index].x, y: graph.nodes[index].y) }
-						graph.nodes[index].x = max(0, min(15000, Double(drag_start!.x + value.translation.width / zoom)))
-						graph.nodes[index].y = max(0, min(15000, Double(drag_start!.y + value.translation.height / zoom)))
+						graph.nodes[index].x = max(0, min(15000, Double(drag_start!.x + value.translation.width / CGFloat(zoom))))
+						graph.nodes[index].y = max(0, min(15000, Double(drag_start!.y + value.translation.height / CGFloat(zoom))))
 					}.onEnded { _ in drag_start = nil })
 				Button { inspector = LogicSelection(id: node.id) } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }.accessibilityLabel("Edit \(node.title)").accessibilityIdentifier("logic.edit.\(node.id)")
 			}.padding(.horizontal, 12).frame(height: 65)
