@@ -65,6 +65,6 @@ struct HomeRuleEditor: View {
 		}
 	}
 	private func clock(_ index: Int, _ key: WritableKeyPath<HomeWindow, String>) -> Binding<Date> {
-		Binding(get: { Calendar.current.date(byAdding: .minute, value: ScheduleWindow.minutes(rule.windows[index][keyPath: key]) ?? 0, to: Calendar.current.startOfDay(for: .now)) ?? .now }, set: { value in let parts = Calendar.current.dateComponents([.hour, .minute], from: value); rule.windows[index][keyPath: key] = ScheduleWindow.clock((parts.hour ?? 0) * 60 + (parts.minute ?? 0)) })
+		Binding(get: { guard rule.windows.indices.contains(index) else { return .now }; return Calendar.current.date(byAdding: .minute, value: ScheduleWindow.minutes(rule.windows[index][keyPath: key]) ?? 0, to: Calendar.current.startOfDay(for: .now)) ?? .now }, set: { value in guard rule.windows.indices.contains(index) else { return }; let parts = Calendar.current.dateComponents([.hour, .minute], from: value); rule.windows[index][keyPath: key] = ScheduleWindow.clock((parts.hour ?? 0) * 60 + (parts.minute ?? 0)) })
 	}
 }

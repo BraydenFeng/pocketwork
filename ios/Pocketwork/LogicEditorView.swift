@@ -172,20 +172,7 @@ struct LogicEditorView: View {
 					if let node = graph.nodes.first(where: { $0.id == id }) {
 						if node.kind == "schedule", graph.nodes.contains(where: { $0.kind == "allowance" }) { Text("Your time windows live in Daily allowance. The schedule keeps the allowance active throughout the day.").supporting() } else if let block = node.block { BlockEditorView(block: Binding(get: { graph.nodes.first { $0.id == id }?.block ?? block }, set: { value in update(id) { $0.block = value } }), groups: library.groups, embedded: true) }
 						if let config = node.config { BehaviorSettings(kind: node.kind, config: Binding(get: { graph.nodes.first { $0.id == id }?.config ?? config }, set: { value in update(id) { $0.config = value } })) }
-						if let policy = node.policy {
-							Text("Daily allowances").heading_font(20)
-							ForEach(Array(policy.rules.enumerated()), id: \.offset) { index, rule in
-								ForEach(1...7, id: \.self) { day in Toggle(Calendar.current.weekdaySymbols[day - 1], isOn: Binding(get: { graph.nodes.first { $0.id == id }?.policy?.rules[index].days.contains(day) ?? false }, set: { on in update(id) { item in
-									if on { item.policy?.rules[index].days.append(day); item.policy?.rules[index].days.sort() } else if (item.policy?.rules[index].days.count ?? 0) > 1 { item.policy?.rules[index].days.removeAll { $0 == day } }
-								} })).tint(Theme.accent) }
-								HomeRuleEditor(rule: Binding(get: { graph.nodes.first { $0.id == id }?.policy?.rules[index] ?? rule }, set: { value in update(id) { $0.policy?.rules[index] = value } }))
-								if rule.windows.count < 2 { Button("Add time window") { update(id) { $0.policy?.rules[index].windows.append(HomeWindow(start: "21:00", end: "22:00")) } } }
-								if rule.windows.count > 1 { Button("Remove second window", role: .destructive) { update(id) { $0.policy?.rules[index].windows.removeLast() } } }
-								Button("Remove day group", role: .destructive) { update(id) { $0.policy?.rules.remove(at: index) } }.disabled(policy.rules.count == 1)
-								Hairline()
-							}
-							Button("Add day group") { update(id) { $0.policy?.rules.append(HomeDayRule(days: [1], allowance_minutes: 30, windows: [HomeWindow(start: "06:30", end: "20:30")])) } }.disabled(policy.rules.count >= 7)
-						}
+						if let policy = node.policy { LogicAllowanceSettings(policy: Binding(get: { graph.nodes.first { $0.id == id }?.policy ?? policy }, set: { value in update(id) { $0.policy = value } })) }
 						if ["home", "usage"].contains(node.kind) { Text("Uses the saved location and distraction selection on this phone. Usage away from that location does not count.").supporting() }
 						SectionLabel(text: "Connections")
 						ForEach(node.inputs.keys.sorted(), id: \.self) { name in Button("Input · \(name)") { inspector = nil; pending_port = LogicPortSelection(node: id, name: name, output: false) }.buttonStyle(QuietButtonStyle()).frame(minHeight: 44) }
@@ -228,4 +215,33 @@ private struct BehaviorSettings: View {
 			Text("Behaviors run while this routine is open. Scheduled app restrictions continue in the background.").supporting()
 		}
 	}
+}
+
+private struct LogicAllowanceSettings: View {
+	@Binding var policy: HomePolicy
+	var body: some View {
+		VStack(alignment: .leading, spacing: 20) {
+			Text("Daily allowances").heading_font(20)
+			ForEach(Array(policy.rules.enumerated()), id: \.offset) { index, rule in
+				day_group(index, rule)
+				Hairline()
+			}
+			Button("Add day group") { policy.rules.append(HomeDayRule(days: [1], allowance_minutes: 30, windows: [HomeWindow(start: "06:30", end: "20:30")])) }.disabled(policy.rules.count >= 7)
+			Text("Assign each weekday to one group. All groups share the saved location; away usage does not count.").supporting()
+		}
+	}
+	private func day_group(_ index: Int, _ fallback: HomeDayRule) -> some View {
+		VStack(alignment: .leading, spacing: 12) {
+			ForEach(1...7, id: \.self) { day in
+				Toggle(Calendar.current.weekdaySymbols[day - 1], isOn: Binding(get: { policy.rules.indices.contains(index) && policy.rules[index].days.contains(day) }, set: { on in
+					change(index) { rule in if on { if !rule.days.contains(day) { rule.days.append(day); rule.days.sort() } } else if rule.days.count > 1 { rule.days.removeAll { $0 == day } } }
+				})).tint(Theme.accent)
+			}
+			HomeRuleEditor(rule: Binding(get: { policy.rules.indices.contains(index) ? policy.rules[index] : fallback }, set: { value in change(index) { $0 = value } }))
+			if fallback.windows.count < 2 { Button("Add time window") { change(index) { $0.windows.append(HomeWindow(start: "21:00", end: "22:00")) } } }
+			if fallback.windows.count > 1 { Button("Remove second window", role: .destructive) { change(index) { if $0.windows.count > 1 { $0.windows.removeLast() } } } }
+			Button("Remove day group", role: .destructive) { if policy.rules.count > 1, policy.rules.indices.contains(index) { policy.rules.remove(at: index) } }.disabled(policy.rules.count == 1)
+		}
+	}
+	private func change(_ index: Int, _ edit: (inout HomeDayRule) -> Void) { if policy.rules.indices.contains(index) { edit(&policy.rules[index]) } }
 }
