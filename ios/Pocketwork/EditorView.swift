@@ -49,12 +49,12 @@ struct EditorView: View {
 				EditorBar {
 					Button { showing_blocks = true } label: { Label("Add block", systemImage: "plus") }.buttonStyle(TextButtonStyle()).accessibilityIdentifier("editor.add-block")
 					Spacer()
-					Button { showing_behavior = true } label: { Label("Behavior", systemImage: "slider.horizontal.3") }.buttonStyle(TextButtonStyle())
+					Button { showing_behavior = true } label: { Label("Logic", systemImage: "point.3.connected.trianglepath.dotted") }.buttonStyle(TextButtonStyle()).accessibilityIdentifier("editor.logic")
 					if saving { ProgressView() }
 				}
 			}
 			.sheet(isPresented: $showing_blocks) { block_palette }
-			.sheet(isPresented: $showing_behavior) { behavior }
+			.fullScreenCover(isPresented: $showing_behavior) { LogicEditorView(document: $draft) }
 			.interactiveDismissDisabled(saving)
 			.alert("Couldn’t save this routine", isPresented: Binding(get: { validation_message != nil }, set: { if !$0 { validation_message = nil } })) { Button("OK") { validation_message = nil } } message: { Text(validation_message ?? "") }
 		}
@@ -102,18 +102,6 @@ struct EditorView: View {
 			}.paper_page().navigationTitle("Add block").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showing_blocks = false } } }
 		}.presentationDetents([.medium, .large])
 	}
-	private var behavior: some View {
-		NavigationStack {
-			ScrollView {
-				VStack(alignment: .leading, spacing: 16) {
-					DocumentHeading(title: "How it works", subtitle: "Choose what happens when this routine runs.", icon: "slider.horizontal.3")
-					ToggleRow(title: draft.is_standing ? "Block on schedule" : "Block during focus", description: draft.has_engine && draft.has_screen_time ? "Uses your Screen Time block" : "Add a timer or schedule and a Screen Time block", is_on: $draft.rules.block_during_focus, disabled: !(draft.has_engine && draft.has_screen_time))
-					Hairline()
-					ToggleRow(title: "Notify when finished", description: "For routines with a timer", is_on: $draft.rules.notify_on_complete, disabled: !draft.has_timer)
-				}.padding(24)
-			}.paper_page().navigationTitle("Behavior").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showing_behavior = false } } }
-		}.presentationDetents([.medium, .large])
-	}
 	private func move(_ index: Int, by offset: Int) { let destination = index + offset; if draft.blocks.indices.contains(destination) { draft.blocks.swapAt(index, destination) } }
 	private func add_block(_ kind: BlockKind) {
 		guard draft.can_add(kind) else { return }
@@ -147,6 +135,7 @@ struct EditorView: View {
 struct BlockEditorView: View {
 	@Binding var block: BlockDocument
 	var groups: [AppGroup] = []
+	var embedded = false
 	@State private var new_group = ""
 	private static let minute_options = [15, 20, 25, 30, 45, 60, 90, 120]
 	private static let limit_options = [15, 30, 45, 60, 90, 120, 180]
@@ -154,7 +143,11 @@ struct BlockEditorView: View {
 	private static let modes = [ModeOption(mode: .block, label: "Block", hint: "Lock these groups"), ModeOption(mode: .allow_only, label: "Only these", hint: "Lock everything except these groups"), ModeOption(mode: .limit, label: "Limit", hint: "Lock after so many minutes")]
 
 	var body: some View {
-		ScrollView {
+		Group {
+			if embedded { fields } else { ScrollView { fields }.page().navigationTitle(EditorView.label(for: block.type)).navigationBarTitleDisplayMode(.inline) }
+		}
+	}
+	private var fields: some View {
 			VStack(alignment: .leading, spacing: 20) {
 				HStack(spacing: 12) {
 					Image(systemName: EditorView.icon(for: block.type)).frame(width: 36, height: 36).background(Theme.surface_hi, in: RoundedRectangle(cornerRadius: Theme.radius_small)).foregroundStyle(Theme.text_dim)
@@ -200,10 +193,6 @@ struct BlockEditorView: View {
 			}
 			.padding(Theme.pad)
 			.padding(.bottom, 24)
-		}
-		.page()
-		.navigationTitle(EditorView.label(for: block.type))
-		.navigationBarTitleDisplayMode(.inline)
 	}
 
 	// Horizontal chips, like the web's day picker, for picking one number from a short list.

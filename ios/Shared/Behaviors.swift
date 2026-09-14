@@ -32,7 +32,7 @@ struct BehaviorGraph: Codable, Equatable {
 		"compare": (["value":"number"], ["result":"boolean"]), "goal": (["value":"number"], ["reached":"boolean"]),
 		"streak": (["check_in":"boolean"], ["days":"number"]), "reminder": (["send":"boolean"], ["sent":"boolean"])
 	]
-	func ordered(external: [String: [String: String]]) throws -> [BehaviorNode] {
+	func ordered(external: [String: [String: String]], require_inputs: Bool = true) throws -> [BehaviorNode] {
 		guard nodes.count <= 48, connections.count <= 128, Set(nodes.map(\.id)).count == nodes.count else { throw DocumentError.invalid("Too many or duplicate behavior nodes.") }
 		for node in nodes {
 			try AppDocument.validate_id(node.id)
@@ -46,6 +46,7 @@ struct BehaviorGraph: Codable, Equatable {
 			guard let to, let output, output == Self.ports[to.kind]?.inputs[edge.input], occupied.insert(edge.to + "." + edge.input).inserted else { throw DocumentError.invalid("Incompatible or occupied behavior input.") }
 		}
 		for node in nodes { for port in Self.ports[node.kind]?.inputs.keys ?? Dictionary<String, String>().keys {
+			if !require_inputs { continue }
 			if (node.kind == "variable" && port == "set") || (node.kind == "count" && port == "reset") { continue }
 			guard occupied.contains(node.id + "." + port) else { throw DocumentError.invalid("Connect the " + port + " input first.") }
 		} }

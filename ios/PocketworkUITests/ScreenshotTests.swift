@@ -127,4 +127,42 @@ final class ScreenshotTests: XCTestCase {
 		XCTAssertTrue(app.staticTexts["Goal reached"].waitForExistence(timeout: 10))
 		try snap("11-connected-behaviors")
 	}
+	func test_build_logic_on_phone() throws {
+		app.buttons["New routine"].tap()
+		element("editor.logic").tap()
+		XCTAssertTrue(app.navigationBars["Logic"].waitForExistence(timeout: 10))
+		for (kind, title) in [("button", "Button"), ("reminder", "Reminder")] {
+			element("logic.add").tap()
+			let search = app.searchFields.firstMatch
+			XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText(title)
+			element("logic.add.\(kind)").tap()
+			XCTAssertTrue(app.navigationBars["Logic"].waitForExistence(timeout: 10))
+		}
+		app.buttons["Find a block"].tap(); app.buttons["Button"].tap()
+		let source = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@", "logic.port.", ".pressed")).firstMatch
+		XCTAssertTrue(source.waitForExistence(timeout: 10)); source.tap()
+		XCTAssertTrue(app.navigationBars["Connect blocks"].waitForExistence(timeout: 10))
+		let connection = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@", "logic.connect.", ".send")).firstMatch
+		XCTAssertTrue(connection.waitForExistence(timeout: 10)); connection.tap()
+		try snap("12-native-logic-canvas")
+		app.buttons["logic.apply"].tap()
+		app.buttons["Save"].tap()
+		XCTAssertTrue(app.buttons["Open My new routine"].waitForExistence(timeout: 10))
+		app.buttons["Open My new routine"].tap()
+		let tap = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "behavior.")).firstMatch
+		XCTAssertTrue(tap.waitForExistence(timeout: 10)); tap.tap()
+		XCTAssertTrue(app.staticTexts["Time for your routine."].waitForExistence(timeout: 10))
+		app.buttons["tool.edit"].tap(); element("editor.logic").tap()
+		XCTAssertTrue(app.staticTexts["2 blocks · 1 connections"].waitForExistence(timeout: 10))
+		app.buttons["Find a block"].tap(); app.buttons["Reminder"].tap()
+		app.buttons["Edit Reminder"].tap()
+		let name = app.textFields["logic.label"]
+		XCTAssertTrue(name.waitForExistence(timeout: 10)); name.tap(); name.typeText(" edited")
+		app.buttons["Done"].tap()
+		app.buttons["Back"].tap()
+		app.buttons["Discard changes"].tap()
+		app.buttons["Cancel"].tap()
+		XCTAssertFalse(app.staticTexts["Reminder edited"].exists)
+	}
+
 }

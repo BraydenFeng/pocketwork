@@ -66,7 +66,7 @@ struct ToolView: View {
 					}
 				}
 				.safeAreaInset(edge: .bottom) { if editor.active { editing_bar } }
-				.sheet(isPresented: $showing_behavior) { behavior }
+				.fullScreenCover(isPresented: $showing_behavior) { if let draft = editor.draft { LogicEditorView(document: Binding(get: { editor.draft ?? draft }, set: { editor.draft = $0 })) } }
 				.onAppear { if !opened { opened = true; if edit_on_open { editor.begin(document) } } }
 				.alert("Couldn’t save changes", isPresented: Binding(get: { editor.failure != nil }, set: { if !$0 { editor.failure = nil } })) { Button("OK") { editor.failure = nil } } message: { Text(editor.failure ?? "") }
 				.navigationDestination(isPresented: $showing_groups) { GroupsView() }
@@ -107,18 +107,8 @@ struct ToolView: View {
 			Menu {
 				ForEach(EditorView.kinds) { option in Button(option.label, systemImage: option.icon) { editor.add(option.kind) }.disabled(editor.draft?.can_add(option.kind) != true) }
 			} label: { Label("Add block", systemImage: "plus").frame(minHeight: 44).contentShape(Rectangle()) }.buttonStyle(TextButtonStyle()).accessibilityIdentifier("page.add-block")
-			Button { showing_behavior = true } label: { Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44) }.buttonStyle(TextButtonStyle()).accessibilityLabel("Routine behavior")
+			Button { showing_behavior = true } label: { Label("Logic", systemImage: "point.3.connected.trianglepath.dotted").frame(minHeight: 44) }.buttonStyle(TextButtonStyle()).accessibilityLabel("Edit logic").accessibilityIdentifier("editor.logic")
 		}.disabled(editor.saving)
-	}
-	private var behavior: some View {
-		NavigationStack {
-			VStack(alignment: .leading, spacing: Theme.gap) {
-				ToggleRow(title: "Block apps while running", is_on: Binding(get: { editor.draft?.rules.block_during_focus ?? false }, set: { editor.draft?.rules.block_during_focus = $0 }), disabled: editor.draft?.has_engine != true || editor.draft?.has_screen_time != true)
-				Hairline()
-				ToggleRow(title: "Notify when finished", is_on: Binding(get: { editor.draft?.rules.notify_on_complete ?? false }, set: { editor.draft?.rules.notify_on_complete = $0 }), disabled: editor.draft?.has_timer != true)
-				Spacer()
-			}.padding(Theme.pad).paper_page().navigationTitle("Behavior").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showing_behavior = false } } }
-		}.presentationDetents([.medium])
 	}
 
 	private func clear_everything() {

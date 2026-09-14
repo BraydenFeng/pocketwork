@@ -117,6 +117,7 @@ struct AppDocument: Codable, Equatable {
 		guard blocks.count > 1 else { return self }
 		var next = self
 		next.blocks.removeAll { $0.id == block_id }
+		next.behaviors?.connections.removeAll { $0.from == block_id }
 		next.rules.block_during_focus = rules.block_during_focus && next.has_engine && next.has_screen_time
 		next.rules.notify_on_complete = rules.notify_on_complete && next.has_timer
 		if !next.is_standing { next.enabled = nil }
