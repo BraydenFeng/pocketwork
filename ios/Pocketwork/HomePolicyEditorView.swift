@@ -20,7 +20,7 @@ struct HomePolicyEditorView: View {
 						HomeRuleEditor(rule: Binding(get: { draft.home_allowance!.rules[index] }, set: { draft.home_allowance?.rules[index] = $0 }))
 						Hairline()
 					}
-					Text("Outside these windows, distractions are blocked at home. Each day's allowance resets at midnight in Los Angeles.").supporting()
+					Text("The minutes count only inside these windows, at home; once they are spent the apps lock until the next window. Outside a window nothing is blocked. Each day's allowance resets at midnight in Los Angeles.").supporting()
 				}.padding(24)
 			}.paper_page().navigationTitle("Edit home allowance").navigationBarTitleDisplayMode(.inline)
 			.toolbar {

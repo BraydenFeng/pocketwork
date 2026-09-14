@@ -59,6 +59,24 @@ final class LogicEditingTests: XCTestCase {
 		graph.remove(counter); graph.connections.removeFirst()
 		XCTAssertThrowsError(try graph.compile(base: base))
 	}
+	func testOutsideWindowsIsUnrestrictedUnlessWired() throws {
+		var base = AppDocument.blank()
+		base.blocks = [BlockDocument.make(.heading), BlockDocument.make(.schedule), BlockDocument.make(.screen_time)]
+		base.blocks[2].groups = ["Distractions"]; base.schema_version = 2; base.rules.block_during_focus = true; base.enabled = false
+		base.blocks[1].days = [1,2,3,4,5,6,7]; base.blocks[1].start = "00:00"; base.blocks[1].end = "23:59"
+		base.home_allowance = HomePolicy(timezone: "America/Los_Angeles", away_usage_counts: false, outside_windows: "unrestricted", rules: [HomeDayRule(days: [1,2,3,4,5,6,7], allowance_minutes: 30, windows: [HomeWindow(start: "18:00", end: "20:00")])])
+		try base.validate()
+		XCTAssertFalse(base.home_allowance!.blocks_outside)
+		var graph = LogicEditing(document: base)
+		XCTAssertFalse(graph.connections.contains { $0.input == "outside" })
+		XCTAssertEqual(try graph.compile(base: base).home_allowance?.outside_windows, "unrestricted")
+		let schedule = try XCTUnwrap(graph.nodes.first { $0.kind == "schedule" }), apps = try XCTUnwrap(graph.nodes.first { $0.kind == "apps" })
+		try graph.connect(BehaviorEdge(from: schedule.id, output: "outside", to: apps.id, input: "outside"))
+		XCTAssertEqual(try graph.compile(base: base).home_allowance?.outside_windows, "block_at_home")
+		var legacy = base; legacy.home_allowance?.outside_windows = "block_at_home"
+		let migrated = try ToolLibrary.empty.upserting(legacy, now: .now).migrated()
+		XCTAssertEqual(migrated.tools.first?.document.home_allowance?.outside_windows, "unrestricted")
+	}
 	func testDeleteRemovesWiresAndReturningToLegacyFormat() throws {
 		let base = AppDocument.blank(); var graph = LogicEditing(document: base)
 		let timer = try graph.add("timer"), reminder = try graph.add("reminder")

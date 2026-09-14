@@ -36,7 +36,7 @@ export function node_height(node: LogicNode): number { const ports = node_ports(
 export function make_node(kind: NodeKind, x = 48, y = 48): LogicNode {
 	if (is_behavior(kind)) { return { id: crypto.randomUUID(), kind, x, y, config: behavior_config_schema.parse({ label: behavior_catalog[kind].title }) }; }
 	const block = kind === "timer" || kind === "schedule" ? create_block(kind) : kind === "apps" ? create_block("screen_time") : undefined;
-	const policy: HomePolicy | undefined = kind === "allowance" ? { timezone: "America/Los_Angeles", away_usage_counts: false, outside_windows: "block_at_home", rules: [{ days: [1, 2, 3, 4, 5, 6, 7], allowance_minutes: 30, windows: [{ start: "06:30", end: "20:30" }] }] } : undefined;
+	const policy: HomePolicy | undefined = kind === "allowance" ? { timezone: "America/Los_Angeles", away_usage_counts: false, outside_windows: "unrestricted", rules: [{ days: [1, 2, 3, 4, 5, 6, 7], allowance_minutes: 30, windows: [{ start: "06:30", end: "20:30" }] }] } : undefined;
 	return { id: block?.id ?? crypto.randomUUID(), kind, x, y, ...(block ? { block } : {}), ...(policy ? { policy } : {}) };
 }
 export function connect(graph: LogicGraph, edge: Connection): LogicGraph {
@@ -64,7 +64,8 @@ export function graph_from_document(document: AppDocument): LogicGraph {
 	};
 	if (document.home_allowance) {
 		nodes.push({ id: "home-condition", kind: "home", x: 40, y: 40 }, { id: "usage-meter", kind: "usage", x: 340, y: 180 }, { id: "daily-allowance", kind: "allowance", x: 640, y: 180, policy: structuredClone(document.home_allowance) });
-		add_edge("home", "present", "usage", "home"); add_edge("schedule", "active", "usage", "window"); add_edge("usage", "used", "allowance", "used"); add_edge("allowance", "reached", "apps", "gate"); add_edge("home", "present", "apps", "home"); add_edge("schedule", "outside", "apps", "outside");
+		add_edge("home", "present", "usage", "home"); add_edge("schedule", "active", "usage", "window"); add_edge("usage", "used", "allowance", "used"); add_edge("allowance", "reached", "apps", "gate"); add_edge("home", "present", "apps", "home");
+		if (document.home_allowance.outside_windows === "block_at_home") { add_edge("schedule", "outside", "apps", "outside"); }
 	} else if (document.rules.block_during_focus) { add_edge(nodes.some((node) => node.kind === "timer") ? "timer" : "schedule", "active", "apps", "gate"); }
 	if (document.rules.notify_on_complete) { nodes.push({ id: "completion-notification", kind: "notification", x: 640, y: 40 }); add_edge("timer", "finished", "notification", "finished"); }
 	if (document.behaviors) { graph.nodes.push(...structuredClone(document.behaviors.nodes)); graph.connections.push(...structuredClone(document.behaviors.connections)); }
@@ -95,11 +96,13 @@ export function compile_graph(base: AppDocument, graph: LogicGraph): AppDocument
 	result.rules = { block_during_focus: linked("timer", "active", "apps", "gate") || linked("schedule", "active", "apps", "gate"), notify_on_complete: linked("timer", "finished", "notification", "finished") };
 	if (by_kind("notification") && !result.rules.notify_on_complete) { throw new Error("Connect the timer's finished output to Notify me."); }
 	if (home) {
-		const required: [NodeKind, string, NodeKind, string][] = [["home", "present", "usage", "home"], ["schedule", "active", "usage", "window"], ["usage", "used", "allowance", "used"], ["allowance", "reached", "apps", "gate"], ["home", "present", "apps", "home"], ["schedule", "outside", "apps", "outside"]];
-		if (by_kind("timer") || !required.every((edge) => linked(...edge))) { throw new Error("Home allowances need Home + Time window → Count usage → Daily allowance → Control apps, plus Home and Outside connections to Control apps."); }
+		const required: [NodeKind, string, NodeKind, string][] = [["home", "present", "usage", "home"], ["schedule", "active", "usage", "window"], ["usage", "used", "allowance", "used"], ["allowance", "reached", "apps", "gate"], ["home", "present", "apps", "home"]];
+		if (by_kind("timer") || !required.every((edge) => linked(...edge))) { throw new Error("Home allowances need Home + Time window → Count usage → Daily allowance → Control apps, plus a Home connection to Control apps."); }
 		const policy = by_kind("allowance")?.policy;
 		if (!policy) { throw new Error("Set the daily allowances and windows."); }
-		result.home_allowance = structuredClone(policy); result.schema_version = 2; result.rules.block_during_focus = true;
+		result.home_allowance = structuredClone(policy);
+		// The optional Outside wire is the only way to get the older "block outside the windows" behavior.
+		result.home_allowance.outside_windows = linked("schedule", "outside", "apps", "outside") ? "block_at_home" : "unrestricted"; result.schema_version = 2; result.rules.block_during_focus = true;
 		const schedule = result.blocks.find((block) => block.type === "schedule")!;
 		if (schedule.type === "schedule") { schedule.days = [1, 2, 3, 4, 5, 6, 7]; schedule.start = "00:00"; schedule.end = "23:59"; }
 	} else { delete result.home_allowance; result.schema_version = 1; }

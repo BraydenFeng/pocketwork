@@ -111,7 +111,11 @@ enum HomeEngine {
 		let stale = center.activities.filter { $0.rawValue.hasPrefix(prefix + "meter.") && $0.rawValue != prefix + "meter." + (state.ledger.generation ?? "") }
 		if !stale.isEmpty { center.stopMonitoring(stale) }
 		guard state.enabled, state.at_home, let document = state.document, let policy = document.home_allowance else { shield.clearAllSettings(); return }
-		guard let generation = state.ledger.generation else { try SharedStore().apply_plan(for: document.id, to: shield); return }
+		guard let generation = state.ledger.generation else {
+			// No meter running: either the minutes are spent inside a window (block) or we are outside every window (leave the apps alone).
+			if policy.allows(at: .now) || policy.blocks_outside { try SharedStore().apply_plan(for: document.id, to: shield) } else { shield.clearAllSettings() }
+			return
+		}
 		if prepared.1 {
 			do {
 				let shared = try SharedStore()

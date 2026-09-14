@@ -19,17 +19,26 @@ describe("executable logic graphs", () => {
 		graph = connect(graph, { from: graph.nodes.find((item) => item.kind === "timer")!.id, output: "finished", to: node.id, input: "finished" });
 		expect(compile_graph(starter_document, graph).rules.notify_on_complete).toBe(true);
 	});
-	it("edited home budgets preserve away exclusion and outside-window blocking", () => {
+	it("edited home budgets preserve away exclusion and leave time outside the windows alone", () => {
 		const graph = graph_from_document(personal_routine);
 		graph.nodes.find((node) => node.kind === "allowance")!.policy!.rules[0].allowance_minutes = 45;
 		const policy = compile_graph(personal_routine, graph).home_allowance!;
+		expect(policy.outside_windows).toBe("unrestricted");
 		expect(home_decision(policy, 2, "19:15", true, 35).blocked).toBe(false);
 		expect(home_decision(policy, 2, "19:15", true, 45).blocked).toBe(true);
 		expect(home_decision(policy, 2, "19:15", false, 45)).toMatchObject({ count_usage: false, blocked: false });
+		expect(home_decision(policy, 2, "20:55", true, 0).blocked).toBe(false);
+	});
+	it("the optional Outside wire restores blocking outside the windows", () => {
+		const graph = graph_from_document(personal_routine);
+		const schedule = graph.nodes.find((node) => node.kind === "schedule")!; const apps = graph.nodes.find((node) => node.kind === "apps")!;
+		const wired = connect(graph, { from: schedule.id, output: "outside", to: apps.id, input: "outside" });
+		const policy = compile_graph(personal_routine, wired).home_allowance!;
+		expect(policy.outside_windows).toBe("block_at_home");
 		expect(home_decision(policy, 2, "20:55", true, 0).blocked).toBe(true);
 	});
 	it("rejects missing home guards instead of silently changing enforcement", () => {
-		const graph = graph_from_document(personal_routine); graph.connections = graph.connections.filter((edge) => edge.input !== "outside");
+		const graph = graph_from_document(personal_routine); graph.connections = graph.connections.filter((edge) => edge.input !== "home");
 		expect(() => compile_graph(personal_routine, graph)).toThrow("Home allowances need");
 	});
 	it("rejects incompatible ports and occupied inputs", () => {

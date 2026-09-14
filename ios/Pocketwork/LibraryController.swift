@@ -26,7 +26,7 @@ final class LibraryController: ObservableObject {
 
 	// A phone that only has the old single imported tool sees it as its first tool; the old key stays until a save succeeds.
 	static func load(from defaults: UserDefaults) throws -> ToolLibrary {
-		if let data = defaults.data(forKey: library_key) { return try ToolLibrary.decode(data) }
+		if let data = defaults.data(forKey: library_key) { return try ToolLibrary.decode(data).migrated() }
 		if let legacy = defaults.data(forKey: legacy_key) {
 			let document = try AppDocument.decode(legacy)
 			return try ToolLibrary.empty.upserting(document, now: .now)

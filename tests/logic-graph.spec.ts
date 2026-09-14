@@ -8,7 +8,7 @@ test("home graph edits real budgets and persists them across reload", async ({ p
 	await page.goto("/?routine=home-distraction-allowance");
 	await page.getByRole("tab", { name: "Logic", exact: true }).click();
 	await page.getByRole("button", { name: "Fit graph" }).click();
-	await expect(page.locator(".logic-wire")).toHaveCount(6);
+	await expect(page.locator(".logic-wire")).toHaveCount(5);
 	await page.getByRole("button", { name: "Configure Daily allowance", exact: true }).click();
 	await page.getByLabel("Shared allowance (minutes)").first().fill("45");
 	await page.getByRole("button", { name: "Apply to routine" }).click();

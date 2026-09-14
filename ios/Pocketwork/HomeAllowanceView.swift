@@ -20,7 +20,7 @@ struct HomeAllowanceView: View {
 			VStack(alignment: .leading, spacing: 16) {
 				if editor.active { TextField("Routine name", text: Binding(get: { editor.draft?.name ?? "" }, set: { editor.draft?.name = $0 }), axis: .vertical).heading_font(26).accessibilityIdentifier("page.name") }
 				else { Text(document.name).heading_font(26) }
-				Text("Only time at home counts. Your allowance is shared across all windows and resets at midnight in Los Angeles.").supporting()
+				Text("Inside your windows, at home, you get these minutes and then the apps lock until the next window. Outside a window, or away from home, nothing is blocked. Resets at midnight in Los Angeles.").supporting()
 				if let policy = shown.home_allowance {
 					ForEach(Array(policy.rules.enumerated()), id: \.offset) { index, rule in
 						Card { if editor.active {
@@ -48,7 +48,7 @@ struct HomeAllowanceView: View {
 				})).disabled(sessions.is_busy || !home.has_home || !home.always_allowed).tint(Theme.success)
 				if sessions.is_busy { ProgressView("Updating home allowance…") }
 				Button("Refresh remaining time") { refresh() }.buttonStyle(TextButtonStyle())
-				Text("Outside the windows, distractions are blocked at home. Away from home, they are unrestricted. Home uses a 150 m boundary. iOS may detect crossings late. Usage is saved in whole minutes; a final partial minute may not count when you leave.").supporting()
+				Text("Outside the windows and away from home, nothing is blocked. Home uses a 150 m boundary. iOS may detect crossings late. Usage is saved in whole minutes; a final partial minute may not count when you leave.").supporting()
 				}.disabled(editor.active)
 				if let error = home.error_message ?? sessions.error_message { Text(error).foregroundStyle(Theme.danger).font(.system(size: 13)) }
 			}.padding(Theme.pad).disabled(editor.saving)

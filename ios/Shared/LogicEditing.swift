@@ -46,7 +46,8 @@ struct LogicEditing: Equatable {
 		if let policy = document.home_allowance {
 			nodes += [LogicItem(id: "home-condition", kind: "home", x: 40, y: 40), LogicItem(id: "usage-meter", kind: "usage", x: 340, y: 180), LogicItem(id: "daily-allowance", kind: "allowance", x: 640, y: 180, policy: policy)]
 			link("home", "present", "usage", "home"); link("schedule", "active", "usage", "window"); link("usage", "used", "allowance", "used")
-			link("allowance", "reached", "apps", "gate"); link("home", "present", "apps", "home"); link("schedule", "outside", "apps", "outside")
+			link("allowance", "reached", "apps", "gate"); link("home", "present", "apps", "home")
+			if policy.blocks_outside { link("schedule", "outside", "apps", "outside") }
 		} else if document.rules.block_during_focus { link(document.has_timer ? "timer" : "schedule", "active", "apps", "gate") }
 		if document.rules.notify_on_complete {
 			nodes.append(LogicItem(id: "completion-notification", kind: "notification", x: 640, y: 40)); link("timer", "finished", "notification", "finished")
@@ -83,7 +84,7 @@ struct LogicEditing: Equatable {
 		let id = block?.id ?? fixed[kind] ?? UUID().uuidString
 		guard !nodes.contains(where: { $0.id == id }) else { throw DocumentError.invalid("This block ID is already in use.") }
 		let config: BehaviorConfig? = is_behavior ? BehaviorConfig(label: Self.title(kind), value: 1, minutes: 5, time: "18:00", days: [1,2,3,4,5,6,7], message: "Time for your routine.", operator: "gte") : nil
-		let policy: HomePolicy? = kind == "allowance" ? HomePolicy(timezone: "America/Los_Angeles", away_usage_counts: false, outside_windows: "block_at_home", rules: [HomeDayRule(days: [1,2,3,4,5,6,7], allowance_minutes: 30, windows: [HomeWindow(start: "06:30", end: "20:30")])]) : nil
+		let policy: HomePolicy? = kind == "allowance" ? HomePolicy(timezone: "America/Los_Angeles", away_usage_counts: false, outside_windows: "unrestricted", rules: [HomeDayRule(days: [1,2,3,4,5,6,7], allowance_minutes: 30, windows: [HomeWindow(start: "06:30", end: "20:30")])]) : nil
 		var position = 0
 		while nodes.contains(where: { abs($0.x - Double(position % 3) * 300 - 40) < 280 && abs($0.y - Double(position / 3) * 260 - 40) < max($0.height, 220) }) { position += 1 }
 		nodes.append(LogicItem(id: id, kind: kind, x: Double(position % 3) * 300 + 40, y: Double(position / 3) * 260 + 40, block: block, policy: policy, config: config))
@@ -104,7 +105,9 @@ struct LogicEditing: Equatable {
 		result.rules = RuleDocument(block_during_focus: linked("timer","active","apps","gate") || linked("schedule","active","apps","gate"), notify_on_complete: linked("timer","finished","notification","finished"))
 		if nodes.contains(where: { $0.kind == "notification" }), !result.rules.notify_on_complete { throw DocumentError.invalid("Connect Timer → finished to Notify me.") }
 		if nodes.contains(where: { ["home","usage","allowance"].contains($0.kind) }) {
-			guard !result.has_timer, linked("home","present","usage","home"), linked("schedule","active","usage","window"), linked("usage","used","allowance","used"), linked("allowance","reached","apps","gate"), linked("home","present","apps","home"), linked("schedule","outside","apps","outside"), let policy = nodes.first(where: { $0.kind == "allowance" })?.policy else { throw DocumentError.invalid("Connect At location and Time window → Count usage → Daily allowance → Control apps, plus location and outside to Control apps.") }
+			guard !result.has_timer, linked("home","present","usage","home"), linked("schedule","active","usage","window"), linked("usage","used","allowance","used"), linked("allowance","reached","apps","gate"), linked("home","present","apps","home"), var policy = nodes.first(where: { $0.kind == "allowance" })?.policy else { throw DocumentError.invalid("Connect At location and Time window → Count usage → Daily allowance → Control apps, plus location and outside to Control apps.") }
+			// The optional Outside wire is the only way to get the older "block outside the windows" behavior.
+			policy.outside_windows = linked("schedule","outside","apps","outside") ? "block_at_home" : "unrestricted"
 			result.home_allowance = policy; result.rules.block_during_focus = true
 			if let index = result.blocks.firstIndex(where: { $0.type == .schedule }) { result.blocks[index].days = [1,2,3,4,5,6,7]; result.blocks[index].start = "00:00"; result.blocks[index].end = "23:59" }
 		} else { result.home_allowance = nil }
