@@ -43,17 +43,17 @@ struct EditorView: View {
 			.navigationTitle(is_new ? "New routine" : "Edit routine").navigationBarTitleDisplayMode(.inline)
 			.toolbar {
 				ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(saving) }
+				ToolbarItem(placement: .topBarTrailing) { Menu { Button("Advanced logic…", systemImage: "point.3.connected.trianglepath.dotted") { showing_behavior = true }.accessibilityIdentifier("editor.logic") } label: { Image(systemName: "ellipsis") } }
 				ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.fontWeight(.semibold).foregroundStyle(Theme.accent).disabled(saving || sessions.is_busy) }
 			}
 			.safeAreaInset(edge: .bottom) {
 				EditorBar {
 					Button { showing_blocks = true } label: { Label("Add block", systemImage: "plus") }.buttonStyle(TextButtonStyle()).accessibilityIdentifier("editor.add-block")
 					Spacer()
-					Button { showing_behavior = true } label: { Label("Logic", systemImage: "point.3.connected.trianglepath.dotted") }.buttonStyle(TextButtonStyle()).accessibilityIdentifier("editor.logic")
 					if saving { ProgressView() }
 				}
 			}
-			.sheet(isPresented: $showing_blocks) { block_palette }
+			.sheet(isPresented: $showing_blocks) { BlockPalette(can_add: { draft.can_add($0) }, add: { add_block($0) }) }
 			.fullScreenCover(isPresented: $showing_behavior) { LogicEditorView(document: $draft) }
 			.interactiveDismissDisabled(saving)
 			.alert("Couldn’t save this routine", isPresented: Binding(get: { validation_message != nil }, set: { if !$0 { validation_message = nil } })) { Button("OK") { validation_message = nil } } message: { Text(validation_message ?? "") }
@@ -88,19 +88,6 @@ struct EditorView: View {
 		case .screen_time: Text(block.shield_description).supporting()
 		case .schedule: Text("\(block.start ?? "")–\(block.end ?? "") · \((block.days ?? []).count) days a week").supporting()
 		}
-	}
-	private var block_palette: some View {
-		NavigationStack {
-			ScrollView {
-				VStack(alignment: .leading, spacing: 0) {
-					Text("What would you like to add?").heading_font(22).padding(.vertical, 16)
-					ForEach(Self.kinds) { option in
-						Button { add_block(option.kind); showing_blocks = false } label: { DocumentRow(icon: option.icon) { Text(option.label).heading_font(16) } }.buttonStyle(.plain).disabled(!draft.can_add(option.kind)).accessibilityIdentifier("add.\(option.kind.rawValue)")
-						Hairline()
-					}
-				}.padding(24)
-			}.paper_page().navigationTitle("Add block").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showing_blocks = false } } }
-		}.presentationDetents([.medium, .large])
 	}
 	private func move(_ index: Int, by offset: Int) { let destination = index + offset; if draft.blocks.indices.contains(destination) { draft.blocks.swapAt(index, destination) } }
 	private func add_block(_ kind: BlockKind) {

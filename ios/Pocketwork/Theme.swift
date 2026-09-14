@@ -181,3 +181,79 @@ extension View {
 		background(Theme.surface.ignoresSafeArea()).toolbarBackground(Theme.surface, for: .navigationBar).toolbarBackground(.visible, for: .navigationBar).toolbarColorScheme(.light, for: .navigationBar).tint(Theme.text)
 	}
 }
+
+// Visible choices instead of hidden steppers and menus: a row of chips, one of which is on.
+struct Chip: View {
+	let text: String
+	var on = false
+	var compact = false
+	let action: () -> Void
+	var body: some View {
+		Button(action: action) {
+			Text(text).font(.system(size: 13, weight: .medium)).lineLimit(1)
+				.padding(.horizontal, compact ? 10 : 12).frame(minHeight: 36)
+				.background(on ? Theme.text : Theme.surface, in: RoundedRectangle(cornerRadius: Theme.radius_small))
+				.overlay(RoundedRectangle(cornerRadius: Theme.radius_small).strokeBorder(on ? Theme.text : Theme.border))
+				.foregroundStyle(on ? Theme.surface : Theme.text_dim)
+		}
+		.buttonStyle(.plain).accessibilityAddTraits(on ? .isSelected : [])
+	}
+}
+
+struct ChipRow<Value: Hashable>: View {
+	let label: String
+	let options: [Value]
+	let selected: Value
+	let text: (Value) -> String
+	let choose: (Value) -> Void
+	var body: some View {
+		VStack(alignment: .leading, spacing: 6) {
+			Text(label).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.text_dim)
+			ScrollView(.horizontal, showsIndicators: false) {
+				HStack(spacing: 6) { ForEach(options, id: \.self) { value in Chip(text: text(value), on: value == selected) { choose(value) } } }
+			}
+		}
+	}
+}
+
+// The seven things a person can put on a routine page, in plain words. Shared by the page editor and the new-routine sheet.
+struct BlockPalette: View {
+	let can_add: (BlockKind) -> Bool
+	let add: (BlockKind) -> Void
+	@Environment(\.dismiss) private var dismiss
+	struct Entry: Identifiable { let kind: BlockKind; let title: String; let detail: String; let icon: String; var id: BlockKind { kind } }
+	static let entries: [Entry] = [
+		Entry(kind: .heading, title: "Heading", detail: "A big line at the top of the page", icon: "textformat"),
+		Entry(kind: .timer, title: "Timer", detail: "A session you start yourself, 15 to 120 minutes", icon: "timer"),
+		Entry(kind: .schedule, title: "Schedule", detail: "Days and hours when this routine runs by itself", icon: "calendar"),
+		Entry(kind: .screen_time, title: "Apps", detail: "Block, allow only, or limit your app groups", icon: "shield"),
+		Entry(kind: .checklist, title: "Checklist", detail: "Tasks you can tick off", icon: "checklist"),
+		Entry(kind: .counter, title: "Counter", detail: "Count toward a goal", icon: "number"),
+		Entry(kind: .note, title: "Note", detail: "Text to read while the routine runs", icon: "note.text"),
+	]
+	var body: some View {
+		NavigationStack {
+			ScrollView {
+				VStack(alignment: .leading, spacing: 0) {
+					Text("Add to this page").heading_font(22).padding(.vertical, 16)
+					ForEach(Self.entries) { entry in
+						let allowed = can_add(entry.kind)
+						Button { add(entry.kind); dismiss() } label: {
+							DocumentRow(icon: entry.icon) {
+								VStack(alignment: .leading, spacing: 3) {
+									Text(entry.title).heading_font(16)
+									Text(allowed ? entry.detail : "Already on this page").supporting()
+								}
+							}
+						}
+						.buttonStyle(.plain).disabled(!allowed).opacity(allowed ? 1 : 0.5).accessibilityIdentifier("add.\(entry.kind.rawValue)")
+						Hairline()
+					}
+				}.padding(24)
+			}
+			.paper_page().navigationTitle("Add block").navigationBarTitleDisplayMode(.inline)
+			.toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+		}
+		.presentationDetents([.medium, .large])
+	}
+}
