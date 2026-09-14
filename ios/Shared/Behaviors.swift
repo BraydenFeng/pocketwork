@@ -173,11 +173,15 @@ extension BehaviorState {
 		values = values.filter { live.contains($0.key) }; days = days.filter { live.contains($0.key) }
 		fired = fired.filter { stable.contains(String($0.key.split(separator: ".").first ?? "")) }
 		pending = pending.filter { stable.contains($0.id) }
-		data?.inputs = data?.inputs.filter { live.contains($0.key) } ?? [:]
-		data?.forms = data?.forms.filter { live.contains($0.key) } ?? [:]
-		data?.entries = data?.entries.filter { live.contains($0.key) } ?? [:]
-		data?.rewards = data?.rewards.filter { live.contains($0.key) } ?? [:]
-		data?.gates = data?.gates.filter { live.contains($0.key) } ?? [:]
+		// Reading and writing `data` in one statement is an exclusivity violation; work on a copy and assign it back.
+		if var builder = data {
+			builder.inputs = builder.inputs.filter { live.contains($0.key) }
+			builder.forms = builder.forms.filter { live.contains($0.key) }
+			builder.entries = builder.entries.filter { live.contains($0.key) }
+			builder.rewards = builder.rewards.filter { live.contains($0.key) }
+			builder.gates = builder.gates.filter { live.contains($0.key) }
+			data = builder
+		}
 		at_location = nil
 	}
 }
