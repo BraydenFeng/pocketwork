@@ -11,6 +11,8 @@ struct HomeState: Codable {
 	var at_home = false
 	var enabled = false
 	var ledger = HomeLedger()
+	// Set once the engine's own copy of the policy has been moved off the old "block outside the windows" behavior.
+	var outside_migrated: Bool? = nil
 }
 
 // One shared file and a process lock serialize app/geofence and monitor-extension callbacks.
@@ -23,6 +25,11 @@ enum HomeEngine {
 		return try HomeFileLock.with_lock(at: folder.appendingPathComponent("home.lock")) {
 			let file = folder.appendingPathComponent("home-state.json")
 			var state = FileManager.default.fileExists(atPath: file.path) ? try JSONDecoder().decode(HomeState.self, from: Data(contentsOf: file)) : HomeState()
+			// The engine keeps its own copy of the routine from when it was switched on; apply the same one-time migration the library gets.
+			if state.outside_migrated != true {
+				if state.document?.home_allowance?.outside_windows == "block_at_home" { state.document?.home_allowance?.outside_windows = "unrestricted" }
+				state.outside_migrated = true
+			}
 			do {
 				let result = try action(&state)
 				try JSONEncoder().encode(state).write(to: file, options: .atomic)
@@ -35,6 +42,12 @@ enum HomeEngine {
 	}
 
 	static func snapshot() throws -> HomeState { try transaction { $0 } }
+
+	// Launch and foreground: re-evaluate the shield against the clock so a policy change (or the migration above) takes effect without a toggle.
+	static func refresh_on_launch() throws {
+		guard try snapshot().enabled else { return }
+		try reconcile()
+	}
 	static func set_home(_ place: HomePlace) throws {
 		try transaction { $0.place = place; $0.at_home = false; $0.ledger.pause() }
 		try reconcile()

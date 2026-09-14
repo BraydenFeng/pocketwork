@@ -19,7 +19,7 @@ final class HomeLocationController: NSObject, ObservableObject, CLLocationManage
 	}
 	func restore() {
 		Task { do {
-			let state = try await HomeWorker.run { try HomeEngine.snapshot() }; has_home = state.place != nil
+			let state = try await HomeWorker.run { try HomeEngine.refresh_on_launch(); return try HomeEngine.snapshot() }; has_home = state.place != nil
 			always_allowed = manager.authorizationStatus == .authorizedAlways
 			if let place = state.place, always_allowed { monitor(place) }
 		} catch { error_message = error.localizedDescription } }
