@@ -46,10 +46,20 @@ export function load_library(storage: DraftStorage, now: number): Library | null
 		try { value = JSON.parse(raw); } catch { throw new Error("Your saved tools could not be opened. They have not been overwritten. The stored data is not valid JSON."); }
 		const result = library_schema.safeParse(value);
 		if (!result.success) { throw new Error(`Your saved tools could not be opened. They have not been overwritten. ${result.error.issues[0].message}`); }
-		return result.data;
+		return migrate_library(result.data);
 	}
 	const legacy = load_draft(storage);
 	return legacy ? { schema_version: 1, tools: [{ document: legacy, updated_at: timestamp(now) }] } : null;
+}
+
+// Home allowances used to block outside their windows; nobody could choose otherwise, so existing ones move to the new default once.
+export function migrate_library(library: Library): Library {
+	const tools = library.tools.map((entry) => {
+		const policy = entry.document.home_allowance;
+		if (!policy || policy.outside_windows !== "block_at_home") { return entry; }
+		return { ...entry, document: { ...entry.document, home_allowance: { ...policy, outside_windows: "unrestricted" as const } } };
+	});
+	return tools.some((entry, index) => entry !== library.tools[index]) ? { ...library, tools } : library;
 }
 
 export function save_library(storage: DraftStorage, library: Library): void {

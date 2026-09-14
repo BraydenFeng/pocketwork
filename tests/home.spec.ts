@@ -82,8 +82,8 @@ test("a scheduled routine gets a switch instead of a start button, on the card a
 	await page.getByRole("button", { name: "Try it", exact: true }).click();
 	await page.getByRole("switch", { name: "Switch Every night on or off" }).check();
 	await expect(page.getByText(/^(On · next|Active now)/)).toBeVisible();
-	await page.getByRole("tab", { name: "Rules", exact: true }).click();
-	await expect(page.getByText("The scheduled window opens")).toBeVisible();
+	await page.getByRole("tab", { name: "Logic", exact: true }).click();
+	await expect(page.getByRole("button", { name: "Configure Time window" })).toBeVisible();
 	await page.getByRole("button", { name: "My routines", exact: true }).click();
 	const card = page.locator(".tool-card:not(.is-template)", { hasText: "Phone-free bedtime" });
 	await expect(card.getByRole("switch", { name: "Switch Phone-free bedtime on or off" })).toBeChecked();
@@ -97,7 +97,7 @@ test("the editor refuses a timer next to a schedule and edits the window", async
 	await seed_library(page, [templates.find((t) => t.name === "Workday focus")!.build()]);
 	await page.goto("/");
 	await page.getByRole("button", { name: "Open Workday focus", exact: true }).click();
-	await page.getByRole("button", { name: "Add Focus timer", exact: true }).click();
+	await page.getByRole("button", { name: "Add Timer", exact: true }).click();
 	await expect(page.locator(".notice-banner")).toContainText("not both");
 	await page.getByRole("button", { name: "Edit Schedule", exact: true }).click();
 	await page.getByRole("group", { name: "Days of the week" }).getByRole("button", { name: "Sat" }).click();

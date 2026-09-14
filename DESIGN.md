@@ -55,3 +55,17 @@ Brayden requested a Notion/Obsidian-inspired phone interface and direct home-scr
 
 
 Phone editing follow-up: Edit opens the actual routine page in place. Preserve its heading rail, timer and counter cards, checklist rows, and note typography. Text becomes editable where it already lives; only configuration controls replace live actions. A quiet bottom bar offers Cancel, Add block, and behavior settings. Save returns to the same running page. Home allowances likewise keep their existing page and edit budgets inside its schedule cards. No block list or separate inspector is the default editing destination.
+
+
+## Connected logic workspace
+
+Brayden selected a Supabase-diagram-like node canvas alongside the Page view. Repeat three structures: compact node cards with labelled input/output ports, graphite connection wires with one selected accent, and a separate inspector for node settings. Node positions are workspace geometry; connections translate into the existing executable native routine schema. Unsupported combinations must fail explicitly rather than imply arbitrary code execution. Keep Page and Logic visibly accessible for home allowances as well as ordinary routines. Native capability boundaries remain visible, and draft graphs require Apply before their rules sync.
+
+## Behavior library organization
+
+Brayden requested less clutter and room for future data features on 2026-09-13. Show four collapsed sections: Time & location, Data, Logic, Actions. Search opens matching groups. Entries are compact names; descriptions belong in node settings. New nodes occupy free canvas space. Keep the graph, settings and optional Test logic distinct. Version-3 behaviors currently execute while a routine is open; do not imply arbitrary background execution or cloud-synced progress.
+
+
+## Native connected editor
+
+The iPhone Page editor opens a full-screen Logic workspace. Keep the original page appearance and use the existing paper, graphite, hairline and blue tokens. A bottom Add block action opens collapsed Time & location, Data, Logic and Actions groups. The canvas pans in both directions and has explicit zoom controls; node headings drag while 44-point ports open a compatible-connection picker. Find a block jumps through larger graphs. Settings use a sheet so the small screen does not carry desktop sidebars. Apply returns the graph to the page draft; Save uses the existing validated cloud save. Back confirms discarding graph changes. Invalid connections, cycles and incomplete graphs cannot overwrite the saved routine. New behaviors retain their foreground execution limits.

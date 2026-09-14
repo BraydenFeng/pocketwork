@@ -13,7 +13,7 @@ describe("personal home allowance", () => {
 	});
 	it("shares thirty minutes across both weekday windows", () => {
 		expect(home_decision(requested_home_policy, 2, "18:10", true, 20).remaining).toBe(10);
-		expect(home_decision(requested_home_policy, 2, "18:45", true, 20)).toMatchObject({ blocked: true, count_usage: false, remaining: 10 });
+		expect(home_decision(requested_home_policy, 2, "18:45", true, 20)).toMatchObject({ blocked: false, count_usage: false, remaining: 10 });
 		expect(home_decision(requested_home_policy, 2, "19:15", true, 20)).toMatchObject({ blocked: false, count_usage: true, remaining: 10 });
 		expect(home_decision(requested_home_policy, 2, "19:15", true, 30).blocked).toBe(true);
 	});
@@ -21,9 +21,11 @@ describe("personal home allowance", () => {
 		for (const time of ["10:00", "18:10", "18:45", "19:15", "23:00"]) { expect(home_decision(requested_home_policy, 2, time, false, 20)).toMatchObject({ blocked: false, count_usage: false, remaining: 10 }); }
 	});
 	it("uses inclusive starts and exclusive ends", () => {
-		expect(home_decision(requested_home_policy, 6, "14:29", true, 0).blocked).toBe(true);
+		expect(home_decision(requested_home_policy, 6, "14:29", true, 0).blocked).toBe(false);
+		expect(home_decision({ ...requested_home_policy, outside_windows: "block_at_home" }, 6, "14:29", true, 0).blocked).toBe(true);
 		expect(home_decision(requested_home_policy, 6, "14:30", true, 0).blocked).toBe(false);
-		expect(home_decision(requested_home_policy, 6, "20:20", true, 0).blocked).toBe(true);
+		expect(home_decision(requested_home_policy, 6, "20:20", true, 0)).toMatchObject({ blocked: false, count_usage: false });
+		expect(home_decision(requested_home_policy, 6, "20:19", true, 0).count_usage).toBe(true);
 		expect(home_decision(requested_home_policy, 1, "06:30", true, 179).remaining).toBe(1);
 	});
 	it("requires the new phone format and never seeds an active restriction", () => {

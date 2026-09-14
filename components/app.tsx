@@ -245,7 +245,7 @@ export function PocketworkApp() {
 
 	if (!ready) { return <div className="app-loading" role="status">Opening your routines…</div>; }
 
-	if (open_tool?.home_allowance) { return <HomeAllowance document={open_tool} on_back={() => navigate(null)} />; }
+	if (open_tool?.home_allowance) { return <HomeAllowance key={open_tool.id} document={open_tool} on_back={() => navigate(null)} on_save={save_tool} disabled={storage_blocked} />; }
 	if (open_tool) {
 		return <Workbench key={open_tool.id} tool={open_tool} groups={library.groups ?? []} on_save={save_tool} on_back={() => navigate(null)} storage_blocked={storage_blocked} storage_error={error} on_replace_unreadable={replace_unreadable} on_dismiss_error={() => set_error(null)} sync={account ? sync : "off"} />;
 	}

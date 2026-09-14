@@ -43,12 +43,12 @@ final class ScreenshotTests: XCTestCase {
 		try snap("09-routine-inline-edit")
 		// The fixed footer is visible; bypass XCTest trying to scroll its accessibility node.
 		app.buttons["page.add-block"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-		app.buttons["Note"].tap()
+		element("add.note").tap()
 		app.buttons["Cancel"].tap()
 		XCTAssertFalse(app.staticTexts["A note to myself"].exists)
 		app.buttons["tool.edit"].tap()
 		app.buttons["page.add-block"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-		app.buttons["Note"].tap()
+		element("add.note").tap()
 		app.buttons["Save"].tap()
 		XCTAssertTrue(app.staticTexts["A note to myself"].waitForExistence(timeout: 10))
 		try snap("10-routine-after-save")
@@ -76,23 +76,37 @@ final class ScreenshotTests: XCTestCase {
 		element("home.edit.home-distraction-allowance").tap()
 		XCTAssertTrue(app.navigationBars["Home allowance"].waitForExistence(timeout: 10))
 		try snap("08-home-allowance-editor")
-		let allowance = app.buttons["home.allowance.2-Increment"]
-		allowance.tap()
-		XCTAssertEqual(allowance.value as? String, "35 minutes")
+		let allowance = app.otherElements["home.allowance.2"].firstMatch.exists ? app.otherElements["home.allowance.2"].firstMatch : app.descendants(matching: .any)["home.allowance.2"].firstMatch
+		XCTAssertTrue(app.buttons["45 min"].firstMatch.waitForExistence(timeout: 10))
+		app.buttons["45 min"].firstMatch.tap()
+		XCTAssertEqual(allowance.value as? String, "45 minutes")
 		app.buttons["Save"].tap()
 		XCTAssertTrue(app.buttons["tool.edit"].waitForExistence(timeout: 10))
 		app.buttons["tool.edit"].tap()
-		XCTAssertTrue(allowance.waitForExistence(timeout: 10))
-		XCTAssertEqual(allowance.value as? String, "35 minutes")
-		allowance.tap()
+		XCTAssertTrue(app.buttons["60 min"].firstMatch.waitForExistence(timeout: 10))
+		XCTAssertEqual(allowance.value as? String, "45 minutes")
+		app.buttons["60 min"].firstMatch.tap()
 		app.buttons["Cancel"].tap()
 		app.buttons["tool.edit"].tap()
-		XCTAssertEqual(allowance.value as? String, "35 minutes")
+		XCTAssertTrue(app.buttons["45 min"].firstMatch.waitForExistence(timeout: 10))
+		XCTAssertEqual(allowance.value as? String, "45 minutes")
 		app.buttons["Cancel"].tap()
 		app.navigationBars["Home allowance"].buttons["My routines"].tap()
 		app.swipeUp()
 		element("home.group.distractions").tap()
 		XCTAssertTrue(app.navigationBars["Distractions"].waitForExistence(timeout: 10))
+	}
+
+	// Advanced logic sits behind the ⋯ menu; open the menu, then the item.
+	private func open_logic() {
+		let item = app.buttons["editor.logic"]
+		if !item.waitForExistence(timeout: 2) {
+			let menus = app.navigationBars.buttons.matching(NSPredicate(format: "label == %@ OR identifier == %@", "More", "ellipsis"))
+			// Toolbar buttons cannot be scrolled into view; tap the menu by its coordinates instead of letting XCTest try.
+			(menus.count > 0 ? menus.element(boundBy: menus.count - 1) : app.navigationBars.buttons.element(boundBy: app.navigationBars.buttons.count - 1)).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+			XCTAssertTrue(item.waitForExistence(timeout: 10), "Advanced logic menu item")
+		}
+		item.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
 	}
 
 	// SwiftUI exposes list rows and toolbar items as different element types; a typed query per kind stays fast.
@@ -111,4 +125,65 @@ final class ScreenshotTests: XCTestCase {
 		add(attachment)
 		if let output { try screenshot.pngRepresentation.write(to: output.appendingPathComponent("\(name).png")) }
 	}
+
+	func test_connected_behaviors() throws {
+		app.terminate()
+		let fixture = #"""
+{"schema_version": 1, "tools": [{"document": {"schema_version": 3, "id": "behavior-test-id", "name": "Gym check-ins", "description": "", "blocks": [{"id": "heading", "type": "heading", "title": "Gym check-ins", "subtitle": ""}], "rules": {"block_during_focus": false, "notify_on_complete": false}, "behaviors": {"nodes": [{"id": "tap", "kind": "check_in", "x": 0, "y": 0, "config": {"label": "Check in", "value": 1, "minutes": 5, "time": "18:00", "days": [1, 2, 3, 4, 5, 6, 7], "message": "Goal reached", "operator": "gte"}}, {"id": "count", "kind": "count", "x": 0, "y": 0, "config": {"label": "Visits", "value": 1, "minutes": 5, "time": "18:00", "days": [1, 2, 3, 4, 5, 6, 7], "message": "Goal reached", "operator": "gte"}}, {"id": "goal", "kind": "goal", "x": 0, "y": 0, "config": {"label": "Visit goal", "value": 2, "minutes": 5, "time": "18:00", "days": [1, 2, 3, 4, 5, 6, 7], "message": "Goal reached", "operator": "gte"}}, {"id": "message", "kind": "reminder", "x": 0, "y": 0, "config": {"label": "Reminder", "value": 1, "minutes": 5, "time": "18:00", "days": [1, 2, 3, 4, 5, 6, 7], "message": "Goal reached", "operator": "gte"}}], "connections": [{"from": "tap", "output": "done", "to": "count", "input": "increment"}, {"from": "count", "output": "value", "to": "goal", "input": "value"}, {"from": "goal", "output": "reached", "to": "message", "input": "send"}]}}, "updated_at": "2026-09-13T12:00:00.000Z"}]}
+"""#.replacingOccurrences(of: "behavior-test-id", with: UUID().uuidString)
+		app.launchEnvironment["POCKETWORK_UI_LIBRARY"] = fixture
+		app.launch()
+		XCTAssertTrue(app.buttons["Open Gym check-ins"].waitForExistence(timeout: 10))
+		app.buttons["Open Gym check-ins"].tap()
+		XCTAssertTrue(app.buttons["behavior.tap"].waitForExistence(timeout: 10))
+		app.buttons["behavior.tap"].tap()
+		app.buttons["behavior.tap"].tap()
+		XCTAssertTrue(app.staticTexts["Goal reached"].waitForExistence(timeout: 10))
+		try snap("11-connected-behaviors")
+	}
+	func test_build_logic_on_phone() throws {
+		app.buttons["New routine"].tap()
+		open_logic()
+		XCTAssertTrue(app.navigationBars["Logic"].waitForExistence(timeout: 10))
+		for (kind, title) in [("button", "Button"), ("reminder", "Reminder")] {
+			element("logic.add").tap()
+			let search = app.searchFields.firstMatch
+			XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText(title)
+			element("logic.add.\(kind)").tap()
+			XCTAssertTrue(app.navigationBars["Logic"].waitForExistence(timeout: 10))
+		}
+		try snap("12-native-logic-before-connect")
+		app.buttons["Find a block"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap(); app.buttons["Button"].tap()
+		let source = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@", "logic.port.", ".pressed")).firstMatch
+		XCTAssertTrue(source.waitForExistence(timeout: 10)); XCTAssertTrue(source.isHittable); source.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+		XCTAssertTrue(app.navigationBars["Connect blocks"].waitForExistence(timeout: 10))
+		let connection = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@", "logic.connect.", ".send")).firstMatch
+		XCTAssertTrue(connection.waitForExistence(timeout: 10)); connection.tap()
+		try snap("12-native-logic-canvas")
+		app.buttons["logic.apply"].tap()
+		app.buttons["Save"].tap()
+		XCTAssertTrue(app.buttons["Open My new routine"].waitForExistence(timeout: 10))
+		app.buttons["Open My new routine"].tap()
+		let tap = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "behavior.")).firstMatch
+		XCTAssertTrue(tap.waitForExistence(timeout: 10)); tap.tap()
+		XCTAssertTrue(app.staticTexts["Time for your routine."].waitForExistence(timeout: 10))
+		app.buttons["tool.edit"].tap(); open_logic()
+		XCTAssertTrue(app.staticTexts["2 blocks · 1 connections"].waitForExistence(timeout: 10))
+		app.buttons["Find a block"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap(); app.buttons["Reminder"].tap()
+		try snap("13-native-logic-find-block")
+		// Find a block scrolls the canvas to the node with animation; wait until the node's button has settled on screen before tapping.
+		let edit_reminder = app.buttons["Edit Reminder"]
+		XCTAssertTrue(edit_reminder.waitForExistence(timeout: 10))
+		let settled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: edit_reminder)
+		XCTAssertEqual(XCTWaiter().wait(for: [settled], timeout: 10), .completed, "Edit Reminder never became hittable after Find a block")
+		edit_reminder.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+		let name = app.textFields["logic.label"]
+		XCTAssertTrue(name.waitForExistence(timeout: 10)); name.tap(); name.typeText(" edited")
+		app.buttons["Done"].tap()
+		app.buttons["Back"].tap()
+		app.buttons["Discard changes"].tap()
+		app.buttons["Cancel"].tap()
+		XCTAssertFalse(app.staticTexts["Reminder edited"].exists)
+	}
+
 }

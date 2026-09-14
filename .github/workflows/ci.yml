@@ -1,11 +1,18 @@
 name: CI
 
 on:
+  push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      ios:
+        description: "Also build and test the iPhone app (macOS minutes cost money)"
+        type: boolean
+        default: true
 
+# A new push to the same branch cancels the run before it, so nobody pays for a build of code that is already stale.
 concurrency:
-  group: ci-${{ github.head_ref || github.ref_name }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -36,7 +43,9 @@ jobs:
 
   ios:
     # Compiles the SwiftUI host and runs its XCTests on a simulator. No signing, so Screen Time is not exercised here.
+    # macOS minutes are billed at 10x, so this only runs on demand: the Run workflow button, or a commit message containing [ios].
     name: iPhone app
+    if: github.event_name == 'workflow_dispatch' && inputs.ios || contains(github.event.head_commit.message, '[ios]')
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4

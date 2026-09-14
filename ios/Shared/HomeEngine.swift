@@ -11,6 +11,8 @@ struct HomeState: Codable {
 	var at_home = false
 	var enabled = false
 	var ledger = HomeLedger()
+	// Set once the engine's own copy of the policy has been moved off the old "block outside the windows" behavior.
+	var outside_migrated: Bool? = nil
 }
 
 // One shared file and a process lock serialize app/geofence and monitor-extension callbacks.
@@ -23,6 +25,11 @@ enum HomeEngine {
 		return try HomeFileLock.with_lock(at: folder.appendingPathComponent("home.lock")) {
 			let file = folder.appendingPathComponent("home-state.json")
 			var state = FileManager.default.fileExists(atPath: file.path) ? try JSONDecoder().decode(HomeState.self, from: Data(contentsOf: file)) : HomeState()
+			// The engine keeps its own copy of the routine from when it was switched on; apply the same one-time migration the library gets.
+			if state.outside_migrated != true {
+				if state.document?.home_allowance?.outside_windows == "block_at_home" { state.document?.home_allowance?.outside_windows = "unrestricted" }
+				state.outside_migrated = true
+			}
 			do {
 				let result = try action(&state)
 				try JSONEncoder().encode(state).write(to: file, options: .atomic)
@@ -35,6 +42,12 @@ enum HomeEngine {
 	}
 
 	static func snapshot() throws -> HomeState { try transaction { $0 } }
+
+	// Launch and foreground: re-evaluate the shield against the clock so a policy change (or the migration above) takes effect without a toggle.
+	static func refresh_on_launch() throws {
+		guard try snapshot().enabled else { return }
+		try reconcile()
+	}
 	static func set_home(_ place: HomePlace) throws {
 		try transaction { $0.place = place; $0.at_home = false; $0.ledger.pause() }
 		try reconcile()
@@ -79,6 +92,14 @@ enum HomeEngine {
 			throw failure
 		}
 	}
+	static func grant_allowance(key: String, minutes: Int) throws {
+		try transaction { state in
+			guard state.enabled, let policy = state.document?.home_allowance else { throw DocumentError.invalid("Enable a home allowance before adding screen time.") }
+			state.ledger.reset_if_needed(policy: policy, now: .now)
+			_ = try state.ledger.grant(key, minutes: minutes)
+		}
+		try reconcile()
+	}
 	static func clock_changed() throws { try reconcile() }
 	static func reached(_ event: DeviceActivityEvent.Name, activity: DeviceActivityName) throws {
 		guard activity.rawValue.hasPrefix(prefix + "meter."), let minutes = Int(event.rawValue) else { return }
@@ -94,7 +115,7 @@ enum HomeEngine {
 		let prepared = try transaction { state -> (HomeState, Bool) in
 			guard state.enabled, let policy = state.document?.home_allowance else { state.ledger.pause(); return (state, false) }
 			state.ledger.reset_if_needed(policy: policy, now: .now)
-			guard state.at_home, policy.allows(at: .now), state.ledger.used_minutes < (policy.rule(at: .now)?.allowance_minutes ?? 0) else { state.ledger.pause(); return (state, false) }
+			guard state.at_home, policy.allows(at: .now), state.ledger.used_minutes < state.ledger.budget(policy.rule(at: .now)?.allowance_minutes ?? 0) else { state.ledger.pause(); return (state, false) }
 			let start = state.ledger.generation == nil
 			if start { state.ledger.generation = UUID().uuidString; state.ledger.segment_base = state.ledger.used_minutes }
 			return (state, start)
@@ -103,13 +124,17 @@ enum HomeEngine {
 		let stale = center.activities.filter { $0.rawValue.hasPrefix(prefix + "meter.") && $0.rawValue != prefix + "meter." + (state.ledger.generation ?? "") }
 		if !stale.isEmpty { center.stopMonitoring(stale) }
 		guard state.enabled, state.at_home, let document = state.document, let policy = document.home_allowance else { shield.clearAllSettings(); return }
-		guard let generation = state.ledger.generation else { try SharedStore().apply_plan(for: document.id, to: shield); return }
+		guard let generation = state.ledger.generation else {
+			// No meter running: either the minutes are spent inside a window (block) or we are outside every window (leave the apps alone).
+			if policy.allows(at: .now) || policy.blocks_outside { try SharedStore().apply_plan(for: document.id, to: shield) } else { shield.clearAllSettings() }
+			return
+		}
 		if prepared.1 {
 			do {
 				let shared = try SharedStore()
 				let selection = try shared.resolved_selection(for: document.id, plan: shared.plan(for: document.id))
 				guard SharedStore.count(selection) > 0 else { throw DocumentError.invalid("Choose your distraction apps first.") }
-				let remaining = (policy.rule(at: .now)?.allowance_minutes ?? 0) - state.ledger.used_minutes
+				let remaining = state.ledger.budget(policy.rule(at: .now)?.allowance_minutes ?? 0) - state.ledger.used_minutes
 				guard remaining > 0 else { try transaction { $0.ledger.pause() }; try reconcile(); return }
 				var events: [DeviceActivityEvent.Name: DeviceActivityEvent] = [:]
 				for minute in 1...remaining {

@@ -14,6 +14,9 @@ struct ProgressSnapshot: Codable, Equatable {
 // One focus session at a time, device-wide. The session remembers which tool started it so the timer shows in the right place.
 @MainActor
 final class SessionController: ObservableObject {
+	// One controller for the app and for the Live Activity's End intent, which arrives outside the SwiftUI tree.
+	static let shared = SessionController()
+
 	@Published private(set) var session: FocusSession?
 	@Published private(set) var progress: [String: ProgressSnapshot] = [:]
 	@Published var error_message: String?
@@ -163,7 +166,7 @@ final class SessionController: ObservableObject {
 
 	// The emergency exit: every shield this app has ever applied comes off. Returns the standing routines that were switched off.
 	func clear_everything() async -> [String] {
-		do { try await HomeWorker.run { try HomeEngine.disable() } } catch { report(error) }
+		do { try await HomeWorker.run { try HomeEngine.disable(); try BuilderAppRules.clear() } } catch { report(error) }
 		stop()
 		let ids = (try? SharedStore().standing_ids()) ?? []
 		for id in ids { release_standing(id); _ = try? SharedStore().set_standing(id, enabled: false) }
@@ -215,6 +218,7 @@ final class SessionController: ObservableObject {
 				try await notifications.add(UNNotificationRequest(identifier: notification_id, content: content, trigger: trigger))
 			}
 			session = record
+			HomeScreenBridge.start_activity(for: document, session: record)
 		} catch {
 			if let activity = scheduled_activity { center.stopMonitoring([activity]) }
 			ManagedSettingsStore(named: SharedStore.settings_name).clearAllSettings()
@@ -236,6 +240,7 @@ final class SessionController: ObservableObject {
 			shared.clear_session()
 		} catch { report(error) }
 		session = nil
+		HomeScreenBridge.end_activity()
 	}
 
 	func refresh() {
@@ -251,6 +256,7 @@ final class SessionController: ObservableObject {
 				center.stopMonitoring(center.activities.filter { $0.rawValue.hasPrefix("pocketwork.") })
 				shared.clear_session()
 				session = nil
+				HomeScreenBridge.end_activity()
 			}
 		} catch {
 			// Runs on launch and every foreground; an alert here would greet the user before they did anything, so log and fail safe instead.

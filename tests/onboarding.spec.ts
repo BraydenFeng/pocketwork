@@ -42,14 +42,15 @@ test("existing native blocks open settings instead of appearing disabled", async
 	await seed_library(page, [starter_document]);
 	await page.goto(STARTER_URL);
 	await page.getByRole("button", { name: "Try it", exact: true }).click();
-	await page.getByRole("button", { name: "Edit Focus timer", exact: true }).click();
+	await page.getByRole("button", { name: "Edit Timer", exact: true }).click();
 	await expect(page.getByLabel("Session length")).toBeVisible();
 	await expect(page.getByRole("button", { name: "Edit", exact: true })).toHaveAttribute("aria-pressed", "true");
 	await expect(page.locator(".block-outline li")).toHaveCount(4);
 	await page.getByRole("button", { name: "Edit Screen Time", exact: true }).click();
 	await expect(page.getByText("Your selection stays on your phone.")).toBeVisible();
-	await page.getByRole("tab", { name: "Rules", exact: true }).click();
-	await page.getByRole("button", { name: "Test these rules", exact: true }).click();
+	await page.getByRole("tab", { name: "Logic", exact: true }).click();
+	await page.getByRole("tab", { name: "Page", exact: true }).click();
+	await page.getByRole("button", { name: "Try it", exact: true }).click();
 	await expect(page.getByRole("button", { name: "Start focusing", exact: true })).toBeEnabled();
 });
 
@@ -70,7 +71,7 @@ test("narrow layouts take block selection to settings and back to preview", asyn
 	for (const width of [768, 375]) {
 		await page.setViewportSize({ width, height: 900 });
 		await page.goto(STARTER_URL);
-		await page.getByRole("button", { name: "Edit Focus timer", exact: true }).click();
+		await page.getByRole("button", { name: "Edit Timer", exact: true }).click();
 		await expect(page.getByRole("complementary", { name: "Inspector", exact: true })).toBeFocused();
 		await expect(page.getByRole("button", { name: "Back to preview", exact: true })).toBeInViewport();
 		await page.getByRole("button", { name: "Back to preview", exact: true }).click();

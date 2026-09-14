@@ -1,4 +1,8 @@
 :root {
+	--logic-library: 192px;
+	--logic-inspector: 264px;
+	--logic-stage: 580px;
+	--logic-port: 28px;
 	--s-1: 4px;
 	--s-2: 8px;
 	--s-3: 12px;

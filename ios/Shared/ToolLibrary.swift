@@ -62,6 +62,18 @@ struct ToolLibrary: Codable, Equatable {
 
 	func find(_ id: String) -> AppDocument? { tools.first(where: { $0.document.id == id })?.document }
 
+	// Home allowances used to block outside their windows; nobody could choose otherwise, so existing ones move to the new default once.
+	func migrated() -> ToolLibrary {
+		var next = self
+		next.tools = tools.map { entry in
+			guard var policy = entry.document.home_allowance, policy.outside_windows == "block_at_home" else { return entry }
+			policy.outside_windows = "unrestricted"
+			var document = entry.document; document.home_allowance = policy
+			return LibraryEntry(document: document, updated_at: entry.updated_at)
+		}
+		return next
+	}
+
 	func group(named name: String) -> AppGroup? { (groups ?? []).first { $0.name.lowercased() == name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() } }
 	func group(id: String) -> AppGroup? { (groups ?? []).first { $0.id == id } }
 	func routines_using(group name: String) -> [AppDocument] { tools.map(\.document).filter { $0.referenced_groups.contains { $0.lowercased() == name.lowercased() } } }
