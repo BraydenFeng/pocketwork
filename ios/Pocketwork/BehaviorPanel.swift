@@ -9,6 +9,9 @@ struct BehaviorPanel: View {
 	@EnvironmentObject private var sessions: SessionController
 	@EnvironmentObject private var home: HomeLocationController
 	@Environment(\.scenePhase) private var scene_phase
+	@StateObject private var health = HealthInputs()
+	@State private var reconcile_actions = true
+	@State private var groups_open = false
 	@State private var state = BehaviorState()
 	@State private var outputs: [String: [String: BehaviorSignal]] = [:]
 	@State private var messages: [String] = []
@@ -30,13 +33,23 @@ struct BehaviorPanel: View {
 					Button("Allow location detection") { home.allow_background() }.buttonStyle(TextButtonStyle())
 					Text(home.status).supporting()
 				}
+				if graph.nodes.contains(where: { $0.kind == "health" }) {
+					HStack { Button("Allow Health access") { Task { await health.refresh(graph.nodes.filter { $0.kind == "health" }.map { $0.config.metric ?? "steps" }, authorize: true); await run() } }; Button("Refresh health") { Task { await health.refresh(graph.nodes.filter { $0.kind == "health" }.map { $0.config.metric ?? "steps" }); await run() } } }.buttonStyle(TextButtonStyle()).disabled(health.busy)
+					if let message = health.message { Text(message).supporting() }
+				}
+				if graph.nodes.contains(where: { $0.kind == "app_gate" }) {
+					HStack { Button("Choose app groups") { groups_open = true }; Button("Allow Screen Time") { Task { _ = await sessions.authorize_screen_time() } } }.buttonStyle(TextButtonStyle())
+					Text("Gates update while this routine is open. An open gate releases only its own restrictions.").supporting()
+				}
 				ForEach(graph.nodes) { node in
 					if node.kind == "button" || node.kind == "check_in" { Button(node.config.label.isEmpty ? node.kind : node.config.label) { Task { await run(tap: node.id) } }.buttonStyle(QuietButtonStyle()).disabled(paused || busy).accessibilityIdentifier("behavior." + node.id) }
 					else if ["count","streak","variable","goal"].contains(node.kind) { HStack { Text(node.config.label).heading_font(15); Spacer(); Text(display(node)).supporting() } }
+					else { BuilderNodeView(node: node, state: state.data, outputs: outputs[node.id] ?? [:], input: { value in Task { await run(inputs: [node.id: value]) } }, submit: { values in Task { await run(submission: BuilderSubmission(node: node.id, values: values)) } }).disabled(busy) }
 				}
 				ForEach(Array(messages.enumerated()), id: \.offset) { _, message in Text(message).supporting() }
 				if let error { Text(error).foregroundStyle(Theme.danger).font(.system(size: 13)) }
-			}.onAppear { load(graph); Task { await run() } }
+			}.onAppear { load(graph); Task { if graph.nodes.contains(where: { $0.kind == "health" }) { await health.refresh(graph.nodes.filter { $0.kind == "health" }.map { $0.config.metric ?? "steps" }) }; await run() } }
+			.sheet(isPresented: $groups_open) { NavigationStack { GroupsView().toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { groups_open = false; reconcile_actions = true } } } } }
 			.onChange(of: graph) { _, next in load(next) }
 			.onChange(of: library.behavior_owner_key) { _, _ in load(graph) }
 			.onReceive(clock) { _ in if scene_phase == .active && !paused { Task { await run() } } }
@@ -48,22 +61,23 @@ struct BehaviorPanel: View {
 	}
 	private func load(_ graph: BehaviorGraph) {
 		do {
-			state = BehaviorState(); outputs = [:]; messages = []; error = nil
+			state = BehaviorState(); paused = false; reconcile_actions = true; outputs = [:]; messages = []; error = nil
 			if let data = UserDefaults.standard.data(forKey: storage_key) { let saved = try JSONDecoder().decode(SavedBehaviors.self, from: data); state = saved.state; state.reconcile(from: saved.graph, to: graph) }
 			// A stale location from a previous visit is not a new boundary crossing.
 			state.at_location = nil
 		} catch { self.error = "Could not load behavior progress: " + error.localizedDescription; paused = true }
 	}
-	@MainActor private func run(tap: String? = nil) async {
-		guard let graph = document.behaviors, !busy, !paused else { return }
+	@MainActor private func run(tap: String? = nil, inputs: [String: BuilderValue] = [:], submission: BuilderSubmission? = nil) async {
+		guard let graph = document.behaviors, !busy, !paused || tap != nil || !inputs.isEmpty || submission != nil else { return }; paused = false
 		busy = true; defer { busy = false }
 		let key = storage_key
 		do {
 			let now = Date(); let testing = CommandLine.arguments.contains("--ui-testing")
 			var used: Double?
+			var allowance: Int?
 			if !testing && (document.home_allowance != nil || graph.nodes.contains(where: { $0.kind == "app_usage" })) {
 				let snapshot = try await HomeWorker.run { try HomeEngine.snapshot() }
-				if let policy = snapshot.document?.home_allowance { used = snapshot.ledger.day == policy.day_key(now) ? Double(snapshot.ledger.used_minutes) : 0 }
+				if let policy = snapshot.document?.home_allowance { used = snapshot.ledger.day == policy.day_key(now) ? Double(snapshot.ledger.used_minutes) : 0; let base = policy.rule(at: now)?.allowance_minutes ?? 0; allowance = snapshot.ledger.day == policy.day_key(now) ? snapshot.ledger.budget(base) : base }
 			}
 			guard key == storage_key else { return }
 			if let session = sessions.session, session.document_id == document.id { timer_end = session.ends_at }
@@ -79,11 +93,22 @@ struct BehaviorPanel: View {
 				external["home-condition"] = ["present":signal(location == true,String(location == true))]
 				external["home-condition"]?["present"]?.available = location != nil
 				external["usage-meter"] = ["used":BehaviorSignal(value: used ?? 0, token: String(used ?? 0), type: "number", available: used != nil)]
-				let reached = used.map { $0 >= Double(document.home_allowance?.rule(at: now)?.allowance_minutes ?? 0) } ?? false
+				let reached = used.map { $0 >= Double(allowance ?? 0) } ?? false
 				external["daily-allowance"] = ["reached":signal(reached,String(reached))]
 				external["daily-allowance"]?["reached"]?.available = used != nil
 			}
-			let result = try BehaviorRuntime.run(graph, state: state, context: BehaviorContext(now: now, at_location: location, usage_minutes: used, tap: tap, external: external))
+			let result = try BehaviorRuntime.run(graph, state: state, context: BehaviorContext(now: now, at_location: location, usage_minutes: used, tap: tap, external: external, inputs: inputs, submission: submission, health: health.values, reconcile_actions: reconcile_actions))
+			if !testing {
+				let id = document.id, groups = library.groups, active_nodes = Set(graph.nodes.filter { $0.kind == "app_gate" }.map(\.id)), reconcile = reconcile_actions
+				try await HomeWorker.run {
+					if reconcile { try BuilderAppRules.prune(document: id, nodes: active_nodes) }
+					for action in result.actions {
+						if action.kind == "app_gate" { try BuilderAppRules.set(document: id, node: action.id, active: action.active == true, names: action.groups ?? [], groups: groups) }
+						else { try HomeEngine.grant_allowance(key: id + "." + action.id, minutes: Int(action.minutes ?? 0)) }
+					}
+				}
+			}
+			reconcile_actions = false
 			let data = try JSONEncoder().encode(SavedBehaviors(graph: graph, state: result.state))
 			UserDefaults.standard.set(data, forKey: key)
 			state = result.state; outputs = result.signals; messages = Array((messages + result.messages.map(\.message)).suffix(8)); error = nil

@@ -163,7 +163,7 @@ final class SessionController: ObservableObject {
 
 	// The emergency exit: every shield this app has ever applied comes off. Returns the standing routines that were switched off.
 	func clear_everything() async -> [String] {
-		do { try await HomeWorker.run { try HomeEngine.disable() } } catch { report(error) }
+		do { try await HomeWorker.run { try HomeEngine.disable(); try BuilderAppRules.clear() } } catch { report(error) }
 		stop()
 		let ids = (try? SharedStore().standing_ids()) ?? []
 		for id in ids { release_standing(id); _ = try? SharedStore().set_standing(id, enabled: false) }

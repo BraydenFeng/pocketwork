@@ -79,6 +79,14 @@ enum HomeEngine {
 			throw failure
 		}
 	}
+	static func grant_allowance(key: String, minutes: Int) throws {
+		try transaction { state in
+			guard state.enabled, let policy = state.document?.home_allowance else { throw DocumentError.invalid("Enable a home allowance before adding screen time.") }
+			state.ledger.reset_if_needed(policy: policy, now: .now)
+			_ = try state.ledger.grant(key, minutes: minutes)
+		}
+		try reconcile()
+	}
 	static func clock_changed() throws { try reconcile() }
 	static func reached(_ event: DeviceActivityEvent.Name, activity: DeviceActivityName) throws {
 		guard activity.rawValue.hasPrefix(prefix + "meter."), let minutes = Int(event.rawValue) else { return }
@@ -94,7 +102,7 @@ enum HomeEngine {
 		let prepared = try transaction { state -> (HomeState, Bool) in
 			guard state.enabled, let policy = state.document?.home_allowance else { state.ledger.pause(); return (state, false) }
 			state.ledger.reset_if_needed(policy: policy, now: .now)
-			guard state.at_home, policy.allows(at: .now), state.ledger.used_minutes < (policy.rule(at: .now)?.allowance_minutes ?? 0) else { state.ledger.pause(); return (state, false) }
+			guard state.at_home, policy.allows(at: .now), state.ledger.used_minutes < state.ledger.budget(policy.rule(at: .now)?.allowance_minutes ?? 0) else { state.ledger.pause(); return (state, false) }
 			let start = state.ledger.generation == nil
 			if start { state.ledger.generation = UUID().uuidString; state.ledger.segment_base = state.ledger.used_minutes }
 			return (state, start)
@@ -109,7 +117,7 @@ enum HomeEngine {
 				let shared = try SharedStore()
 				let selection = try shared.resolved_selection(for: document.id, plan: shared.plan(for: document.id))
 				guard SharedStore.count(selection) > 0 else { throw DocumentError.invalid("Choose your distraction apps first.") }
-				let remaining = (policy.rule(at: .now)?.allowance_minutes ?? 0) - state.ledger.used_minutes
+				let remaining = state.ledger.budget(policy.rule(at: .now)?.allowance_minutes ?? 0) - state.ledger.used_minutes
 				guard remaining > 0 else { try transaction { $0.ledger.pause() }; try reconcile(); return }
 				var events: [DeviceActivityEvent.Name: DeviceActivityEvent] = [:]
 				for minute in 1...remaining {

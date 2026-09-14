@@ -9,8 +9,8 @@ struct LogicItem: Equatable, Identifiable {
 	var policy: HomePolicy?
 	var config: BehaviorConfig?
 	var title: String { config?.label.isEmpty == false ? config!.label : block?.title ?? LogicEditing.title(kind) }
-	var inputs: [String: String] { BehaviorGraph.ports[kind]?.inputs ?? LogicEditing.legacy_ports[kind]?.inputs ?? [:] }
-	var outputs: [String: String] { BehaviorGraph.ports[kind]?.outputs ?? LogicEditing.legacy_ports[kind]?.outputs ?? [:] }
+	var inputs: [String: String] { BehaviorGraph.ports[kind] != nil ? BehaviorGraph.node_ports(kind, config).inputs : LogicEditing.legacy_ports[kind]?.inputs ?? [:] }
+	var outputs: [String: String] { BehaviorGraph.ports[kind] != nil ? BehaviorGraph.node_ports(kind, config).outputs : LogicEditing.legacy_ports[kind]?.outputs ?? [:] }
 	var height: Double { 78 + Double(max(inputs.count, outputs.count)) * 44 }
 }
 
@@ -25,12 +25,14 @@ struct LogicEditing: Equatable {
 		"notification": (["finished":"boolean"], [:])
 	]
 	static let sections: [(title: String, kinds: [String])] = [
+		("Inputs", ["number_input", "text_input", "checkbox", "form", "health"]),
 		("Time & location", ["timer", "schedule", "clock", "location", "arrive", "leave", "delay"]),
-		("Data", ["variable", "count", "streak", "usage", "app_usage", "allowance"]),
-		("Logic", ["compare", "and", "or", "not", "branch", "goal"]),
-		("Actions", ["button", "check_in", "apps", "notification", "reminder"])
+		("Data", ["variable", "count", "streak", "usage", "app_usage", "allowance", "save_entry", "aggregate"]),
+		("Logic", ["compare", "and", "or", "not", "branch", "goal", "calculate", "text_compare"]),
+		("Actions", ["button", "check_in", "apps", "notification", "reminder", "app_gate", "add_allowance"]),
+		("Display", ["table", "chart", "progress"])
 	]
-	static let names = ["timer":"Timer", "schedule":"Time window", "home":"At location", "location":"At location", "usage":"Count usage", "allowance":"Daily allowance", "apps":"Control apps", "notification":"Notify me", "button":"Button", "check_in":"Check in", "arrive":"Arrive", "leave":"Leave", "clock":"At a time", "app_usage":"App usage", "and":"All conditions", "or":"Any condition", "not":"Not", "branch":"Branch", "delay":"Delay", "variable":"Variable", "count":"Counter", "compare":"Compare", "goal":"Goal", "streak":"Streak", "reminder":"Reminder"]
+	static let names = ["timer":"Timer", "schedule":"Time window", "home":"At location", "location":"At location", "usage":"Count usage", "allowance":"Daily allowance", "apps":"Control apps", "notification":"Notify me", "button":"Button", "check_in":"Check in", "arrive":"Arrive", "leave":"Leave", "clock":"At a time", "app_usage":"App usage", "and":"All conditions", "or":"Any condition", "not":"Not", "branch":"Branch", "delay":"Delay", "variable":"Variable", "count":"Counter", "compare":"Compare", "goal":"Goal", "streak":"Streak", "reminder":"Reminder"].merging(BuilderRuntime.names) { first, _ in first }
 	static func title(_ kind: String) -> String { names[kind] ?? kind }
 	static let supported: Set<String> = ["timer.active>apps.gate", "timer.finished>notification.finished", "schedule.active>apps.gate", "home.present>usage.home", "schedule.active>usage.window", "usage.used>allowance.used", "allowance.reached>apps.gate", "home.present>apps.home", "schedule.outside>apps.outside"]
 

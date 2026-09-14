@@ -21,3 +21,6 @@ ios/screenshots/
 *.p8
 
 .signing/
+
+# Local paperwork, never source
+*.pdf

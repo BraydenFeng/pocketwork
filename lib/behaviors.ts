@@ -1,8 +1,11 @@
 import { z } from "zod";
+import { builder_kinds, builder_catalog, builder_config_fields, builder_node, form_fields, type PortType, type Scalar, type Entry, type BuilderState, type BuilderAction } from "./builder-blocks";
+export type { PortType } from "./builder-blocks";
 
-export const behavior_kinds = ["location", "button", "check_in", "arrive", "leave", "clock", "app_usage", "and", "or", "not", "branch", "delay", "variable", "count", "compare", "goal", "streak", "reminder"] as const;
+export const behavior_kinds = ["location", "button", "check_in", "arrive", "leave", "clock", "app_usage", "and", "or", "not", "branch", "delay", "variable", "count", "compare", "goal", "streak", "reminder", ...builder_kinds] as const;
 export type BehaviorKind = typeof behavior_kinds[number];
 export const behavior_config_schema = z.object({
+	...builder_config_fields,
 	label: z.string().max(80).default(""), value: z.number().finite().min(-1000000).max(1000000).default(1),
 	minutes: z.number().min(1).max(1440).default(5), time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default("18:00"),
 	days: z.array(z.number().int().min(1).max(7)).min(1).max(7).default([1,2,3,4,5,6,7]),
@@ -14,8 +17,8 @@ export const edge_schema = z.object({ from: z.string(), output: z.string(), to: 
 export const behaviors_schema = z.object({ nodes: z.array(behavior_node_schema).max(48), connections: z.array(edge_schema).max(128) }).strict();
 export type Behaviors = z.infer<typeof behaviors_schema>;
 export type BehaviorNode = Behaviors["nodes"][number];
-type PortType = "boolean" | "number";
 export const behavior_catalog: Record<BehaviorKind, { title: string; detail: string; category: string; inputs: Record<string, PortType>; outputs: Record<string, PortType> }> = {
+	...builder_catalog,
 	location: { title: "At location", detail: "Inside the saved place on your phone", category: "Triggers", inputs: {}, outputs: { present: "boolean", away: "boolean" } },
 	button: { title: "Button", detail: "Run a connection with one tap", category: "Triggers", inputs: {}, outputs: { pressed: "boolean" } },
 	check_in: { title: "Check-in", detail: "Record showing up", category: "Accountability", inputs: {}, outputs: { done: "boolean" } },
@@ -35,6 +38,10 @@ export const behavior_catalog: Record<BehaviorKind, { title: string; detail: str
 	streak: { title: "Streak", detail: "Consecutive days checked in", category: "Accountability", inputs: { check_in: "boolean" }, outputs: { days: "number" } },
 	reminder: { title: "Reminder", detail: "Show a message when triggered", category: "Actions", inputs: { send: "boolean" }, outputs: { sent: "boolean" } },
 };
+export function behavior_ports(node: Pick<BehaviorNode, "kind" | "config">) {
+	const ports = behavior_catalog[node.kind];
+	return node.kind === "form" ? { inputs: ports.inputs, outputs: { ...ports.outputs, ...Object.fromEntries(form_fields(node as BehaviorNode).map(f => [f.id, f.type])) } as Record<string, PortType> } : ports;
+}
 export function is_behavior(kind: string): kind is BehaviorKind { return Object.hasOwn(behavior_catalog, kind); }
 export function behavior_order(graph: Behaviors, external: Record<string, Record<string, PortType>>, require_inputs = false): BehaviorNode[] {
 	const ids = new Set(graph.nodes.map(n => n.id));
@@ -42,14 +49,14 @@ export function behavior_order(graph: Behaviors, external: Record<string, Record
 	const occupied = new Set<string>();
 	for (const edge of graph.connections) {
 		const from = graph.nodes.find(n => n.id === edge.from); const to = graph.nodes.find(n => n.id === edge.to);
-		const output = from ? behavior_catalog[from.kind].outputs[edge.output] : external[edge.from]?.[edge.output];
-		if (!to || !output || output !== behavior_catalog[to.kind].inputs[edge.input]) { throw new Error("These ports do not match. Connect the same value type."); }
+		const output = from ? behavior_ports(from).outputs[edge.output] : external[edge.from]?.[edge.output];
+		if (!to || !output || output !== behavior_ports(to).inputs[edge.input]) { throw new Error("These ports do not match. Connect the same value type."); }
 		const input = `${edge.to}.${edge.input}`;
 		if (occupied.has(input)) { throw new Error("This input is already connected."); } occupied.add(input);
 	}
 	if (require_inputs) {
-		for (const node of graph.nodes) { for (const port of Object.keys(behavior_catalog[node.kind].inputs)) {
-			if ((node.kind === "variable" && port === "set") || (node.kind === "count" && port === "reset")) { continue; }
+		for (const node of graph.nodes) { for (const port of Object.keys(behavior_ports(node).inputs)) {
+			if ((node.kind === "variable" && port === "set") || (node.kind === "count" && port === "reset") || (node.kind === "save_entry" && port === "clear")) { continue; }
 			if (!occupied.has(`${node.id}.${port}`)) { throw new Error(`Connect ${behavior_catalog[node.kind].title}'s ${port} input first.`); }
 		} }
 	}
@@ -61,14 +68,15 @@ export function behavior_order(graph: Behaviors, external: Record<string, Record
 	}
 	return ordered;
 }
-export type Signal = { value: number | boolean; token: string; available?: boolean };
-export type BehaviorState = { values: Record<string, number>; fired: Record<string, string>; days: Record<string, string>; pending: { id: string; at: number; token: string }[]; sequence: number; at_location?: boolean };
-export type BehaviorContext = { now: number; at_location?: boolean; usage_minutes?: number; tap?: string; external?: Record<string, Record<string, Signal>> };
+export type Signal = { value: Scalar | Record<string, Scalar> | Entry[]; token: string; available?: boolean };
+export type BehaviorState = { values: Record<string, number>; fired: Record<string, string>; days: Record<string, string>; pending: { id: string; at: number; token: string }[]; sequence: number; data?: BuilderState; at_location?: boolean };
+export type BehaviorContext = { now: number; at_location?: boolean; usage_minutes?: number; tap?: string; inputs?: Record<string, Scalar>; submission?: { node: string; values: Record<string, Scalar> }; health?: Record<string, number>; reconcile_actions?: boolean; external?: Record<string, Record<string, Signal>> };
 export function initial_behaviors(): BehaviorState { return { values: {}, fired: {}, days: {}, pending: [], sequence: 0 }; }
 export function run_behaviors(graph: Behaviors, previous: BehaviorState, context: BehaviorContext) {
 	const state = structuredClone(previous); state.sequence += 1;
 	const signals: Record<string, Record<string, Signal>> = { ...context.external };
 	const effects: { id: string; message: string }[] = [];
+	const actions: BuilderAction[] = [];
 	const external_types = Object.fromEntries(Object.entries(context.external ?? {}).map(([id, ports]) => [id, Object.fromEntries(Object.entries(ports).map(([name, signal]) => [name, typeof signal.value as PortType]))]));
 	const ordered = behavior_order(graph, external_types, true);
 	const date = new Date(context.now); const day = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
@@ -78,10 +86,10 @@ export function run_behaviors(graph: Behaviors, previous: BehaviorState, context
 	for (const node of ordered) {
 		const c = node.config; const out: Record<string, Signal> = {}; signals[node.id] = out;
 		const input = (port: string): Signal => { const edge = graph.connections.find(e => e.to === node.id && e.input === port); return edge ? signals[edge.from]?.[edge.output] ?? { value: false, token: "" } : { value: false, token: "" }; };
-		const emit = (port: string, value: boolean | number, token = String(value)) => { out[port] = { value, token }; };
+		const emit = (port: string, value: Signal["value"], token = String(value)) => { out[port] = typeof value === "number" && (!Number.isFinite(value) || Math.abs(value) > 1000000) ? { value: 0, token, available: false } : { value, token }; };
 		const once = (port: string) => { const signal = input(port); const key = `${node.id}.${port}`; if (!signal.value) { delete state.fired[key]; return false; } if (state.fired[key] === signal.token) { return false; } state.fired[key] = signal.token; return true; };
 		const pulse = String(state.sequence);
-		if (node.kind !== "variable" && graph.connections.some(e => e.to === node.id && signals[e.from]?.[e.output]?.available === false)) { for (const [port,type] of Object.entries(behavior_catalog[node.kind].outputs)) { out[port] = { value: type === "number" ? 0 : false, token: "", available: false }; } continue; }
+		if (node.kind !== "variable" && graph.connections.some(e => e.to === node.id && signals[e.from]?.[e.output]?.available === false)) { for (const [port,type] of Object.entries(behavior_ports(node).outputs)) { out[port] = { value: type === "number" ? 0 : false, token: "", available: false }; } continue; }
 		switch (node.kind) {
 			case "location": emit("present", context.at_location === true); emit("away", context.at_location === false); for (const port of Object.keys(out)) { out[port].available = context.at_location !== undefined; } break;
 			case "button": emit("pressed", context.tap === node.id, pulse); break;
@@ -99,8 +107,12 @@ export function run_behaviors(graph: Behaviors, previous: BehaviorState, context
 			case "compare": case "goal": { const value = Number(input("value").value); const result = node.kind === "goal" || c.operator === "gte" ? value >= c.value : c.operator === "gt" ? value > c.value : c.operator === "eq" ? value === c.value : c.operator === "lt" ? value < c.value : value <= c.value; emit(node.kind === "goal" ? "reached" : "result", result); break; }
 			case "streak": if (once("check_in") && state.days[node.id] !== day) { state.values[node.id] = state.days[node.id] === yesterday ? (state.values[node.id] ?? 0)+1 : 1; state.days[node.id] = day; } emit("days", state.days[node.id] === day || state.days[node.id] === yesterday ? state.values[node.id] ?? 0 : 0); break;
 			case "reminder": { const send = once("send"); if (send) { effects.push({ id: node.id, message: c.message }); } emit("sent", send, pulse); break; }
+			default: builder_node(node, state, context, input, emit, once, actions, day); break;
 		}
+		if (node.kind === "health") { out.value.available = context.health?.[c.metric ?? "steps"] !== undefined; }
+		if (node.kind === "form" && !state.data?.forms[node.id]) { for (const [port, signal] of Object.entries(out)) { if (port !== "submitted") { signal.available = false; } } }
+		if (node.kind === "calculate" && c.operation === "divide" && Number(input("b").value) === 0) { out.value.available = false; }
 	}
 	state.at_location = context.at_location;
-	return { state, signals, effects };
+	return { state, signals, effects, actions };
 }

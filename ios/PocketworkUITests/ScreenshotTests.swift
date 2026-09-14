@@ -157,8 +157,12 @@ final class ScreenshotTests: XCTestCase {
 		XCTAssertTrue(app.staticTexts["2 blocks · 1 connections"].waitForExistence(timeout: 10))
 		app.buttons["Find a block"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap(); app.buttons["Reminder"].tap()
 		try snap("13-native-logic-find-block")
-		XCTAssertTrue(app.buttons["Edit Reminder"].isHittable)
-		app.buttons["Edit Reminder"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+		// Find a block scrolls the canvas to the node with animation; wait until the node's button has settled on screen before tapping.
+		let edit_reminder = app.buttons["Edit Reminder"]
+		XCTAssertTrue(edit_reminder.waitForExistence(timeout: 10))
+		let settled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: edit_reminder)
+		XCTAssertEqual(XCTWaiter().wait(for: [settled], timeout: 10), .completed, "Edit Reminder never became hittable after Find a block")
+		edit_reminder.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
 		let name = app.textFields["logic.label"]
 		XCTAssertTrue(name.waitForExistence(timeout: 10)); name.tap(); name.typeText(" edited")
 		app.buttons["Done"].tap()

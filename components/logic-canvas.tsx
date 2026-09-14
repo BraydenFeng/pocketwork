@@ -3,21 +3,24 @@
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { ArrowRight, Check, CircleHelp, GripVertical, Plus, RotateCcw, Trash2, Workflow, ZoomIn, ZoomOut } from "lucide-react";
 import { behavior_catalog, is_behavior } from "@/lib/behaviors";
+import { BuilderSettings } from "./builder-settings";
 import { BehaviorRunner } from "./behavior-runner";
 import type { HomePolicy } from "@/lib/home-policy";
 import type { AppDocument, Block } from "@/lib/document";
-import { compile_graph, connect, connection_key, graph_from_document, make_node, node_catalog, node_height, NODE_WIDTH, PORT_GAP, PORT_TOP, type Connection, type LogicGraph, type LogicNode, type NodeKind } from "@/lib/logic-graph";
+import { compile_graph, connect, connection_key, graph_from_document, make_node, node_catalog, node_ports, node_height, NODE_WIDTH, PORT_GAP, PORT_TOP, type Connection, type LogicGraph, type LogicNode, type NodeKind } from "@/lib/logic-graph";
 import { Button, SectionLabel, TextField } from "./ui";
 
 const library_sections: { title: string; kinds: NodeKind[] }[] = [
+	{ title: "Inputs", kinds: ["number_input", "text_input", "checkbox", "form", "health"] },
 	{ title: "Time & location", kinds: ["timer", "schedule", "clock", "location", "arrive", "leave", "delay"] },
-	{ title: "Data", kinds: ["variable", "count", "streak", "usage", "app_usage", "allowance"] },
-	{ title: "Logic", kinds: ["compare", "and", "or", "not", "branch", "goal"] },
-	{ title: "Actions", kinds: ["button", "check_in", "apps", "notification", "reminder"] },
+	{ title: "Data", kinds: ["variable", "count", "streak", "usage", "app_usage", "allowance", "save_entry", "aggregate"] },
+	{ title: "Logic", kinds: ["compare", "and", "or", "not", "branch", "goal", "calculate", "text_compare"] },
+	{ title: "Actions", kinds: ["button", "check_in", "apps", "notification", "reminder", "app_gate", "add_allowance"] },
+	{ title: "Display", kinds: ["table", "chart", "progress"] },
 ];
 const day_names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 function message(error: unknown): string { return error instanceof Error ? error.message : "Could not update this graph."; }
-function port_point(node: LogicNode, port: string, output: boolean) { return { x: node.x + (output ? NODE_WIDTH : 0), y: node.y + PORT_TOP + (output ? node_catalog[node.kind].outputs : node_catalog[node.kind].inputs).indexOf(port) * PORT_GAP }; }
+function port_point(node: LogicNode, port: string, output: boolean) { return { x: node.x + (output ? NODE_WIDTH : 0), y: node.y + PORT_TOP + (output ? node_ports(node).outputs : node_ports(node).inputs).indexOf(port) * PORT_GAP }; }
 function curve(a: { x: number; y: number }, b: { x: number; y: number }) { const bend = Math.max(60, Math.abs(b.x - a.x) / 2); return `M ${a.x} ${a.y} C ${a.x + bend} ${a.y}, ${b.x - bend} ${b.y}, ${b.x} ${b.y}`; }
 
 export function LogicCanvas({ document, on_change, disabled = false, on_dirty_change }: { document: AppDocument; on_change: (document: AppDocument) => void; disabled?: boolean; on_dirty_change?: (dirty: boolean) => void }) {
@@ -95,7 +98,7 @@ export function LogicCanvas({ document, on_change, disabled = false, on_dirty_ch
 				{graph.nodes.map((item) => <g key={item.id} className={`logic-node ${selected === item.id ? "is-selected" : ""}`} transform={`translate(${item.x},${item.y})`} data-node-id={item.id}>
 					<rect className="logic-node-shell" width={NODE_WIDTH} height={node_height(item)} rx="10" />
 					<foreignObject x="12" y="8" width={NODE_WIDTH - 24} height="80"><button type="button" className="logic-node-heading" onPointerDown={(event) => start_drag(event, item)} onClick={() => set_selected(item.id)} aria-label={`Configure ${node_catalog[item.kind].title}`}><span><GripVertical /><strong>{item.config?.label || node_catalog[item.kind].title}</strong></span><small>{item.kind === "timer" && item.block?.type === "timer" ? `${item.block.minutes} minutes` : item.kind === "apps" && item.block?.type === "screen_time" ? item.block.groups?.join(", ") || "Choose apps on iPhone" : node_catalog[item.kind].detail}</small></button></foreignObject>
-					{([false, true] as const).flatMap((output) => (output ? node_catalog[item.kind].outputs : node_catalog[item.kind].inputs).map((port, index) => <g key={`${output}-${port}`} className={`logic-port ${pending?.id === item.id && pending.port === port && output ? "is-active" : ""}`} role="button" tabIndex={0} aria-label={`${node_catalog[item.kind].title} ${output ? "output" : "input"} ${port}`} onPointerDown={(event) => { event.stopPropagation(); if (output) { set_pending({ id: item.id, port }); set_cursor(port_point(item, port, true)); } }} onPointerUp={() => { if (!output) { input(item.id, port); } }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); if (output) { set_pending({ id: item.id, port }); set_cursor(port_point(item, port, true)); } else { input(item.id, port); } } }}>
+					{([false, true] as const).flatMap((output) => (output ? node_ports(item).outputs : node_ports(item).inputs).map((port, index) => <g key={`${output}-${port}`} className={`logic-port ${pending?.id === item.id && pending.port === port && output ? "is-active" : ""}`} role="button" tabIndex={0} aria-label={`${node_catalog[item.kind].title} ${output ? "output" : "input"} ${port}`} onPointerDown={(event) => { event.stopPropagation(); if (output) { set_pending({ id: item.id, port }); set_cursor(port_point(item, port, true)); } }} onPointerUp={() => { if (!output) { input(item.id, port); } }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); if (output) { set_pending({ id: item.id, port }); set_cursor(port_point(item, port, true)); } else { input(item.id, port); } } }}>
 						<circle className="logic-port-hit" cx={output ? NODE_WIDTH : 0} cy={PORT_TOP + index * PORT_GAP} r="14" /><circle cx={output ? NODE_WIDTH : 0} cy={PORT_TOP + index * PORT_GAP} r="5" /><text x={output ? NODE_WIDTH - 14 : 14} y={PORT_TOP + index * PORT_GAP + 4} textAnchor={output ? "end" : "start"}>{port}</text>
 					</g>))}
 				</g>)}
@@ -146,6 +149,7 @@ function BehaviorSettings({ node, update }: { node: LogicNode; update: (node: Lo
 	const config = node.config!;
 	const patch = (next: Partial<typeof config>) => update({ ...node, config: { ...config, ...next } });
 	return <>
+		<BuilderSettings node={node} patch={patch} />
 		<label>Name<input value={config.label} onChange={event => patch({ label: event.target.value })} maxLength={80} /></label>
 		{["variable", "count", "goal", "compare", "app_usage"].includes(node.kind) && <label>{node.kind === "count" ? "Increase by" : node.kind === "variable" ? "Initial value" : "Target value"}<input type="number" value={config.value} onChange={event => patch({ value: Number(event.target.value) })} /></label>}
 		{node.kind === "delay" && <label>Wait (minutes)<input type="number" min="1" max="1440" value={config.minutes} onChange={event => patch({ minutes: Number(event.target.value) })} /></label>}

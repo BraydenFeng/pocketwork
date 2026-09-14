@@ -61,5 +61,5 @@ struct HomeAllowanceView: View {
 		.sheet(item: $picking_group) { group in AppGroupSelectionSheet(group: group) }
 	}
 
-	private func refresh() { guard !ui_testing else { return }; Task { do { let state = try await HomeWorker.run { try HomeEngine.snapshot() }; let used = state.ledger.day == document.home_allowance?.day_key(.now) ? state.ledger.used_minutes : 0; remaining = max(0, (document.home_allowance?.rule(at: .now)?.allowance_minutes ?? 0) - used) } catch { sessions.report(error) } } }
+	private func refresh() { guard !ui_testing else { return }; Task { do { let state = try await HomeWorker.run { try HomeEngine.snapshot() }; let used = state.ledger.day == document.home_allowance?.day_key(.now) ? state.ledger.used_minutes : 0; let base = document.home_allowance?.rule(at: .now)?.allowance_minutes ?? 0; let budget = state.ledger.day == document.home_allowance?.day_key(.now) ? state.ledger.budget(base) : base; remaining = max(0, budget - used) } catch { sessions.report(error) } } }
 }

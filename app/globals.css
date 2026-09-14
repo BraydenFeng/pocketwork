@@ -440,3 +440,17 @@ kbd { font: inherit; font-size: var(--t-micro); padding-inline: var(--s-1); bord
 }
 
 .logic-runtime-note { margin: 0; padding: var(--s-2) var(--s-4); background: var(--c-surface); color: var(--c-text-faint); font-size: var(--t-small); }
+
+.builder-controls { display: grid; gap: var(--s-4); }
+.builder-controls form, .builder-fields > div { display: grid; gap: var(--s-3); padding: var(--s-4); border: var(--hairline); border-radius: var(--r-1); }
+.builder-controls label, .builder-fields { display: grid; gap: var(--s-2); }
+.builder-controls input { min-height: var(--control-h); border: var(--hairline); background: var(--c-surface); color: var(--c-text); padding: var(--s-2); }
+.builder-controls input[type="checkbox"] { min-height: auto; }
+.builder-controls progress { display: block; width: 100%; accent-color: var(--c-accent); }
+.builder-data { margin: 0; padding: var(--s-4); border: var(--hairline); }
+.builder-data figcaption { font-weight: var(--w-semi); margin-bottom: var(--s-3); }
+.builder-data svg { width: 100%; max-height: var(--w-rail); }
+.builder-data polyline { fill: none; stroke: var(--c-accent); stroke-width: 2; }
+.builder-table { overflow-x: auto; }
+.builder-table table { width: 100%; border-collapse: collapse; font-size: var(--t-small); }
+.builder-table th, .builder-table td { text-align: left; padding: var(--s-2); border-bottom: var(--hairline); }

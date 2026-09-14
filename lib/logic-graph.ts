@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { behavior_catalog, behavior_config_schema, behavior_kinds, behavior_order, behaviors_schema, is_behavior, type BehaviorConfig, type BehaviorKind, type Behaviors } from "./behaviors";
+import { behavior_ports, behavior_catalog, behavior_config_schema, behavior_kinds, behavior_order, behaviors_schema, is_behavior, type BehaviorConfig, type BehaviorKind, type Behaviors } from "./behaviors";
 import { home_policy_schema } from "./home-policy";
 import { block_schema, create_block, document_schema, type AppDocument, type Block } from "./document";
 import type { HomePolicy } from "./home-policy";
@@ -31,7 +31,8 @@ const supported = new Set([
 	"allowance.reached>apps.gate", "home.present>apps.home", "schedule.outside>apps.outside",
 ]);
 export function connection_key(edge: Connection): string { return `${edge.from}.${edge.output}>${edge.to}.${edge.input}`; }
-export function node_height(node: LogicNode): number { return PORT_TOP + Math.max(node_catalog[node.kind].inputs.length, node_catalog[node.kind].outputs.length) * PORT_GAP + 16; }
+export function node_ports(node: LogicNode) { if (is_behavior(node.kind)) { const ports = behavior_ports({ kind: node.kind, config: node.config ?? behavior_config_schema.parse({}) }); return { inputs: Object.keys(ports.inputs), outputs: Object.keys(ports.outputs) }; } return node_catalog[node.kind]; }
+export function node_height(node: LogicNode): number { const ports = node_ports(node); return PORT_TOP + Math.max(ports.inputs.length, ports.outputs.length) * PORT_GAP + 16; }
 export function make_node(kind: NodeKind, x = 48, y = 48): LogicNode {
 	if (is_behavior(kind)) { return { id: crypto.randomUUID(), kind, x, y, config: behavior_config_schema.parse({ label: behavior_catalog[kind].title }) }; }
 	const block = kind === "timer" || kind === "schedule" ? create_block(kind) : kind === "apps" ? create_block("screen_time") : undefined;
@@ -43,8 +44,8 @@ export function connect(graph: LogicGraph, edge: Connection): LogicGraph {
 	const to = graph.nodes.find((node) => node.id === edge.to);
 	if (!from || !to) { throw new Error("Both ends of the connection need a node."); }
 	if (is_behavior(to.kind)) {
-		const output = is_behavior(from.kind) ? behavior_catalog[from.kind].outputs[edge.output] : legacy_ports(from)[edge.output];
-		if (!output || output !== behavior_catalog[to.kind].inputs[edge.input]) { throw new Error("These ports do not match. Connect the same value type."); }
+		const output = is_behavior(from.kind) ? behavior_ports({ kind: from.kind, config: from.config ?? behavior_config_schema.parse({}) }).outputs[edge.output] : legacy_ports(from)[edge.output];
+		if (!output || output !== behavior_ports({ kind: to.kind, config: to.config ?? behavior_config_schema.parse({}) }).inputs[edge.input]) { throw new Error("These ports do not match. Connect the same value type."); }
 	} else if (!supported.has(`${from.kind}.${edge.output}>${to.kind}.${edge.input}`)) { throw new Error("These ports do not match. Choose a compatible input."); }
 	if (graph.connections.some((item) => item.to === edge.to && item.input === edge.input)) { throw new Error("This input is already connected. Remove its connection first."); }
 	const result = { ...graph, connections: [...graph.connections, edge] };

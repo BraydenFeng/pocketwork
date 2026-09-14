@@ -35,9 +35,16 @@ struct HomeLedger: Codable, Equatable {
 	var used_minutes = 0
 	var segment_base = 0
 	var generation: String?
+	var bonuses: [String: Int]?
 	mutating func reset_if_needed(policy: HomePolicy, now: Date) {
 		let today = policy.day_key(now)
-		if day != today { day = today; used_minutes = 0; segment_base = 0; generation = nil }
+		if day != today { day = today; used_minutes = 0; segment_base = 0; generation = nil; bonuses = [:] }
+	}
+	func budget(_ base: Int) -> Int { min(1440, base + (bonuses ?? [:]).values.reduce(0,+)) }
+	mutating func grant(_ key: String, minutes: Int) throws -> Bool {
+		guard (1...1440).contains(minutes) else { throw DocumentError.invalid("Choose 1 to 1440 bonus minutes.") }
+		if bonuses?[key] != nil { return false }
+		if bonuses == nil { bonuses = [:] }; bonuses?[key] = minutes; pause(); return true
 	}
 	mutating func checkpoint(generation: String, minutes: Int, at_home: Bool) {
 		guard at_home, self.generation == generation, minutes > 0 else { return }
