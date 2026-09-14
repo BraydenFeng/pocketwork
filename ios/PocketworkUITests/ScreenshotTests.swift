@@ -138,9 +138,10 @@ final class ScreenshotTests: XCTestCase {
 			element("logic.add.\(kind)").tap()
 			XCTAssertTrue(app.navigationBars["Logic"].waitForExistence(timeout: 10))
 		}
-		app.buttons["Find a block"].tap(); app.buttons["Button"].tap()
+		try snap("12-native-logic-before-connect")
+		app.buttons["Find a block"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap(); app.buttons["Button"].tap()
 		let source = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@", "logic.port.", ".pressed")).firstMatch
-		XCTAssertTrue(source.waitForExistence(timeout: 10)); source.tap()
+		XCTAssertTrue(source.waitForExistence(timeout: 10)); XCTAssertTrue(source.isHittable); source.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
 		XCTAssertTrue(app.navigationBars["Connect blocks"].waitForExistence(timeout: 10))
 		let connection = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@", "logic.connect.", ".send")).firstMatch
 		XCTAssertTrue(connection.waitForExistence(timeout: 10)); connection.tap()
@@ -154,8 +155,9 @@ final class ScreenshotTests: XCTestCase {
 		XCTAssertTrue(app.staticTexts["Time for your routine."].waitForExistence(timeout: 10))
 		app.buttons["tool.edit"].tap(); element("editor.logic").tap()
 		XCTAssertTrue(app.staticTexts["2 blocks · 1 connections"].waitForExistence(timeout: 10))
-		app.buttons["Find a block"].tap(); app.buttons["Reminder"].tap()
-		app.buttons["Edit Reminder"].tap()
+		app.buttons["Find a block"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap(); app.buttons["Reminder"].tap()
+		XCTAssertTrue(app.buttons["Edit Reminder"].isHittable)
+		app.buttons["Edit Reminder"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
 		let name = app.textFields["logic.label"]
 		XCTAssertTrue(name.waitForExistence(timeout: 10)); name.tap(); name.typeText(" edited")
 		app.buttons["Done"].tap()
