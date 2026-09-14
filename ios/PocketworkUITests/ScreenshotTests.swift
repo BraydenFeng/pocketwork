@@ -102,10 +102,11 @@ final class ScreenshotTests: XCTestCase {
 		let item = app.buttons["editor.logic"]
 		if !item.waitForExistence(timeout: 2) {
 			let menus = app.navigationBars.buttons.matching(NSPredicate(format: "label == %@ OR identifier == %@", "More", "ellipsis"))
-			(menus.count > 0 ? menus.element(boundBy: menus.count - 1) : app.navigationBars.buttons.element(boundBy: app.navigationBars.buttons.count - 1)).tap()
+			// Toolbar buttons cannot be scrolled into view; tap the menu by its coordinates instead of letting XCTest try.
+			(menus.count > 0 ? menus.element(boundBy: menus.count - 1) : app.navigationBars.buttons.element(boundBy: app.navigationBars.buttons.count - 1)).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
 			XCTAssertTrue(item.waitForExistence(timeout: 10), "Advanced logic menu item")
 		}
-		item.tap()
+		item.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
 	}
 
 	// SwiftUI exposes list rows and toolbar items as different element types; a typed query per kind stays fast.
