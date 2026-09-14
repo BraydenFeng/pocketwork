@@ -156,6 +156,7 @@ final class ScreenshotTests: XCTestCase {
 		app.buttons["tool.edit"].tap(); element("editor.logic").tap()
 		XCTAssertTrue(app.staticTexts["2 blocks · 1 connections"].waitForExistence(timeout: 10))
 		app.buttons["Find a block"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap(); app.buttons["Reminder"].tap()
+		try snap("13-native-logic-find-block")
 		XCTAssertTrue(app.buttons["Edit Reminder"].isHittable)
 		app.buttons["Edit Reminder"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
 		let name = app.textFields["logic.label"]

@@ -74,7 +74,9 @@ struct LogicEditorView: View {
 							context.stroke(path, with: .color(Theme.accent.opacity(0.65)), lineWidth: 2)
 						}
 					}.allowsHitTesting(false).accessibilityHidden(true)
-					ForEach(graph.nodes) { node in card(node).frame(width: 248, height: node.height).offset(x: position(node).x, y: position(node).y).id(node.id) }
+					LogicNodeLayout(origins: graph.nodes.map { position($0) }, heights: graph.nodes.map { CGFloat($0.height) }, size: CGSize(width: CGFloat(width), height: CGFloat(height))) {
+						ForEach(graph.nodes) { node in card(node).frame(width: 248, height: node.height).id(node.id) }
+					}
 				}.frame(width: width, height: height, alignment: .topLeading)
 					.scaleEffect(zoom, anchor: .topLeading).frame(width: width * zoom, height: height * zoom, alignment: .topLeading)
 			}.background {
@@ -246,4 +248,18 @@ private struct LogicAllowanceSettings: View {
 		}
 	}
 	private func change(_ index: Int, _ edit: (inout HomeDayRule) -> Void) { if policy.rules.indices.contains(index) { edit(&policy.rules[index]) } }
+}
+
+// Give each card a real layout position so ScrollViewReader can reveal its controls.
+private struct LogicNodeLayout: Layout {
+	var origins: [CGPoint]
+	var heights: [CGFloat]
+	var size: CGSize
+	func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize { size }
+	func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+		for index in subviews.indices where origins.indices.contains(index) && heights.indices.contains(index) {
+			let origin = origins[index]
+			subviews[index].place(at: CGPoint(x: bounds.minX + origin.x, y: bounds.minY + origin.y), anchor: .topLeading, proposal: ProposedViewSize(width: 248, height: heights[index]))
+		}
+	}
 }
