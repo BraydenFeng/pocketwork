@@ -73,11 +73,13 @@ final class LogicEditingTests: XCTestCase {
 		XCTAssertEqual(empty.blocks, base.blocks)
 	}
 	func testEveryBehaviorCanBeAddedAndPositionsDoNotOverlap() throws {
+		// The catalog grows over time; what matters is that every kind can be added once and none of them land on top of each other.
 		var graph = LogicEditing(document: .blank())
-		for kind in BehaviorGraph.ports.keys.sorted() { _ = try graph.add(kind) }
-		XCTAssertEqual(graph.nodes.count, 18)
+		let kinds = BehaviorGraph.ports.keys.sorted()
+		for kind in kinds { _ = try graph.add(kind) }
+		XCTAssertEqual(graph.nodes.count, kinds.count)
 		for (index, node) in graph.nodes.enumerated() { for other in graph.nodes.dropFirst(index + 1) { XCTAssertTrue(abs(node.x - other.x) >= 280 || abs(node.y - other.y) >= 220) } }
-		for _ in 18..<48 { _ = try graph.add("button") }
+		for _ in kinds.count..<48 { _ = try graph.add("button") }
 		XCTAssertThrowsError(try graph.add("button"))
 	}
 }
