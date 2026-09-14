@@ -29,6 +29,8 @@ struct PocketworkApp: App {
 	var body: some Scene {
 		WindowGroup {
 			HomeView()
+				// The workbench palette is light-only (like the web editor); without this, dark mode turns system-drawn text white on the light cards.
+				.preferredColorScheme(.light)
 				.environmentObject(library)
 				.environmentObject(sessions)
 				.environmentObject(cloud)

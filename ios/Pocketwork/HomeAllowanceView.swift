@@ -25,10 +25,15 @@ struct HomeAllowanceView: View {
 					ForEach(Array(policy.rules.enumerated()), id: \.offset) { index, rule in
 						Card { if editor.active {
 							HomeRuleEditor(rule: Binding(get: { editor.draft?.home_allowance?.rules[index] ?? rule }, set: { editor.draft?.home_allowance?.rules[index] = $0 }))
-						} else { VStack(alignment: .leading, spacing: 6) {
-							Text(rule.days.map { days[$0] }.joined(separator: ", ") + " · \(rule.allowance_minutes) min total").heading_font(15)
-							Text(rule.windows.map { "\($0.start)–\($0.end)" }.joined(separator: " and ")).supporting()
-						} } }
+						} else { Button { editor.begin(document) } label: { HStack {
+							VStack(alignment: .leading, spacing: 6) {
+								Text(rule.days.map { days[$0] }.joined(separator: ", ") + " · \(rule.allowance_minutes) min total").heading_font(15)
+								Text(rule.windows.map { "\($0.start)–\($0.end)" }.joined(separator: " and ")).supporting()
+								Text("Tap to change the minutes or windows").font(.system(size: 11)).foregroundStyle(Theme.text_faint)
+							}
+							Spacer()
+							Image(systemName: "pencil").foregroundStyle(Theme.text_faint)
+						}.contentShape(Rectangle()) }.buttonStyle(.plain).disabled(sessions.is_busy) } }
 					}
 				}
 				Group {
