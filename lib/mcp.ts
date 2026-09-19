@@ -5,11 +5,14 @@ import { empty_library, upsert_tool, delete_tool } from "./library";
 import { fetch_library, push_library, type Account, type Cloud } from "./cloud";
 import { compile_graph, graph_from_document, graph_schema, node_catalog } from "./logic-graph";
 import { personal_routine } from "./personal-routine";
+import { fetch_status, render_history_png, summarize_status } from "./status";
 
 const object = { type: "object", properties: {}, additionalProperties: false };
 export const mcp_tools = [
 	{ name: "get_routine_graph", description: "Read a routine as connected native-capability nodes, with its current document for safe editing.", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"], additionalProperties: false }, annotations: { readOnlyHint: true } },
 	{ name: "save_routine_graph", description: "Validate and apply connected logic to a routine. Supply the unmodified base_document from get_routine_graph to prevent overwriting newer edits. Node positions are temporary; executable connections sync to iPhone. Supports the native capabilities from get_capabilities, not arbitrary code.", inputSchema: { type: "object", properties: { base_document: { type: "object" }, graph: z.toJSONSchema(graph_schema) }, required: ["base_document", "graph"], additionalProperties: false }, annotations: { destructiveHint: false, idempotentHint: true } },
+	{ name: "get_status", description: "What the phone last reported: running session, home allowance minutes left today, which routines are switched on, and a 30-day history. Requires Share status to be on in the iPhone app. Minute counts only; never app identities.", inputSchema: object, annotations: { readOnlyHint: true } },
+	{ name: "render_status_chart", description: "A PNG bar chart of the last 14 days (allowance minutes used against budget, or focus minutes), with the same status summary as text.", inputSchema: object, annotations: { readOnlyHint: true } },
 	{ name: "list_routines", description: "Read your saved routine library. App selections and home coordinates stay on the phone.", inputSchema: object, annotations: { readOnlyHint: true } },
 	{ name: "get_capabilities", description: "Read routine format and enforcement limits before designing a routine.", inputSchema: object, annotations: { readOnlyHint: true } },
 	{ name: "save_routine", description: "Create or update a validated routine in this account. Requires a supplied routine document. Never executes code.", inputSchema: { type: "object", properties: { document: { type: "object" } }, required: ["document"], additionalProperties: false }, annotations: { destructiveHint: false, idempotentHint: true } },
@@ -18,6 +21,14 @@ export const mcp_tools = [
 ];
 function content(value: unknown) { return { content: [{ type: "text", text: JSON.stringify(value) }] }; }
 export async function call_mcp_tool(cloud: Cloud, account: Account, name: string, args: unknown) {
+	if (name === "get_status" || name === "render_status_chart") {
+		const found = await fetch_status(cloud, account);
+		if (!found) { return { content: [{ type: "text", text: "The phone has not shared any status. In Pocketwork on iPhone, open Account & sync and switch on Share status with your agents, then open the app once." }] }; }
+		const summary = summarize_status(found.status, Date.now());
+		if (name === "get_status") { return { content: [{ type: "text", text: summary }, { type: "text", text: JSON.stringify(found.status) }] }; }
+		const chart = render_history_png(found.status);
+		return { content: [{ type: "text", text: `${summary} ${chart.caption}` }, { type: "image", data: chart.png.toString("base64"), mimeType: "image/png" }] };
+	}
 	if (name === "get_capabilities") { return content({ graph_schema: z.toJSONSchema(graph_schema), graph_nodes: node_catalog, behaviors: behavior_catalog, execution: "New behaviors require the format-3 phone update. They run while the routine is open, including location transitions and allowance-meter usage. Existing Screen Time enforcement remains background capable. Browser Test logic simulates events. Progress is device-local; no AI API is used.", document_schema: z.toJSONSchema(document_schema, { unrepresentable: "any" }), home_allowance: "One home allowance per phone, daily shared windows, home-only whole-minute usage checkpoints; a final partial minute may be lost at departure. Home geofence is 150 m and OS callbacks may be delayed. Phone setup/permissions required. Cloud changes apply when the phone app opens." }); }
 	if (name === "get_routine_graph") {
 		const { id } = z.object({ id: z.string() }).strict().parse(args);

@@ -69,6 +69,10 @@ The existing Supabase libraries table and RLS policies work without another migr
 
 Add com.braydenfeng.pocketwork://auth/callback to Supabase Authentication redirect URLs. iOS reads SupabaseURL and SupabaseAnonKey from build settings, supplied by the manual TestFlight workflow from the same public client settings as the website. No service-role key is bundled. Local iOS builds need SUPABASE_URL and SUPABASE_ANON_KEY build settings.
 
+## Phone status for agents (optional)
+
+Off by default. In the iPhone app, Account & sync → **Share status with your agents** uploads a small report to your account whenever the phone syncs or a session starts or ends: which routines are switched on, a running session's end time, home allowance minutes used and left today, and a 30-day history of allowance and focus minutes. Minute counts only; never app identities or locations. It lives in `routine_status` (one row per user, `supabase/schema.sql`) under the same row-level security as the library, and switching the setting off deletes the row. The MCP gains `get_status` (summary sentence plus the JSON) and `render_status_chart` (the same summary plus a PNG of the last 14 days). The web cards show the phone's line when a report exists. Freshness is "as of the phone's last sync"; the background meter does not upload on its own.
+
 ## Home allowance and MCP
 
 The personal seed is available at `http://127.0.0.1:3210/?seed=home` after signing in. It calls the authenticated `seed_home_allowance` MCP tool, preserves an existing routine with the same ID, and starts disabled. The user must install the new TestFlight build, set home while physically there, allow Always location access, choose the Distractions apps, and enable the allowance. Routine format 2 prevents older builds from silently ignoring the home requirement.

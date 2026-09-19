@@ -13,6 +13,9 @@ struct AccountView: View {
 						Button("Sync now") { Task { await cloud.sync() } }.buttonStyle(QuietButtonStyle())
 						Button("Sign out") { cloud.sign_out() }.buttonStyle(TextButtonStyle())
 					}
+					Hairline()
+					ToggleRow(title: "Share status with your agents", description: cloud.share_status ? (cloud.status_shared_at.map { "Minutes left, running sessions, and a 30-day history. Last shared \($0.formatted(date: .omitted, time: .shortened))." } ?? "Minutes left, running sessions, and a 30-day history.") : "Off. Usage stays on this iPhone.", is_on: $cloud.share_status)
+						.accessibilityIdentifier("account.share-status")
 				} else {
 					HStack {
 						Button("Sign in with Apple") { cloud.sign_in(provider: "apple") }.buttonStyle(PrimaryButtonStyle())

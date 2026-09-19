@@ -32,3 +32,33 @@ $$;
 drop trigger if exists libraries_touch_updated_at on public.libraries;
 create trigger libraries_touch_updated_at before update on public.libraries
 	for each row execute function public.touch_updated_at();
+
+-- Optional status the phone shares when the person opts in: running state, minutes left today, a 30-day history.
+-- Minute counts only; never app identities or locations. One row per user, replaced on every report.
+create table if not exists public.routine_status (
+	user_id uuid primary key references auth.users (id) on delete cascade,
+	status jsonb not null,
+	updated_at timestamptz not null default now()
+);
+
+alter table public.routine_status enable row level security;
+
+drop policy if exists "people read their own status" on public.routine_status;
+create policy "people read their own status" on public.routine_status
+	for select using (auth.uid() = user_id);
+
+drop policy if exists "people write their own status" on public.routine_status;
+create policy "people write their own status" on public.routine_status
+	for insert with check (auth.uid() = user_id);
+
+drop policy if exists "people update their own status" on public.routine_status;
+create policy "people update their own status" on public.routine_status
+	for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "people delete their own status" on public.routine_status;
+create policy "people delete their own status" on public.routine_status
+	for delete using (auth.uid() = user_id);
+
+drop trigger if exists routine_status_touch_updated_at on public.routine_status;
+create trigger routine_status_touch_updated_at before update on public.routine_status
+	for each row execute function public.touch_updated_at();

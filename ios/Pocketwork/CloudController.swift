@@ -22,6 +22,9 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 	@Published private(set) var busy = false
 	@Published private(set) var status = "Sign in on both devices with the same account."
 	@Published var error_message: String?
+	@Published var share_status = StatusReporter.sharing { didSet { StatusReporter.sharing = share_status; Task { await publish_status(force: true) } } }
+	@Published private(set) var status_shared_at: Date?
+	private var last_report: StatusReport?
 	private var session: CloudSession?
 	private var web_session: ASWebAuthenticationSession?
 	private var syncing = false
@@ -177,10 +180,37 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 					} catch CloudConflict.changed { continue }
 				}
 				if merged != library.library { continue }
-				status = "Synced with your account"; error_message = nil; return
+				status = "Synced with your account"; error_message = nil
+				await publish_status()
+				return
 			}
 			throw DocumentError.invalid("Another device is saving. Pull to refresh to retry.")
 		} catch { status = "Saved on this iPhone · sync needs attention"; fail(error) }
+	}
+
+	private struct StatusRow: Encodable { let user_id: String; let status: StatusReport }
+
+	// Shares minute counts and running state with the account when the person has opted in. Silent when nothing changed.
+	func publish_status(force: Bool = false) async {
+		guard share_status, let credentials = session, let library else {
+			if !share_status, let credentials = session { await clear_status(credentials) }
+			return
+		}
+		let home = try? await HomeWorker.run { try HomeEngine.snapshot() }
+		let report = StatusReporter.build(library: library.library, session: sessions?.session, home: home)
+		var comparable = report; comparable.reported_at = ""
+		var previous = last_report; previous?.reported_at = ""
+		if !force, previous == comparable { return }
+		do {
+			_ = try await request("rest/v1/routine_status?on_conflict=user_id", method: "POST", body: JSONEncoder().encode(StatusRow(user_id: credentials.user.id, status: report)), token: credentials.access_token, prefer: "resolution=merge-duplicates,return=minimal")
+			last_report = report; status_shared_at = .now
+		} catch { fail(error) }
+	}
+
+	private func clear_status(_ credentials: CloudSession) async {
+		guard last_report != nil || status_shared_at != nil else { return }
+		do { _ = try await request("rest/v1/routine_status?user_id=eq." + credentials.user.id, method: "DELETE", token: credentials.access_token, prefer: "return=minimal"); last_report = nil; status_shared_at = nil }
+		catch { fail(error) }
 	}
 
 	private func fail(_ error: Error) { error_message = error.localizedDescription }

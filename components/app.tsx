@@ -5,6 +5,7 @@ import type { AppDocument } from "@/lib/document";
 import { connect_cloud, current_account, fetch_library, push_library, sign_in_with_google, sign_out, watch_account, type Account, type Cloud } from "@/lib/cloud";
 import { add_group, delete_tool, duplicate_tool, empty_library, find_tool, import_tool, load_library, remove_group, rename_group, save_library, upsert_tool, LIBRARY_KEY, library_schema, type Library } from "@/lib/library";
 import { merge_libraries, same_library } from "@/lib/sync";
+import { fetch_status, type StatusReport } from "@/lib/status";
 import { HomeAllowance } from "./home-allowance";
 import { Home } from "./home";
 import { Workbench } from "./workbench";
@@ -28,6 +29,8 @@ export function PocketworkApp() {
 	const [cloud, set_cloud] = useState<Cloud | null>(null);
 	const [account, set_account] = useState<Account | null>(null);
 	const [sync, set_sync] = useState<SyncState>("off");
+	// What the phone last shared, when the person has opted in there. Read-only on the web.
+	const [phone_status, set_phone_status] = useState<StatusReport | null>(null);
 	// Autosaves from the editor arrive in quick succession; the ref keeps each one building on the last.
 	const library_ref = useRef(library);
 	const account_ref = useRef(account);
@@ -98,7 +101,10 @@ export function PocketworkApp() {
 					if (account_ref.current?.id !== who.id) { return; }
 					last_pushed.current = JSON.stringify(merged);
 					if (!same_library(merged, library_ref.current)) { continue; }
-					set_sync("synced"); return;
+					set_sync("synced");
+					try { const found = await fetch_status(connection, who); if (account_ref.current?.id === who.id) { set_phone_status(found?.status ?? null); } }
+					catch (failure) { console.warn(error_message(failure)); }
+					return;
 				}
 			}
 			throw new Error("Your other device is saving changes. Sync will retry shortly.");
@@ -250,7 +256,7 @@ export function PocketworkApp() {
 		return <Workbench key={open_tool.id} tool={open_tool} groups={library.groups ?? []} on_save={save_tool} on_back={() => navigate(null)} storage_blocked={storage_blocked} storage_error={error} on_replace_unreadable={replace_unreadable} on_dismiss_error={() => set_error(null)} sync={account ? sync : "off"} />;
 	}
 
-	return <Home library={library} now={Date.now()} error={error} notice={notice} storage_blocked={storage_blocked}
+	return <Home library={library} now={Date.now()} error={error} notice={notice} storage_blocked={storage_blocked} phone_status={account ? phone_status : null}
 		on_connect_agent={() => { void copy_agent_connection(); }} cloud_available={cloud !== null} account={account} sync={sync} on_sign_in={(provider) => { void start_sign_in(provider); }} on_sign_out={() => { void finish_sign_out(); }}
 		on_open={navigate} on_create={create_tool} on_delete={remove_tool} on_duplicate={copy_tool} on_import={add_imported} on_toggle={toggle_tool}
 		on_add_group={create_group} on_rename_group={change_group_name} on_remove_group={drop_group}

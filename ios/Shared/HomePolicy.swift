@@ -38,9 +38,25 @@ struct HomeLedger: Codable, Equatable {
 	var segment_base = 0
 	var generation: String?
 	var bonuses: [String: Int]?
+	// Past days' used/budget, keyed by day_key, so status reports can show a trend. Trimmed to StatusReport.history_days entries.
+	var history: [String: [Int]]?
 	mutating func reset_if_needed(policy: HomePolicy, now: Date) {
 		let today = policy.day_key(now)
-		if day != today { day = today; used_minutes = 0; segment_base = 0; generation = nil; bonuses = [:] }
+		if day != today {
+			if !day.isEmpty {
+				var past = history ?? [:]
+				past[day] = [used_minutes, budget(policy.rules.first { rule in rule.days.contains(HomeLedger.weekday(of: day, policy: policy)) }?.allowance_minutes ?? 0)]
+				if past.count > StatusReport.history_days { for key in past.keys.sorted().prefix(past.count - StatusReport.history_days) { past.removeValue(forKey: key) } }
+				history = past
+			}
+			day = today; used_minutes = 0; segment_base = 0; generation = nil; bonuses = [:]
+		}
+	}
+	// day_key is "YYYY-M-D"; recover its weekday so yesterday's budget is the right rule's.
+	static func weekday(of key: String, policy: HomePolicy) -> Int {
+		let parts = key.split(separator: "-").compactMap { Int($0) }
+		guard parts.count == 3, let date = policy.calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2])) else { return 0 }
+		return policy.calendar.component(.weekday, from: date)
 	}
 	func budget(_ base: Int) -> Int { min(1440, base + (bonuses ?? [:]).values.reduce(0,+)) }
 	mutating func grant(_ key: String, minutes: Int) throws -> Bool {

@@ -218,6 +218,7 @@ final class SessionController: ObservableObject {
 				try await notifications.add(UNNotificationRequest(identifier: notification_id, content: content, trigger: trigger))
 			}
 			session = record
+			UserDefaults.standard.set(now, forKey: started_key)
 			HomeScreenBridge.start_activity(for: document, session: record)
 		} catch {
 			if let activity = scheduled_activity { center.stopMonitoring([activity]) }
@@ -229,7 +230,20 @@ final class SessionController: ObservableObject {
 		}
 	}
 
+	// Sessions that finished or were ended are rolled up per day for the status report. The start time is kept in
+	// UserDefaults so a session that runs to its end while the app is closed is still measured correctly.
+	private let started_key = "session_started_at.v1"
+	private func record_session(_ running: FocusSession, ended_at: Date) {
+		guard let started = UserDefaults.standard.object(forKey: started_key) as? Date else { return }
+		UserDefaults.standard.removeObject(forKey: started_key)
+		let elapsed = max(0, Int(min(ended_at, running.ends_at).timeIntervalSince(started) / 60))
+		var history = SessionHistory.load(from: .standard)
+		history.record(minutes: elapsed, at: ended_at)
+		do { try history.save(to: .standard) } catch { logger.warning("Session history not saved: \(error.localizedDescription, privacy: .public)") }
+	}
+
 	func stop() {
+		if let running = session { record_session(running, ended_at: .now) }
 		ManagedSettingsStore(named: SharedStore.settings_name).clearAllSettings()
 		center.stopMonitoring(center.activities.filter { $0.rawValue.hasPrefix("pocketwork.") })
 		notifications.removePendingNotificationRequests(withIdentifiers: [notification_id])
@@ -254,6 +268,8 @@ final class SessionController: ObservableObject {
 			} else {
 				ManagedSettingsStore(named: SharedStore.settings_name).clearAllSettings()
 				center.stopMonitoring(center.activities.filter { $0.rawValue.hasPrefix("pocketwork.") })
+				// A session that ran to its end counts in full.
+				if let finished = stored ?? session, finished.has_ended(at: .now) { record_session(finished, ended_at: finished.ends_at) }
 				shared.clear_session()
 				session = nil
 				HomeScreenBridge.end_activity()
