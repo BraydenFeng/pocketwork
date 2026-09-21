@@ -1,5 +1,7 @@
 import { z } from "zod";
+import { behaviors_schema, behavior_order } from "./behaviors";
 import { home_policy_schema } from "./home-policy";
+import { requires_format_four } from "./primitives";
 
 const identifier = z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/);
 const short_text = z.string().trim().min(1).max(80);
@@ -30,8 +32,9 @@ function window_minutes(start: string, end: string): number {
 }
 
 export const document_schema = z.object({
-	schema_version: z.union([z.literal(1), z.literal(2)]),
+	schema_version: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
 	home_allowance: home_policy_schema.optional(),
+	behaviors: behaviors_schema.optional(),
 	id: identifier,
 	name: short_text,
 	description: z.string().max(200),
@@ -40,8 +43,16 @@ export const document_schema = z.object({
 	// Only meaningful for a standing routine: whether the person has switched it on.
 	enabled: z.boolean().optional(),
 }).strict().superRefine((document, context) => {
-	if ((document.schema_version === 2) !== Boolean(document.home_allowance)) { context.addIssue({ code: "custom", message: "Home allowances require routine format 2." }); }
+	if (document.schema_version < 3 && (document.schema_version === 2) !== Boolean(document.home_allowance)) { context.addIssue({ code: "custom", message: "Home allowances require routine format 2." }); }
 	if (document.home_allowance && (!document.blocks.some((b) => b.type === "schedule") || !document.rules.block_during_focus || !document.blocks.some((b) => b.type === "screen_time" && b.mode === "block" && b.groups?.length === 1))) { context.addIssue({ code: "custom", message: "Home allowances require a schedule and one distraction group in block mode." }); }
+	if ((document.schema_version >= 3) !== Boolean(document.behaviors)) { context.addIssue({ code: "custom", message: "Connected behaviors require routine format 3 or 4 and the updated phone app." }); }
+	if (document.behaviors && requires_format_four(document.behaviors) && document.schema_version !== 4) { context.addIssue({ code: "custom", message: "These building blocks require routine format 4 and a compatible phone update." }); }
+	if (document.behaviors) {
+		const ports: Record<string, Record<string, "boolean" | "number">> = {};
+		for (const block of document.blocks) { if (block.type === "timer") { ports[block.id] = { active: "boolean", finished: "boolean" }; } if (block.type === "schedule") { ports[block.id] = { active: "boolean", outside: "boolean" }; } }
+		if (document.home_allowance) { ports["home-condition"] = { present: "boolean" }; ports["usage-meter"] = { used: "number" }; ports["daily-allowance"] = { reached: "boolean" }; }
+		try { behavior_order(document.behaviors, ports, true); } catch (failure) { context.addIssue({ code: "custom", message: failure instanceof Error ? failure.message : "Invalid behavior connections." }); }
+	}
 	const ids = new Set<string>();
 	for (const block of document.blocks) {
 		for (const id of [block.id, ...(block.type === "checklist" ? block.items.map((item) => item.id) : [])]) {

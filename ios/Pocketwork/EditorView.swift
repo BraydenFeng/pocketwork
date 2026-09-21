@@ -19,7 +19,7 @@ struct EditorView: View {
 	}
 	struct KindOption: Identifiable { let kind: BlockKind; let label: String; let icon: String; var id: BlockKind { kind } }
 	static let kinds: [KindOption] = [
-		KindOption(kind: .heading, label: "Heading", icon: "textformat"), KindOption(kind: .timer, label: "Focus timer", icon: "timer"), KindOption(kind: .checklist, label: "Checklist", icon: "checklist"),
+		KindOption(kind: .heading, label: "Heading", icon: "textformat"), KindOption(kind: .timer, label: "Timer", icon: "timer"), KindOption(kind: .checklist, label: "Checklist", icon: "checklist"),
 		KindOption(kind: .counter, label: "Counter", icon: "number"), KindOption(kind: .note, label: "Note", icon: "note.text"), KindOption(kind: .screen_time, label: "Screen Time", icon: "shield"), KindOption(kind: .schedule, label: "Schedule", icon: "calendar")
 	]
 	var body: some View {
@@ -28,7 +28,7 @@ struct EditorView: View {
 				VStack(alignment: .leading, spacing: 24) {
 					VStack(alignment: .leading, spacing: 12) {
 						Image(systemName: "doc.text").font(.system(size: 28, weight: .light)).foregroundStyle(Theme.text_faint)
-						TextField("Untitled routine", text: $draft.name, axis: .vertical).font(.system(size: 30, weight: .semibold)).tracking(-0.6).foregroundStyle(Theme.text).accessibilityIdentifier("editor.name")
+						TextField("Untitled page", text: $draft.name, axis: .vertical).font(.system(size: 30, weight: .semibold)).tracking(-0.6).foregroundStyle(Theme.text).accessibilityIdentifier("editor.name")
 						TextField("Add a description…", text: $draft.description, axis: .vertical).font(.system(size: 14)).foregroundStyle(Theme.text_dim).accessibilityIdentifier("editor.description")
 					}
 					Hairline()
@@ -40,21 +40,21 @@ struct EditorView: View {
 				}
 				.padding(24).padding(.bottom, 24)
 			}.paper_page().scrollDismissesKeyboard(.interactively)
-			.navigationTitle(is_new ? "New routine" : "Edit routine").navigationBarTitleDisplayMode(.inline)
+			.navigationTitle(is_new ? "New page" : "Edit page").navigationBarTitleDisplayMode(.inline)
 			.toolbar {
 				ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(saving) }
+				ToolbarItem(placement: .topBarTrailing) { Menu { Button("Advanced logic…", systemImage: "point.3.connected.trianglepath.dotted") { showing_behavior = true }.accessibilityIdentifier("editor.logic") } label: { Image(systemName: "ellipsis") } }
 				ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.fontWeight(.semibold).foregroundStyle(Theme.accent).disabled(saving || sessions.is_busy) }
 			}
 			.safeAreaInset(edge: .bottom) {
 				EditorBar {
 					Button { showing_blocks = true } label: { Label("Add block", systemImage: "plus") }.buttonStyle(TextButtonStyle()).accessibilityIdentifier("editor.add-block")
 					Spacer()
-					Button { showing_behavior = true } label: { Label("Behavior", systemImage: "slider.horizontal.3") }.buttonStyle(TextButtonStyle())
 					if saving { ProgressView() }
 				}
 			}
-			.sheet(isPresented: $showing_blocks) { block_palette }
-			.sheet(isPresented: $showing_behavior) { behavior }
+			.sheet(isPresented: $showing_blocks) { BlockPalette(can_add: { draft.can_add($0) }, add: { add_block($0) }) }
+			.fullScreenCover(isPresented: $showing_behavior) { LogicEditorView(document: $draft) }
 			.interactiveDismissDisabled(saving)
 			.alert("Couldn’t save this routine", isPresented: Binding(get: { validation_message != nil }, set: { if !$0 { validation_message = nil } })) { Button("OK") { validation_message = nil } } message: { Text(validation_message ?? "") }
 		}
@@ -89,31 +89,6 @@ struct EditorView: View {
 		case .schedule: Text("\(block.start ?? "")–\(block.end ?? "") · \((block.days ?? []).count) days a week").supporting()
 		}
 	}
-	private var block_palette: some View {
-		NavigationStack {
-			ScrollView {
-				VStack(alignment: .leading, spacing: 0) {
-					Text("What would you like to add?").heading_font(22).padding(.vertical, 16)
-					ForEach(Self.kinds) { option in
-						Button { add_block(option.kind); showing_blocks = false } label: { DocumentRow(icon: option.icon) { Text(option.label).heading_font(16) } }.buttonStyle(.plain).disabled(!draft.can_add(option.kind)).accessibilityIdentifier("add.\(option.kind.rawValue)")
-						Hairline()
-					}
-				}.padding(24)
-			}.paper_page().navigationTitle("Add block").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showing_blocks = false } } }
-		}.presentationDetents([.medium, .large])
-	}
-	private var behavior: some View {
-		NavigationStack {
-			ScrollView {
-				VStack(alignment: .leading, spacing: 16) {
-					DocumentHeading(title: "How it works", subtitle: "Choose what happens when this routine runs.", icon: "slider.horizontal.3")
-					ToggleRow(title: draft.is_standing ? "Block on schedule" : "Block during focus", description: draft.has_engine && draft.has_screen_time ? "Uses your Screen Time block" : "Add a timer or schedule and a Screen Time block", is_on: $draft.rules.block_during_focus, disabled: !(draft.has_engine && draft.has_screen_time))
-					Hairline()
-					ToggleRow(title: "Notify when finished", description: "For routines with a focus timer", is_on: $draft.rules.notify_on_complete, disabled: !draft.has_timer)
-				}.padding(24)
-			}.paper_page().navigationTitle("Behavior").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showing_behavior = false } } }
-		}.presentationDetents([.medium, .large])
-	}
 	private func move(_ index: Int, by offset: Int) { let destination = index + offset; if draft.blocks.indices.contains(destination) { draft.blocks.swapAt(index, destination) } }
 	private func add_block(_ kind: BlockKind) {
 		guard draft.can_add(kind) else { return }
@@ -147,6 +122,7 @@ struct EditorView: View {
 struct BlockEditorView: View {
 	@Binding var block: BlockDocument
 	var groups: [AppGroup] = []
+	var embedded = false
 	@State private var new_group = ""
 	private static let minute_options = [15, 20, 25, 30, 45, 60, 90, 120]
 	private static let limit_options = [15, 30, 45, 60, 90, 120, 180]
@@ -154,7 +130,11 @@ struct BlockEditorView: View {
 	private static let modes = [ModeOption(mode: .block, label: "Block", hint: "Lock these groups"), ModeOption(mode: .allow_only, label: "Only these", hint: "Lock everything except these groups"), ModeOption(mode: .limit, label: "Limit", hint: "Lock after so many minutes")]
 
 	var body: some View {
-		ScrollView {
+		Group {
+			if embedded { fields } else { ScrollView { fields }.page().navigationTitle(EditorView.label(for: block.type)).navigationBarTitleDisplayMode(.inline) }
+		}
+	}
+	private var fields: some View {
 			VStack(alignment: .leading, spacing: 20) {
 				HStack(spacing: 12) {
 					Image(systemName: EditorView.icon(for: block.type)).frame(width: 36, height: 36).background(Theme.surface_hi, in: RoundedRectangle(cornerRadius: Theme.radius_small)).foregroundStyle(Theme.text_dim)
@@ -200,10 +180,6 @@ struct BlockEditorView: View {
 			}
 			.padding(Theme.pad)
 			.padding(.bottom, 24)
-		}
-		.page()
-		.navigationTitle(EditorView.label(for: block.type))
-		.navigationBarTitleDisplayMode(.inline)
 	}
 
 	// Horizontal chips, like the web's day picker, for picking one number from a short list.

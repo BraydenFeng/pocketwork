@@ -8,6 +8,7 @@
 		"build": "npm run verify:ui && next build",
 		"start": "next start --hostname 127.0.0.1 --port 3210",
 		"typecheck": "tsc --noEmit",
+		"check:release": "node tools/check-release.mjs",
 		"test": "vitest run",
 		"test:browser": "playwright test",
 		"verify:ui": "node tools/ui-lint.mjs \"app/**/*.{css,tsx}\" \"components/**/*.{css,tsx}\"",

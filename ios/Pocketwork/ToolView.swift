@@ -15,6 +15,7 @@ struct ToolView: View {
 	@State private var showing_picker = false
 	@State private var draft_selection = FamilyActivitySelection()
 	@State private var showing_groups = false
+	@State private var showing_palette = false
 	// UI tests freeze the clock; a view that redraws every second never lets XCUITest see the app as idle.
 	private static let frozen = CommandLine.arguments.contains("--ui-testing")
 	private let frozen = ToolView.frozen
@@ -29,8 +30,11 @@ struct ToolView: View {
 						HStack(spacing: 8) {
 							RoundedRectangle(cornerRadius: 3).fill(Theme.text).frame(width: 12, height: 12)
 							if editor.active {
-								TextField("Routine name", text: Binding(get: { editor.draft?.name ?? "" }, set: { editor.draft?.name = $0 })).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text_dim).accessibilityIdentifier("page.name")
-							} else { Text(document.name).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text_dim) }
+								TextField("Page name", text: Binding(get: { editor.draft?.name ?? "" }, set: { editor.draft?.name = $0 })).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text_dim).accessibilityIdentifier("page.name")
+							} else {
+								Button { begin_editing(document) } label: { HStack(spacing: 6) { Text(document.name).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text_dim); Image(systemName: "pencil").font(.system(size: 11)).foregroundStyle(Theme.text_faint) } }
+									.buttonStyle(.plain).disabled(!can_edit(document)).accessibilityLabel("Edit \(document.name)")
+							}
 						}
 						ForEach(document.blocks) { block in
 							if editor.active {
@@ -40,7 +44,14 @@ struct ToolView: View {
 										Button("Move down", systemImage: "arrow.down") { editor.move(block.id, by: 1) }.disabled(document.blocks.last?.id == block.id)
 										Button("Remove block", systemImage: "trash", role: .destructive) { editor.draft = editor.draft?.removing_block(block.id) }.disabled(document.blocks.count == 1)
 									}
+							} else if [.heading, .note, .schedule, .screen_time].contains(block.type) {
+								// Tapping a settings-only block opens the page for editing, like clicking into a Notion block.
+								block_view(block, in: document).contentShape(Rectangle()).onTapGesture { if can_edit(document) { begin_editing(document) } }
 							} else { block_view(block, in: document) }
+						}
+						if !editor.active, document.behaviors != nil { BehaviorPanel(document: document) }
+						if !editor.active, can_edit(document) {
+							Button { begin_editing(document) } label: { Label("Edit this page", systemImage: "pencil") }.buttonStyle(TextButtonStyle()).frame(minHeight: 44)
 						}
 						Text("Made for you. By you.").mono_caption().padding(.top, 8)
 					}
@@ -55,17 +66,20 @@ struct ToolView: View {
 				.toolbar {
 					ToolbarItem(placement: .topBarTrailing) {
 						if editor.active { Button("Save") { Task { await editor.save(library: library, sessions: sessions) } }.fontWeight(.semibold).foregroundStyle(Theme.accent).disabled(editor.saving || sessions.is_busy) }
-						else { Button("Edit") { editor.begin(document) }.disabled(sessions.is_running(document) || sessions.is_busy).accessibilityIdentifier("tool.edit") }
+						else { Button("Edit") { begin_editing(document) }.disabled(!can_edit(document)).accessibilityIdentifier("tool.edit") }
 					}
 					ToolbarItem(placement: .topBarTrailing) {
 						Menu {
 							Button("Reset checklist and counters", systemImage: "arrow.counterclockwise") { sessions.reset_progress(for: document) }
+							// The node canvas is for people who want it; the page itself is the editor.
+							Button("Advanced logic…", systemImage: "point.3.connected.trianglepath.dotted") { if !editor.active { begin_editing(document) }; showing_behavior = true }.disabled(!can_edit(document) && !editor.active).accessibilityIdentifier("editor.logic")
 							Button(role: .destructive) { clear_everything() } label: { Label("Clear all focus restrictions", systemImage: "lock.open") }.disabled(sessions.is_busy)
-						} label: { Image(systemName: "ellipsis") }.disabled(editor.active)
+						} label: { Image(systemName: "ellipsis") }
 					}
 				}
 				.safeAreaInset(edge: .bottom) { if editor.active { editing_bar } }
-				.sheet(isPresented: $showing_behavior) { behavior }
+				.sheet(isPresented: $showing_palette) { BlockPalette(can_add: { editor.draft?.can_add($0) == true }, add: { editor.add($0) }) }
+				.fullScreenCover(isPresented: $showing_behavior) { if let draft = editor.draft { LogicEditorView(document: Binding(get: { editor.draft ?? draft }, set: { editor.draft = $0 })) } }
 				.onAppear { if !opened { opened = true; if edit_on_open { editor.begin(document) } } }
 				.alert("Couldn’t save changes", isPresented: Binding(get: { editor.failure != nil }, set: { if !$0 { editor.failure = nil } })) { Button("OK") { editor.failure = nil } } message: { Text(editor.failure ?? "") }
 				.navigationDestination(isPresented: $showing_groups) { GroupsView() }
@@ -83,7 +97,7 @@ struct ToolView: View {
 				VStack(spacing: 12) {
 					Image(systemName: "square.stack.3d.up").font(.system(size: 28)).foregroundStyle(Theme.text_faint)
 					Text("This routine was deleted").heading_font(17)
-					Text("Go back to My routines to pick another.").supporting()
+					Text("Go back to My pages to pick another.").supporting()
 				}
 				.frame(maxWidth: .infinity, maxHeight: .infinity)
 				.page()
@@ -103,22 +117,12 @@ struct ToolView: View {
 			Button("Cancel") { editor.cancel() }.buttonStyle(TextButtonStyle()).frame(minHeight: 44)
 			Spacer()
 			if editor.saving { ProgressView() }
-			Menu {
-				ForEach(EditorView.kinds) { option in Button(option.label, systemImage: option.icon) { editor.add(option.kind) }.disabled(editor.draft?.can_add(option.kind) != true) }
-			} label: { Label("Add block", systemImage: "plus").frame(minHeight: 44).contentShape(Rectangle()) }.buttonStyle(TextButtonStyle()).accessibilityIdentifier("page.add-block")
-			Button { showing_behavior = true } label: { Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44) }.buttonStyle(TextButtonStyle()).accessibilityLabel("Routine behavior")
+			Button { showing_palette = true } label: { Label("Add block", systemImage: "plus").frame(minHeight: 44).contentShape(Rectangle()) }.buttonStyle(TextButtonStyle()).accessibilityIdentifier("page.add-block")
 		}.disabled(editor.saving)
 	}
-	private var behavior: some View {
-		NavigationStack {
-			VStack(alignment: .leading, spacing: Theme.gap) {
-				ToggleRow(title: "Block apps while running", is_on: Binding(get: { editor.draft?.rules.block_during_focus ?? false }, set: { editor.draft?.rules.block_during_focus = $0 }), disabled: editor.draft?.has_engine != true || editor.draft?.has_screen_time != true)
-				Hairline()
-				ToggleRow(title: "Notify when finished", is_on: Binding(get: { editor.draft?.rules.notify_on_complete ?? false }, set: { editor.draft?.rules.notify_on_complete = $0 }), disabled: editor.draft?.has_timer != true)
-				Spacer()
-			}.padding(Theme.pad).paper_page().navigationTitle("Behavior").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showing_behavior = false } } }
-		}.presentationDetents([.medium])
-	}
+
+	private func can_edit(_ document: AppDocument) -> Bool { !sessions.is_running(document) && !sessions.is_busy }
+	private func begin_editing(_ document: AppDocument) { editor.begin(document) }
 
 	private func clear_everything() {
 		Task { for id in await sessions.clear_everything() { library.set_enabled(id, false) } }

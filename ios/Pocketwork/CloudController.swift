@@ -22,6 +22,9 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 	@Published private(set) var busy = false
 	@Published private(set) var status = "Sign in on both devices with the same account."
 	@Published var error_message: String?
+	@Published var share_status = StatusReporter.sharing { didSet { StatusReporter.sharing = share_status; Task { await publish_status(force: true) } } }
+	@Published private(set) var status_shared_at: Date?
+	private var last_report: StatusReport?
 	private var session: CloudSession?
 	private var web_session: ASWebAuthenticationSession?
 	private var syncing = false
@@ -32,6 +35,12 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 	private var endpoint: String { Bundle.main.object(forInfoDictionaryKey: "SupabaseURL") as? String ?? "" }
 	private var public_key: String { Bundle.main.object(forInfoDictionaryKey: "SupabaseAnonKey") as? String ?? "" }
 	var configured: Bool { endpoint.hasPrefix("https://") && !public_key.isEmpty }
+	var account_id: UUID? { session.flatMap { UUID(uuidString: $0.user.id) } }
+	var website: URL? {
+		guard let raw = Bundle.main.object(forInfoDictionaryKey: "PocketworkWebsiteURL") as? String, let url = URL(string: raw), url.scheme == "https", url.host != nil else { return nil }
+		return url
+	}
+	private var deleting = false
 	private var keychain_query: [String: Any] { [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "Pocketwork.Cloud", kSecAttrAccount as String: endpoint] }
 
 	func attach(_ library: LibraryController, _ sessions: SessionController) async {
@@ -105,6 +114,88 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 		} catch { fail(error) }
 		}
 	}
+	func api_request(_ path: String, body: [String: String]? = nil) async throws -> Data {
+		guard let website, var credentials = session else { throw DocumentError.invalid("Sign in and configure the public website first.") }
+		let epoch = generation
+		if credentials.needs_refresh {
+			let data = try await request("auth/v1/token?grant_type=refresh_token", method: "POST", body: JSONSerialization.data(withJSONObject: ["refresh_token": credentials.refresh_token]))
+			credentials = try JSONDecoder().decode(CloudSession.self, from: data); credentials.saved_at = .now
+			guard epoch == generation else { throw DocumentError.invalid("Your account changed. Try again.") }
+			try store(credentials); session = credentials
+		}
+		var request = URLRequest(url: website.appendingPathComponent(path)); request.timeoutInterval = 30
+		request.setValue("Bearer " + credentials.access_token, forHTTPHeaderField: "Authorization")
+		if let body { request.httpMethod = "POST"; request.httpBody = try JSONSerialization.data(withJSONObject: body); request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
+		let (data, response) = try await URLSession.shared.data(for: request)
+		guard epoch == generation else { throw DocumentError.invalid("Your account changed. Try again.") }
+		guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else {
+			struct Failure: Decodable { let error: String }
+			let message = (try? JSONDecoder().decode(Failure.self, from: data))?.error ?? "Account service unavailable. Please retry."
+			throw DocumentError.invalid(message)
+		}
+		return data
+	}
+	struct PagePlan: Decodable { let pro: Bool; let expires_at: String?; let configured: Bool }
+	func refresh_plan(transaction_id: String? = nil) async throws {
+		guard website != nil, signed_in, Bundle.main.object(forInfoDictionaryKey: "PocketworkSubscriptionsEnabled") as? Bool == true else { return }
+		let data = try await api_request("api/subscription", body: transaction_id.map { ["transaction_id": $0] })
+		let plan = try JSONDecoder().decode(PagePlan.self, from: data)
+		let formatter = ISO8601DateFormatter(); formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+		library?.pro_until = plan.pro ? plan.expires_at.flatMap { formatter.date(from: $0) } : nil
+	}
+	func delete_account() async {
+		guard !busy, !syncing, signed_in else { return }
+		busy = true; deleting = true; pending_save?.cancel(); error_message = nil
+		do {
+			struct Reply: Decodable { let deleted: Bool; let authorize_url: String?; let state: String? }
+			let reply = try JSONDecoder().decode(Reply.self, from: try await api_request("api/account/delete", body: ["confirm": "DELETE", "platform": "ios"]))
+			if reply.deleted { try await finish_deletion(); busy = false; deleting = false; return }
+			guard let raw = reply.authorize_url, let url = URL(string: raw), url.scheme == "https", url.host == "appleid.apple.com", let state = reply.state else { throw DocumentError.invalid("Apple confirmation could not start.") }
+			web_session = ASWebAuthenticationSession(url: url, callbackURLScheme: "com.braydenfeng.pocketwork") { [weak self] callback, error in
+				Task { @MainActor in
+					guard let self else { return }; defer { self.busy = false; self.deleting = false; self.web_session = nil }
+					do {
+						if let error { throw error }
+						guard let callback, callback.host == "account", callback.path == "/deleted", let items = URLComponents(url: callback, resolvingAgainstBaseURL: false)?.queryItems, items.first(where: { $0.name == "state" })?.value == state, items.first(where: { $0.name == "deleted" })?.value == "true" else { throw DocumentError.invalid("Deletion did not finish. Start again from Account.") }
+						try await self.finish_deletion()
+					} catch { self.fail(error) }
+				}
+			}
+			web_session?.presentationContextProvider = self
+			if web_session?.start() != true { throw DocumentError.invalid("Could not open Apple's confirmation.") }
+		} catch { busy = false; deleting = false; fail(error) }
+	}
+	private func finish_deletion() async throws {
+		generation += 1; pending_save?.cancel()
+		let document_ids = library?.library.tools.map(\.id) ?? []
+		let group_ids = library?.groups.map(\.id) ?? []
+		let failures = await AccountCleanup.run([
+			("Sessions", {
+				self.sessions?.error_message = nil
+				for id in document_ids { await self.sessions?.forget(id) }
+				_ = await self.sessions?.clear_everything()
+				if let error = self.sessions?.error_message { throw DocumentError.invalid(error) }
+			}),
+			("Saved location", { try await HomeLocationController.shared.forget_account_data() }),
+			("Page restrictions", { try await HomeWorker.run { try BuilderAppRules.clear() } }),
+			("App selections", {
+				let shared = try SharedStore()
+				for id in document_ids { shared.remove_selection(for: id); shared.remove_plan(for: id); shared.set_standing(id, enabled: false) }
+				for id in group_ids { shared.remove_group_selection(id) }
+			}),
+			("Saved sign-in", {
+				let code = SecItemDelete(self.keychain_query as CFDictionary)
+				guard code == errSecSuccess || code == errSecItemNotFound else { throw DocumentError.invalid("Could not remove this iPhone's saved sign-in (\(code)).") }
+			})
+		])
+		library?.purge_account(); session = nil; signed_in = false; email = nil
+		StatusReporter.sharing = false; share_status = false; last_report = nil; status_shared_at = nil
+		if !failures.isEmpty {
+			status = "Account deleted. This iPhone's cleanup needs attention."
+			throw DocumentError.invalid("Your cloud account was deleted, but device cleanup did not fully finish. Use Clear all focus restrictions and remove local app data before reusing this iPhone. " + failures.joined(separator: " · "))
+		}
+		status = "Account deleted. Your cloud pages and this iPhone's account library were removed."
+	}
 
 	private func store(_ value: CloudSession) throws {
 		let data = try JSONEncoder().encode(value)
@@ -135,7 +226,7 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 	private struct WriteRow: Encodable { let user_id: String; let library: ToolLibrary }
 
 	func sync() async {
-		guard var credentials = session, let library, !library.storage_blocked, !syncing else { return }
+		guard var credentials = session, let library, !library.storage_blocked, !syncing, !deleting else { return }
 		syncing = true; status = "Syncing…"
 		let epoch = generation
 		defer { syncing = false }
@@ -168,6 +259,7 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 					}
 				}
 				if remote?.library != merged {
+					if merged.tools.count > 3 && merged.tools.contains(where: { remote?.library.find($0.id) == nil }) { try await refresh_plan() }
 					let stamp = remote?.updated_at.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""
 					let write_path = remote == nil ? "rest/v1/libraries" : path + "&updated_at=eq." + stamp
 					do {
@@ -177,10 +269,37 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 					} catch CloudConflict.changed { continue }
 				}
 				if merged != library.library { continue }
-				status = "Synced with your account"; error_message = nil; return
+				status = "Synced with your account"; error_message = nil
+				await publish_status()
+				return
 			}
 			throw DocumentError.invalid("Another device is saving. Pull to refresh to retry.")
 		} catch { status = "Saved on this iPhone · sync needs attention"; fail(error) }
+	}
+
+	private struct StatusRow: Encodable { let user_id: String; let status: StatusReport }
+
+	// Shares minute counts and running state with the account when the person has opted in. Silent when nothing changed.
+	func publish_status(force: Bool = false) async {
+		guard share_status, let credentials = session, let library else {
+			if !share_status, let credentials = session { await clear_status(credentials) }
+			return
+		}
+		let home = try? await HomeWorker.run { try HomeEngine.snapshot() }
+		let report = StatusReporter.build(library: library.library, session: sessions?.session, home: home)
+		var comparable = report; comparable.reported_at = ""
+		var previous = last_report; previous?.reported_at = ""
+		if !force, previous == comparable { return }
+		do {
+			_ = try await request("rest/v1/routine_status?on_conflict=user_id", method: "POST", body: JSONEncoder().encode(StatusRow(user_id: credentials.user.id, status: report)), token: credentials.access_token, prefer: "resolution=merge-duplicates,return=minimal")
+			last_report = report; status_shared_at = .now
+		} catch { fail(error) }
+	}
+
+	private func clear_status(_ credentials: CloudSession) async {
+		guard last_report != nil || status_shared_at != nil else { return }
+		do { _ = try await request("rest/v1/routine_status?user_id=eq." + credentials.user.id, method: "DELETE", token: credentials.access_token, prefer: "return=minimal"); last_report = nil; status_shared_at = nil }
+		catch { fail(error) }
 	}
 
 	private func fail(_ error: Error) { error_message = error.localizedDescription }

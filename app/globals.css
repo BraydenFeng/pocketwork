@@ -338,3 +338,119 @@ kbd { font: inherit; font-size: var(--t-micro); padding-inline: var(--s-1); bord
 	.preview-heading h2 { font-size: var(--t-display); }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none; animation: none; } }
+
+/* The graph uses SVG coordinates for geometry; all visual styling comes from the UI tokens. */
+.workbench-grid.has-logic-canvas { grid-template-columns: minmax(0, 1fr); }
+.has-logic-canvas > .library, .has-logic-canvas > .inspector { display: none; }
+.logic-workspace { display: grid; grid-template-columns: var(--logic-library) minmax(0, 1fr) var(--logic-inspector); background: var(--c-bg); border-top: var(--hairline); }
+.logic-library, .logic-inspector { padding: var(--s-4); background: var(--c-surface); min-width: 0; }
+.logic-library { border-right: var(--hairline); }
+.logic-inspector { border-left: var(--hairline); }
+.logic-add { display: flex; gap: var(--s-2); width: 100%; padding: var(--s-3) 0; border: 0; border-bottom: var(--hairline); background: transparent; text-align: left; color: var(--c-text); cursor: pointer; }
+.logic-add > svg { width: var(--icon); flex: none; margin-top: var(--s-1); }
+.logic-add strong, .logic-add small { display: block; }
+.logic-add strong { font-size: var(--t-body); font-weight: var(--w-medium); }
+.logic-add small { font-size: var(--t-small); color: var(--c-text-faint); margin-top: var(--s-1); }
+.logic-add:disabled { color: var(--c-text-faint); cursor: default; opacity: .5; }
+.logic-help { margin-top: var(--s-5); color: var(--c-text-faint); font-size: var(--t-small); }
+.logic-help > svg { width: var(--icon); }
+.logic-main { min-width: 0; }
+.logic-toolbar, .logic-footer { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-3) var(--s-4); background: var(--c-surface); }
+.logic-toolbar { flex-wrap: wrap; justify-content: space-between; border-bottom: var(--hairline); }
+.logic-toolbar > span, .logic-toolbar > div { display: flex; align-items: center; gap: var(--s-2); }
+.logic-toolbar svg { width: var(--icon); }
+.logic-footer { border-top: var(--hairline); flex-wrap: wrap; }
+.logic-footer > span { flex: 1; font-size: var(--t-small); color: var(--c-text-dim); }
+.logic-stage { position: relative; height: var(--logic-stage); overflow: hidden; }
+.logic-svg { user-select: none; width: 100%; height: 100%; display: block; touch-action: none; }
+.logic-dot { fill: var(--c-border-hi); }
+.logic-wire { fill: none; stroke: var(--c-border-hi); stroke-width: 2; pointer-events: none; }
+.logic-wire.is-selected { stroke: var(--c-text-dim); }
+.logic-wire.is-pending { stroke: var(--c-accent); stroke-dasharray: 4 4; }
+.logic-node-shell { fill: var(--c-surface); stroke: var(--c-border-hi); }
+.logic-node.is-selected .logic-node-shell { stroke: var(--c-accent); stroke-width: 2; }
+.logic-node-heading { width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: flex-start; gap: var(--s-2); padding: var(--s-2) 0; border: 0; background: transparent; color: var(--c-text); text-align: left; cursor: grab; }
+.logic-node-heading > span { display: flex; align-items: center; gap: var(--s-2); }
+.logic-node-heading svg { width: var(--icon); height: var(--icon); color: var(--c-text-faint); }
+.logic-node-heading strong { font-size: var(--t-body); font-weight: var(--w-semi); }
+.logic-node-heading small { font-size: var(--t-small); color: var(--c-text-faint); }
+.logic-port { cursor: crosshair; }
+.logic-port circle { fill: var(--c-surface); stroke: var(--c-text-dim); stroke-width: 2; }
+.logic-port .logic-port-hit { fill: transparent; stroke: none; }
+.logic-port:hover circle:not(.logic-port-hit), .logic-port:focus circle:not(.logic-port-hit), .logic-port.is-active circle:not(.logic-port-hit) { fill: var(--c-accent); stroke: var(--c-accent); }
+.logic-port text { fill: var(--c-text-dim); font-size: var(--t-small); font-family: var(--font-mono); }
+.logic-empty { position: absolute; top: var(--s-6); left: var(--s-6); max-width: var(--measure); pointer-events: none; }
+.logic-empty > svg { color: var(--c-text-faint); }
+.logic-empty h2, .logic-inspector h2 { font-size: var(--t-title); letter-spacing: var(--track-title); font-weight: var(--w-semi); }
+.logic-empty p, .logic-inspector p { font-size: var(--t-body); color: var(--c-text-faint); line-height: var(--lh-body); }
+.logic-inspector-empty { padding-top: var(--s-5); }
+.logic-inspector-empty > svg { width: var(--icon-large); color: var(--c-text-faint); }
+.logic-settings { display: grid; gap: var(--s-4); margin: var(--s-4) 0 var(--s-5); }
+.logic-settings label { display: grid; gap: var(--s-1); font-size: var(--t-small); color: var(--c-text-dim); }
+.logic-settings input, .logic-settings select, .logic-settings textarea { min-width: 0; width: 100%; min-height: var(--control-h); padding: var(--s-2); border: var(--hairline); border-radius: var(--r-1); background: var(--c-surface); color: var(--c-text); font: inherit; font-size: var(--t-body); }
+.logic-settings input[type="checkbox"] { width: var(--icon); min-height: var(--icon); margin: 0; }
+.logic-days { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-2); }
+.logic-days label { display: flex; align-items: center; gap: var(--s-2); }
+.logic-settings fieldset { min-width: 0; padding: var(--s-3); border: var(--hairline); display: grid; gap: var(--s-3); }
+.logic-settings legend { font-size: var(--t-small); color: var(--c-text-dim); }
+.logic-window { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-2); }
+.logic-connections { padding: 0; margin: var(--s-3) 0; list-style: none; }
+.logic-connections li { display: flex; align-items: center; padding: var(--s-2) 0; border-bottom: var(--hairline); gap: var(--s-2); }
+.logic-connections li > span { flex: 1; min-width: 0; font-size: var(--t-small); color: var(--c-text-dim); }
+.logic-connections li > span > svg { display: block; width: var(--icon-small); margin: var(--s-1) 0; }
+.logic-error { margin: 0; padding: var(--s-4); color: var(--c-danger); background: var(--c-surface); border-top: var(--hairline); font-size: var(--t-body); }
+@media (max-width: 1100px) {
+	.logic-workspace { grid-template-columns: var(--logic-library) minmax(0, 1fr); }
+	.logic-inspector { grid-column: 1 / -1; border-left: 0; border-top: var(--hairline); }
+	.logic-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+	.logic-workspace { grid-template-columns: minmax(0, 1fr); }
+	.logic-library { display: flex; overflow-x: auto; gap: var(--s-3); border-right: 0; border-bottom: var(--hairline); }
+	.logic-library > .section-label, .logic-library > .supporting, .logic-library > .logic-help { display: none; }
+	.logic-add { flex: 0 0 var(--w-rail); border-bottom: 0; }
+	.logic-stage { height: var(--canvas-min); }
+	.logic-settings { grid-template-columns: minmax(0, 1fr); }
+	.logic-footer > span { flex-basis: 100%; }
+}
+
+.logic-search { width: 100%; padding: var(--s-2); border: var(--hairline); background: var(--c-surface); color: var(--c-text); border-radius: var(--r-1); }
+.logic-node-list { max-height: var(--logic-stage); overflow-y: auto; }
+.behavior-test { padding: var(--s-4); border-top: var(--hairline); }
+.behavior-controls { display: flex; flex-wrap: wrap; gap: var(--s-3); align-items: center; margin-block: var(--s-3); }
+.behavior-controls label { display: flex; gap: var(--s-2); align-items: center; }
+.behavior-test dl > div { display: flex; justify-content: space-between; gap: var(--s-3); padding-block: var(--s-2); border-bottom: var(--hairline); }
+
+
+.logic-search { margin-block: var(--s-3); min-height: var(--control-h); font: inherit; font-size: var(--t-small); }
+.logic-category { border-bottom: var(--hairline); }
+.logic-category summary { display: flex; align-items: center; gap: var(--s-2); padding-block: var(--s-3); cursor: pointer; font-size: var(--t-small); font-weight: var(--w-semi); list-style: none; }
+.logic-category summary::before { content: "›"; font-size: var(--t-body); color: var(--c-text-faint); }
+.logic-category[open] summary::before { content: "⌄"; }
+.logic-category summary > span { margin-left: auto; color: var(--c-text-faint); font-weight: var(--w-regular); }
+.logic-category .logic-add { padding: var(--s-2); align-items: center; border: 0; gap: var(--s-2); }
+.logic-category .logic-add strong { font-size: var(--t-small); }
+.logic-category .logic-add > svg { margin-top: 0; width: var(--icon-small); }
+.logic-category .logic-add:hover:not(:disabled) { background: var(--c-surface-hi); }
+@media (max-width: 760px) {
+	.logic-library { display: block; overflow: visible; }
+	.logic-search { margin-top: 0; }
+	.logic-node-list { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); align-items: start; gap: 0 var(--s-4); max-height: var(--canvas-min); }
+	.logic-category .logic-add { width: 100%; }
+}
+
+.logic-runtime-note { margin: 0; padding: var(--s-2) var(--s-4); background: var(--c-surface); color: var(--c-text-faint); font-size: var(--t-small); }
+
+.builder-controls { display: grid; gap: var(--s-4); }
+.builder-controls form, .builder-fields > div { display: grid; gap: var(--s-3); padding: var(--s-4); border: var(--hairline); border-radius: var(--r-1); }
+.builder-controls label, .builder-fields { display: grid; gap: var(--s-2); }
+.builder-controls input { min-height: var(--control-h); border: var(--hairline); background: var(--c-surface); color: var(--c-text); padding: var(--s-2); }
+.builder-controls input[type="checkbox"] { min-height: auto; }
+.builder-controls progress { display: block; width: 100%; accent-color: var(--c-accent); }
+.builder-data { margin: 0; padding: var(--s-4); border: var(--hairline); }
+.builder-data figcaption { font-weight: var(--w-semi); margin-bottom: var(--s-3); }
+.builder-data svg { width: 100%; max-height: var(--w-rail); }
+.builder-data polyline { fill: none; stroke: var(--c-accent); stroke-width: 2; }
+.builder-table { overflow-x: auto; }
+.builder-table table { width: 100%; border-collapse: collapse; font-size: var(--t-small); }
+.builder-table th, .builder-table td { text-align: left; padding: var(--s-2); border-bottom: var(--hairline); }

@@ -89,6 +89,7 @@ struct AppDocument: Codable, Equatable {
 	// Only meaningful for a standing routine: whether the person has switched it on.
 	var enabled: Bool?
 	var home_allowance: HomePolicy? = nil
+	var behaviors: BehaviorGraph? = nil
 
 	var focus_minutes: Int? { blocks.first(where: { $0.type == .timer })?.minutes }
 	var has_timer: Bool { blocks.contains(where: { $0.type == .timer }) }
@@ -108,7 +109,7 @@ struct AppDocument: Codable, Equatable {
 	}
 
 	static func blank() -> AppDocument {
-		AppDocument(schema_version: 1, id: UUID().uuidString, name: "My new routine", description: "", blocks: [BlockDocument.make(.heading)], rules: RuleDocument(block_during_focus: false, notify_on_complete: false), enabled: nil)
+		AppDocument(schema_version: 1, id: UUID().uuidString, name: "My new page", description: "", blocks: [BlockDocument.make(.heading)], rules: RuleDocument(block_during_focus: false, notify_on_complete: false), enabled: nil)
 	}
 
 	// Rules that depend on a removed block are switched off rather than left invalid, as remove_block does in the editor.
@@ -116,6 +117,7 @@ struct AppDocument: Codable, Equatable {
 		guard blocks.count > 1 else { return self }
 		var next = self
 		next.blocks.removeAll { $0.id == block_id }
+		next.behaviors?.connections.removeAll { $0.from == block_id }
 		next.rules.block_during_focus = rules.block_during_focus && next.has_engine && next.has_screen_time
 		next.rules.notify_on_complete = rules.notify_on_complete && next.has_timer
 		if !next.is_standing { next.enabled = nil }
@@ -134,7 +136,7 @@ struct AppDocument: Codable, Equatable {
 		guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
 			throw DocumentError.invalid("This file is not a Pocketwork configuration.")
 		}
-		try require_keys(object, ["schema_version", "id", "name", "description", "blocks", "rules"], optional: ["enabled"])
+		try require_keys(object, ["schema_version", "id", "name", "description", "blocks", "rules"], optional: ["enabled", "home_allowance", "behaviors"])
 		guard let raw_blocks = object["blocks"] as? [[String: Any]], let raw_rules = object["rules"] as? [String: Any] else {
 			throw DocumentError.invalid("The tool is missing its blocks or rules.")
 		}
@@ -168,12 +170,14 @@ struct AppDocument: Codable, Equatable {
 	}
 
 	func validate() throws {
-		guard (schema_version == 2) == (home_allowance != nil) else { throw DocumentError.invalid("Home allowances need routine format 2.") }
+		guard schema_version >= 3 || (schema_version == 2) == (home_allowance != nil) else { throw DocumentError.invalid("Home allowances need routine format 2.") }
 		if let policy = home_allowance {
 			try policy.validate()
 			guard schedule != nil, rules.block_during_focus, shield?.shield_mode == .block, shield?.group_names.count == 1 else { throw DocumentError.invalid("Home allowances require one distraction group and a schedule.") }
 		}
-		guard schema_version == 1 || schema_version == 2 else { throw DocumentError.invalid("Unsupported schema version. This host supports version 1.") }
+		guard (1...4).contains(schema_version) else { throw DocumentError.invalid("Update Pocketwork to open this routine format.") }
+		guard (schema_version >= 3) == (behaviors != nil) else { throw DocumentError.invalid("Connected behaviors require routine format 3 or 4.") }
+		if let behaviors { guard schema_version == 4 || !PrimitiveRuntime.requires_four(behaviors) else { throw DocumentError.invalid("These blocks require routine format 4.") }; _ = try behaviors.ordered(external: behavior_external_ports) }
 		try Self.validate_id(id)
 		try Self.validate_text(name, maximum: 80, required: true)
 		try Self.validate_text(description, maximum: 200)
@@ -188,7 +192,7 @@ struct AppDocument: Codable, Equatable {
 				guard let subtitle = block.subtitle else { throw DocumentError.invalid("Missing heading subtitle.") }
 				try Self.validate_text(subtitle, maximum: 200)
 			case .timer:
-				guard let minutes = block.minutes, (15...120).contains(minutes) else { throw DocumentError.invalid("Focus timers must be 15–120 minutes.") }
+				guard let minutes = block.minutes, (15...120).contains(minutes) else { throw DocumentError.invalid("Timers must be 15–120 minutes.") }
 			case .checklist:
 				guard let items = block.items, (1...20).contains(items.count) else { throw DocumentError.invalid("Checklists need 1–20 tasks.") }
 				for item in items {

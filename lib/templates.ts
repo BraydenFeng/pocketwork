@@ -72,5 +72,5 @@ export const templates: Template[] = [
 ];
 
 export function blank_tool(): AppDocument {
-	return { schema_version: 1, id: new_id(), name: "My new routine", description: "", blocks: [create_block("heading")], rules: { block_during_focus: false, notify_on_complete: false } };
+	return { schema_version: 1, id: new_id(), name: "Untitled page", description: "", blocks: [{ id: new_id(), type: "note", title: "Text", text: "" }], rules: { block_during_focus: false, notify_on_complete: false } };
 }

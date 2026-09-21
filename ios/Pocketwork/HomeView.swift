@@ -25,9 +25,9 @@ struct HomeView: View {
 					intro
 					if !cloud.signed_in { AccountView() }
 					Hairline()
-					section(number: "01", label: "My routines", heading: library.sorted_tools.isEmpty ? "Nothing here yet." : "Pick up where you left off.", supporting: library.sorted_tools.isEmpty ? "Create a routine here, or sign in to bring in the routines you made on your computer." : nil) {
+					section(number: "01", label: "My pages", heading: library.sorted_tools.isEmpty ? "Nothing here yet." : "Pick up where you left off.", supporting: library.sorted_tools.isEmpty ? "Create a page here, or sign in to bring in pages from your computer." : nil) {
 						if library.storage_blocked { storage_warning }
-						Button { editing = RoutineDraft(document: AppDocument.blank(), is_new: true) } label: { Label("New routine", systemImage: "plus") }.buttonStyle(PrimaryButtonStyle(accent: true))
+						Button { editing = RoutineDraft(document: AppDocument.blank(), is_new: true) } label: { Label("New page", systemImage: "plus") }.buttonStyle(PrimaryButtonStyle(accent: true))
 						ForEach(library.sorted_tools) { entry in routine_card(entry) }
 					}
 					Hairline()
@@ -52,7 +52,7 @@ struct HomeView: View {
 			}
 			.refreshable { await cloud.sync() }
 			.page()
-			.navigationTitle("My routines")
+			.navigationTitle("My pages")
 			.navigationBarTitleDisplayMode(.inline)
 			.navigationDestination(for: RoutineRoute.self) { route in ToolView(document_id: route.id, edit_on_open: route.editing) }
 			.navigationDestination(isPresented: $showing_groups) { GroupsView() }
@@ -69,7 +69,9 @@ struct HomeView: View {
 			}
 			.sheet(item: $editing) { item in RoutineEditorSheet(item: item) }
 			.sheet(item: $picking_group) { group in AppGroupSelectionSheet(group: group) }
-			.sheet(isPresented: $showing_account) { NavigationStack { AccountView().navigationTitle("Account & sync").toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showing_account = false } } } } }
+			// A widget tap arrives as com.braydenfeng.pocketwork://routine/<id>; the sign-in callback uses a different host and is handled elsewhere.
+			.onOpenURL { url in if let id = WidgetSnapshot.routine_id(from: url), library.tool(id) != nil { path = [RoutineRoute(id: id)] } }
+			.sheet(isPresented: $showing_account) { NavigationStack { ScrollView { AccountView() }.navigationTitle("Account & sync").toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showing_account = false } } } } }
 			.fileImporter(isPresented: $showing_import, allowedContentTypes: [.json]) { result in import_file(result) }
 			.confirmationDialog("Delete \"\(pending_delete?.document.name ?? "this routine")\"? This cannot be undone.", isPresented: Binding(get: { pending_delete != nil }, set: { if !$0 { pending_delete = nil } }), titleVisibility: .visible) {
 				Button("Delete", role: .destructive) {
@@ -94,7 +96,7 @@ struct HomeView: View {
 
 	private var intro: some View {
 		VStack(alignment: .leading, spacing: 8) {
-			Text("My routines").heading_font(28)
+			Text("My pages").heading_font(28)
 			Text("Your own little tools.").supporting()
 			HStack(spacing: 8) {
 				Circle().fill(library.storage_blocked ? Theme.danger : Theme.success).frame(width: 6, height: 6)
