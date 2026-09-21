@@ -24,8 +24,10 @@ final class PagePlanTests: XCTestCase {
 		try controller.switch_account("alice"); XCTAssertNotNil(controller.create_blank())
 		defaults.set(Data([1]), forKey: "behaviors.v1.alice.test")
 		defaults.set(Data([2]), forKey: "behaviors.v1.bob.test")
+		var history = SessionHistory(); history.record(minutes: 20, at: .now); try history.save(to: defaults)
 		controller.purge_account()
 		XCTAssertNil(defaults.data(forKey: "tool_library.v1.alice")); XCTAssertNil(defaults.data(forKey: "behaviors.v1.alice.test"))
+		XCTAssertNil(defaults.data(forKey: SessionHistory.key))
 		XCTAssertNotNil(defaults.data(forKey: "behaviors.v1.bob.test")); XCTAssertEqual(controller.library.tools.count, 0)
 	}
 }

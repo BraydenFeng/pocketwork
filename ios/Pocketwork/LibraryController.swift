@@ -115,6 +115,7 @@ final class LibraryController: ObservableObject {
 		let prefix = "behaviors.v1." + behavior_owner_key + "."
 		for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(prefix) { defaults.removeObject(forKey: key) }
 		defaults.removeObject(forKey: current_key)
+		defaults.removeObject(forKey: SessionHistory.key)
 		library = .empty; owner = nil; pro_until = nil
 	}
 
