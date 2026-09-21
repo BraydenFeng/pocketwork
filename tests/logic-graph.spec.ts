@@ -30,9 +30,7 @@ test("home graph edits real budgets and persists them across reload", async ({ p
 test("users can add nodes, wire ports, reject invalid wiring and remove real rules", async ({ page }) => {
 	const document = { ...starter_document, rules: { block_during_focus: true, notify_on_complete: false } };
 	await seed_library(page, [document]);
-	await page.goto("/?routine=my-focus-space");
-	await page.getByRole("button", { name: "Dismiss quick start" }).click();
-	await page.getByRole("tab", { name: "Logic", exact: true }).click();
+	await page.goto("/?routine=my-focus-space&view=logic");
 	await add_behavior(page, "Notify me");
 	await page.getByRole("button", { name: "Fit graph" }).click();
 	await page.getByRole("button", { name: "Timer output active", exact: true }).focus();
@@ -93,7 +91,6 @@ test("home logic deep links and day groups save only valid shared budgets", asyn
 test("build a check-in counter goal reminder flow and test it before saving", async ({ page }) => {
 	await seed_library(page, [starter_document]);
 	await page.goto("/?routine=my-focus-space&view=logic");
-	await page.getByRole("button", { name: "Dismiss quick start" }).click();
 	for (const name of ["Check-in", "Counter", "Goal", "Reminder"]) {
 		await add_behavior(page, name);
 		if (name === "Goal") { await page.getByLabel("Target value", { exact: true }).fill("2"); }

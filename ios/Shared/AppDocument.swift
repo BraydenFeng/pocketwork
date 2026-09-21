@@ -109,7 +109,7 @@ struct AppDocument: Codable, Equatable {
 	}
 
 	static func blank() -> AppDocument {
-		AppDocument(schema_version: 1, id: UUID().uuidString, name: "My new routine", description: "", blocks: [BlockDocument.make(.heading)], rules: RuleDocument(block_during_focus: false, notify_on_complete: false), enabled: nil)
+		AppDocument(schema_version: 1, id: UUID().uuidString, name: "My new page", description: "", blocks: [BlockDocument.make(.heading)], rules: RuleDocument(block_during_focus: false, notify_on_complete: false), enabled: nil)
 	}
 
 	// Rules that depend on a removed block are switched off rather than left invalid, as remove_block does in the editor.
@@ -170,14 +170,14 @@ struct AppDocument: Codable, Equatable {
 	}
 
 	func validate() throws {
-		guard schema_version == 3 || (schema_version == 2) == (home_allowance != nil) else { throw DocumentError.invalid("Home allowances need routine format 2.") }
+		guard schema_version >= 3 || (schema_version == 2) == (home_allowance != nil) else { throw DocumentError.invalid("Home allowances need routine format 2.") }
 		if let policy = home_allowance {
 			try policy.validate()
 			guard schedule != nil, rules.block_during_focus, shield?.shield_mode == .block, shield?.group_names.count == 1 else { throw DocumentError.invalid("Home allowances require one distraction group and a schedule.") }
 		}
-		guard schema_version == 1 || schema_version == 2 || schema_version == 3 else { throw DocumentError.invalid("Unsupported schema version. This host supports version 1.") }
-		guard (schema_version == 3) == (behaviors != nil) else { throw DocumentError.invalid("Connected behaviors require routine format 3.") }
-		if let behaviors { _ = try behaviors.ordered(external: behavior_external_ports) }
+		guard (1...4).contains(schema_version) else { throw DocumentError.invalid("Update Pocketwork to open this routine format.") }
+		guard (schema_version >= 3) == (behaviors != nil) else { throw DocumentError.invalid("Connected behaviors require routine format 3 or 4.") }
+		if let behaviors { guard schema_version == 4 || !PrimitiveRuntime.requires_four(behaviors) else { throw DocumentError.invalid("These blocks require routine format 4.") }; _ = try behaviors.ordered(external: behavior_external_ports) }
 		try Self.validate_id(id)
 		try Self.validate_text(name, maximum: 80, required: true)
 		try Self.validate_text(description, maximum: 200)

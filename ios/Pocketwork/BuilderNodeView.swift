@@ -13,7 +13,7 @@ struct BuilderNodeView: View {
 			case "number_input", "text_input", "checkbox", "form": BuilderInputView(node: node, saved: state?.inputs[node.id], record: state?.forms[node.id], input: input, submit: submit)
 			case "table", "chart": BuilderDataView(node: node, rows: outputs["rows"]?.rows ?? [])
 			case "progress":
-				VStack(alignment: .leading, spacing: 8) { Text(node.config.label).heading_font(15); ProgressView(value: max(0,min(1,outputs["fraction"]?.value ?? 0))).tint(Theme.accent); Text(outputs["value"]?.available == false ? "Unavailable" : "\((outputs["value"]?.value ?? 0).formatted()) / \(node.config.value.formatted())").supporting() }
+				VStack(alignment: .leading, spacing: 8) { Text(node.config.label).heading_font(15); ProgressView(value: max(0,min(1,outputs["fraction"]?.value ?? 0))).tint(Theme.accent); Text(outputs["value"]?.available == false ? "Unavailable" : "\((outputs["value"]?.value ?? 0).formatted()) / \((outputs["target"]?.value ?? node.config.value).formatted())").supporting() }
 			case "health", "aggregate", "calculate":
 				HStack { Text(node.config.label).heading_font(15); Spacer(); Text(outputs["value"]?.available == false || outputs["value"] == nil ? "Unavailable" : (outputs["value"]?.value ?? 0).formatted()).supporting() }
 			case "app_gate": HStack { Text(node.config.label).heading_font(15); Spacer(); Text(outputs["active"]?.available == false || outputs["active"] == nil ? "Waiting for data" : outputs["active"]?.value == 1 ? "Closed" : "Open").supporting() }

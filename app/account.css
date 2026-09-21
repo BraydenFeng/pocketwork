@@ -1,0 +1,9 @@
+.legal-page { max-width: var(--editor-page-width); margin: auto; padding: var(--s-6) var(--s-5); color: var(--c-text); }
+.legal-page nav, .legal-page footer { display: flex; flex-wrap: wrap; gap: var(--s-5); padding-block: var(--s-4); }
+.legal-page h1 { font-family: var(--font-heading); font-size: var(--t-display); margin-block: var(--s-6); }
+.legal-page h2 { font-size: var(--t-title); margin-bottom: var(--s-4); }
+.legal-page p { line-height: var(--lh-body); margin-block: var(--s-4); }
+.legal-page section { border-top: var(--hairline); padding-block: var(--s-5); }
+.legal-page a { color: var(--c-accent); text-underline-offset: var(--s-1); }
+.legal-page footer { border-top: var(--hairline); }
+.legal-page .account-error { color: var(--c-danger); }

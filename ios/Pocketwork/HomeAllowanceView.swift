@@ -18,7 +18,7 @@ struct HomeAllowanceView: View {
 	var body: some View {
 		ScrollView {
 			VStack(alignment: .leading, spacing: 16) {
-				if editor.active { TextField("Routine name", text: Binding(get: { editor.draft?.name ?? "" }, set: { editor.draft?.name = $0 }), axis: .vertical).heading_font(26).accessibilityIdentifier("page.name") }
+				if editor.active { TextField("Page name", text: Binding(get: { editor.draft?.name ?? "" }, set: { editor.draft?.name = $0 }), axis: .vertical).heading_font(26).accessibilityIdentifier("page.name") }
 				else { Text(document.name).heading_font(26) }
 				Text("Inside your windows, at home, you get these minutes and then the apps lock until the next window. Outside a window, or away from home, nothing is blocked. Resets at midnight in Los Angeles.").supporting()
 				if let policy = shown.home_allowance {

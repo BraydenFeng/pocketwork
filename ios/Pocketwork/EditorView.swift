@@ -28,7 +28,7 @@ struct EditorView: View {
 				VStack(alignment: .leading, spacing: 24) {
 					VStack(alignment: .leading, spacing: 12) {
 						Image(systemName: "doc.text").font(.system(size: 28, weight: .light)).foregroundStyle(Theme.text_faint)
-						TextField("Untitled routine", text: $draft.name, axis: .vertical).font(.system(size: 30, weight: .semibold)).tracking(-0.6).foregroundStyle(Theme.text).accessibilityIdentifier("editor.name")
+						TextField("Untitled page", text: $draft.name, axis: .vertical).font(.system(size: 30, weight: .semibold)).tracking(-0.6).foregroundStyle(Theme.text).accessibilityIdentifier("editor.name")
 						TextField("Add a description…", text: $draft.description, axis: .vertical).font(.system(size: 14)).foregroundStyle(Theme.text_dim).accessibilityIdentifier("editor.description")
 					}
 					Hairline()
@@ -40,7 +40,7 @@ struct EditorView: View {
 				}
 				.padding(24).padding(.bottom, 24)
 			}.paper_page().scrollDismissesKeyboard(.interactively)
-			.navigationTitle(is_new ? "New routine" : "Edit routine").navigationBarTitleDisplayMode(.inline)
+			.navigationTitle(is_new ? "New page" : "Edit page").navigationBarTitleDisplayMode(.inline)
 			.toolbar {
 				ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(saving) }
 				ToolbarItem(placement: .topBarTrailing) { Menu { Button("Advanced logic…", systemImage: "point.3.connected.trianglepath.dotted") { showing_behavior = true }.accessibilityIdentifier("editor.logic") } label: { Image(systemName: "ellipsis") } }

@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { graph_from_document } from "../lib/logic-graph";
+import { compile_graph, graph_from_document, make_node } from "../lib/logic-graph";
 import { call_mcp_tool } from "../lib/mcp";
 import { personal_routine } from "../lib/personal-routine";
 import { empty_library } from "../lib/library";
@@ -8,6 +8,13 @@ vi.mock("../lib/cloud", () => ({ fetch_library: vi.fn(), push_library: vi.fn() }
 const cloud = {} as Cloud;
 const account = { id: "owner", email: "test@example.com" };
 beforeEach(() => { vi.resetAllMocks(); });
+it("never publishes primitive drafts to an older phone through MCP", async () => {
+	const graph = graph_from_document(personal_routine); graph.nodes.push(make_node("elapsed_timer"));
+	const document = compile_graph(personal_routine, graph);
+	await expect(call_mcp_tool(cloud, account, "save_routine", { document })).rejects.toThrow("local web drafts");
+	await expect(call_mcp_tool(cloud, account, "save_routine_graph", { base_document: personal_routine, graph })).rejects.toThrow("local web drafts");
+	expect(push_library).not.toHaveBeenCalled(); expect(fetch_library).not.toHaveBeenCalled();
+});
 it("seeds the exact disabled routine into the authenticated account", async () => {
 	vi.mocked(fetch_library).mockResolvedValue(null); vi.mocked(push_library).mockResolvedValue(true);
 	await call_mcp_tool(cloud, account, "seed_home_allowance", {});

@@ -1,5 +1,7 @@
 import { createClient, type Session, type SupabaseClient } from "@supabase/supabase-js";
 import { library_schema, type Library } from "./library";
+import { fetch_plan } from "./account-client";
+import { assert_page_limit, plan_active } from "./page-plan";
 
 export type Account = { id: string; email: string | null };
 export type Cloud = { client: SupabaseClient };
@@ -48,6 +50,9 @@ export async function fetch_library(cloud: Cloud, account: Account): Promise<Clo
 }
 
 export async function push_library(cloud: Cloud, account: Account, library: Library, previous: CloudSnapshot | null): Promise<boolean> {
+	const old = previous?.library ?? { schema_version: 1 as const, tools: [] };
+	const is_new = library.tools.some(entry => !old.tools.some(item => item.document.id === entry.document.id));
+	if (is_new && library.tools.length > 3) { assert_page_limit(old, library, plan_active(await fetch_plan(cloud))); }
 	const row = { user_id: account.id, library: library_schema.parse(library) };
 	const query = previous
 		? cloud.client.from("libraries").update(row).eq("user_id", account.id).eq("updated_at", previous.updated_at)

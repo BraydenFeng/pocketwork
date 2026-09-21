@@ -7,6 +7,7 @@ struct PocketworkApp: App {
 	@Environment(\.scenePhase) private var scene_phase
 	@StateObject private var home = HomeLocationController.shared
 	@StateObject private var cloud = CloudController()
+	@StateObject private var subscriptions = SubscriptionController()
 	@StateObject private var sessions = SessionController.shared
 
 	// UI tests start from an empty library so screenshots are deterministic.
@@ -34,8 +35,13 @@ struct PocketworkApp: App {
 				.environmentObject(library)
 				.environmentObject(sessions)
 				.environmentObject(cloud)
+				.environmentObject(subscriptions)
 				.environmentObject(home)
-				.task { await cloud.attach(library, sessions) }
+				.task {
+					if !CommandLine.arguments.contains("--ui-testing") { do { try await HomeWorker.run { try BuilderAppRules.clear() } } catch { sessions.report(error) } }
+					await cloud.attach(library, sessions); await subscriptions.attach(cloud); await subscriptions.refresh()
+				}
+				.onChange(of: cloud.account_id) { _, _ in Task { await subscriptions.refresh() } }
 				.onChange(of: scene_phase) { _, phase in if phase == .active { Task { await cloud.sync() }; HomeScreenBridge.reconcile(session: sessions.session) } }
 				// Widgets read a snapshot, not the library; refresh it whenever routines or the session change.
 				.onAppear { HomeScreenBridge.publish(library: library.library, session: sessions.session) }

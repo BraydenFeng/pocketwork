@@ -1,221 +1,128 @@
 "use client";
 
+import { native_format_four } from "@/lib/release-flags";
+
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpRight, Bell, BookOpen, Braces, CalendarClock, Check, ChevronRight, Download, FileText, GripVertical, Hash, Info, Layers2, LayoutTemplate, ListChecks, MonitorSmartphone, MousePointer2, Play, Plus, Redo2, RotateCcw, Search, Shield, SlidersHorizontal, Smartphone, Timer, Trash2, Type, Undo2, Workflow, X } from "lucide-react";
-import { create_block, describe_shield, document_schema, move_block, new_id, remove_block, serialize_document, shield_mode, type AppDocument, type Block, type BlockType, type ShieldMode } from "@/lib/document";
+import { ArrowLeft, Check, ChevronRight, Download, FileText, Info, Link2, MoreHorizontal, Play, Redo2, RotateCcw, Smartphone, Undo2, Workflow, X } from "lucide-react";
+import { serialize_document, type AppDocument } from "@/lib/document";
+import { add_connected_block, checked_document, insert_page_block, is_page_kind, page_section, validate_connections, type CreationKind } from "@/lib/creation";
+import { compile_graph, graph_from_document, type LogicGraph } from "@/lib/logic-graph";
 import type { AppGroup } from "@/lib/library";
-import { ALL_DAYS, DAY_LABELS, WEEKDAYS } from "@/lib/schedule";
 import { change, redo, undo, type History } from "@/lib/history";
 import { initial_runtime, transition, type RuntimeAction } from "@/lib/runtime";
-import { load_guide_dismissed, save_guide_dismissed } from "@/lib/onboarding";
-import { Button, SectionLabel, TextField, Toggle } from "./ui";
+import { Button } from "./ui";
+import { BlockPicker } from "./creation-controls";
+import { RoutinePage } from "./routine-page";
+import { RoutineConnections } from "./routine-connections";
 import { PhonePreview } from "./preview";
 import { LogicCanvas } from "./logic-canvas";
-import { QuickStart, type GuideStep } from "./quick-start";
+import { BehaviorRunner } from "./behavior-runner";
 import type { SyncState } from "./app";
 
-const block_catalog = [
-	{ type: "heading", label: "Heading", description: "A title and supporting text", icon: Type },
-	{ type: "timer", label: "Timer", description: "A 15–120 minute countdown", icon: Timer },
-	{ type: "checklist", label: "Checklist", description: "Tasks you can check off", icon: ListChecks },
-	{ type: "counter", label: "Counter", description: "Track a count toward a goal", icon: Hash },
-	{ type: "note", label: "Note", description: "Text to read in your tool", icon: FileText },
-	{ type: "screen_time", label: "Screen Time", description: "Block chosen apps during focus", icon: Shield },
-	{ type: "schedule", label: "Schedule", description: "Runs by itself on set days and times", icon: CalendarClock },
-] satisfies { type: BlockType; label: string; description: string; icon: typeof Type }[];
-
-function error_message(error: unknown): string { return error instanceof Error ? error.message : "Something went wrong. Please try again."; }
+type EditorView = "page" | "connections" | "data" | "preview" | "advanced";
+function message(error: unknown): string { return error instanceof Error ? error.message : "Something went wrong. Please try again."; }
 
 export function Workbench({ tool, groups, on_save, on_back, storage_blocked, storage_error, on_replace_unreadable, on_dismiss_error, sync }: {
 	tool: AppDocument; groups: AppGroup[]; on_save: (document: AppDocument) => void; on_back: () => void; storage_blocked: boolean; storage_error: string | null; on_replace_unreadable: () => void; on_dismiss_error: () => void; sync: SyncState;
 }) {
 	const [history, set_history] = useState<History<AppDocument>>({ past: [], present: tool, future: [] });
-	const [previous_tool, set_previous_tool] = useState(tool);
-	if (tool !== previous_tool) {
-		set_previous_tool(tool);
-		if (history.present === previous_tool) { set_history({ past: [], present: tool, future: [] }); }
-	}
 	const document = history.present;
-	const [logic_dirty, set_logic_dirty] = useState(false);
-	const [ready, set_ready] = useState(false);
-	const [save_state, set_save_state] = useState("Saved on this browser");
+	const [previous_tool, set_previous_tool] = useState(tool);
+	if (tool !== previous_tool) { set_previous_tool(tool); if (history.present === previous_tool || JSON.stringify(history.present) === JSON.stringify(previous_tool)) { set_history({ past: [], present: tool, future: [] }); } }
+	const [view, set_view] = useState<EditorView>("page");
+	const [picker, set_picker] = useState<{ before?: string; connections_only?: boolean } | null>(null);
+	const [more, set_more] = useState(false);
+	const [help, set_help] = useState(false);
 	const [error, set_error] = useState<string | null>(null);
 	const [notice, set_notice] = useState<string | null>(null);
-	const [selected_id, set_selected_id] = useState<string | null>((tool.blocks.find((block) => block.type === "timer") ?? tool.blocks[0]).id);
-	const [view, set_view] = useState<"canvas" | "behavior" | "configuration">("canvas");
-	const [inspector, set_inspector] = useState<"block" | "app" | "device">("block");
-	const [interactive, set_interactive] = useState(false);
-	const [query, set_query] = useState("");
-	const [dragged_id, set_dragged_id] = useState<string | null>(null);
+	const [saving, set_saving] = useState(false);
+	const [save_failed, set_save_failed] = useState(false);
+	const [graph, set_graph] = useState<LogicGraph>(() => graph_from_document(tool));
+	const [graph_source, set_graph_source] = useState(tool);
+	const [graph_dirty, set_graph_dirty] = useState(false);
+	const [advanced_dirty, set_advanced_dirty] = useState(false);
+	const [selected_node, set_selected_node] = useState<string | null>(null);
 	const [runtime, set_runtime] = useState(initial_runtime);
+	const [preview_enabled, set_preview_enabled] = useState(false);
 	const [now, set_now] = useState(0);
-	const [guide_open, set_guide_open] = useState(false);
-	const [new_group, set_new_group] = useState("");
-	const [guide_step, set_guide_step] = useState<GuideStep>("customize");
-	const [focus_target, set_focus_target] = useState<"inspector" | "preview" | "guide" | "help" | null>(null);
-	const inspector_ref = useRef<HTMLElement>(null);
-	const preview_ref = useRef<HTMLElement>(null);
-	const help_ref = useRef<HTMLButtonElement>(null);
-	const search_input = useRef<HTMLInputElement>(null);
-	const selected_block = document.blocks.find((block) => block.id === selected_id);
-	const has_timer = document.blocks.some((block) => block.type === "timer");
-	const has_shield = document.blocks.some((block) => block.type === "screen_time");
-	const has_schedule = document.blocks.some((block) => block.type === "schedule");
-	const has_engine = has_timer || has_schedule;
-	const valid = document_schema.safeParse(document).success;
-
-	useEffect(() => {
-		try { set_guide_open(!load_guide_dismissed(window.localStorage)); }
-		catch (failure) { console.warn(error_message(failure)); set_guide_open(true); }
-		if (new URLSearchParams(window.location.search).get("view") === "logic") { set_view("behavior"); }
-		set_now(Date.now()); set_ready(true);
-	}, []);
-
-	useEffect(() => {
-		if (!focus_target) { return; }
-		const target = focus_target === "inspector" ? inspector_ref.current : focus_target === "preview" ? preview_ref.current : help_ref.current;
-		target?.focus({ preventScroll: true });
-		const region = focus_target === "guide" ? window.document.getElementById("quick-start") : target;
-		region?.scrollIntoView({ block: "start" });
-		set_focus_target(null);
-	}, [focus_target]);
-
-	useEffect(() => {
-		if (!ready || storage_blocked || document === tool) { return; }
-		set_save_state("Saving…");
-		const timeout = window.setTimeout(() => {
-			try { on_save(document); set_save_state("Saved on this browser"); }
-			catch (failure) { set_error(error_message(failure)); set_save_state("Not saved · export a backup"); }
-		}, 350);
-		return () => window.clearTimeout(timeout);
-	}, [document, ready, storage_blocked, on_save, tool]);
-
-	// Leaving the editor inside the debounce window must not drop the last edit.
+	const graph_stale = JSON.stringify(graph_source) !== JSON.stringify(document);
+	const graph_error = validate_connections(document, graph);
 	const pending = useRef({ document, tool, on_save, storage_blocked });
 	pending.current = { document, tool, on_save, storage_blocked };
+	useEffect(() => { if (new URLSearchParams(window.location.search).get("view") === "logic") { set_view("advanced"); } set_now(Date.now()); }, []);
+	useEffect(() => {
+		if (storage_blocked || document === tool || JSON.stringify(document) === JSON.stringify(tool)) { return; }
+		set_saving(true);
+		const timer = window.setTimeout(() => { try { on_save(checked_document(document)); set_saving(false); set_save_failed(false); } catch (failure) { set_error(message(failure)); set_saving(false); set_save_failed(true); } }, 350);
+		return () => window.clearTimeout(timer);
+	}, [document, tool, storage_blocked, on_save]);
 	useEffect(() => () => {
-		const { document: latest, tool: saved, on_save: save, storage_blocked: blocked } = pending.current;
-		if (blocked || latest === saved) { return; }
-		try { save(latest); } catch (failure) { console.warn(error_message(failure)); }
+		const latest = pending.current;
+		if (latest.storage_blocked || latest.document === latest.tool || JSON.stringify(latest.document) === JSON.stringify(latest.tool)) { return; }
+		try { latest.on_save(checked_document(latest.document)); } catch (failure) { console.warn("Could not save the last routine edit:", failure); }
 	}, []);
-
+	useEffect(() => { if (!graph_dirty) { set_graph(graph_from_document(document)); set_graph_source(document); } }, [document, graph_dirty]);
+	useEffect(() => { set_runtime(initial_runtime()); set_preview_enabled(document.enabled ?? false); }, [document, view]);
 	useEffect(() => {
-		const tick = () => { const timestamp = Date.now(); set_now(timestamp); set_runtime((state) => transition(document, state, { type: "tick", now: timestamp })); };
-		const interval = window.setInterval(tick, 500);
-		window.addEventListener("focus", tick);
-		return () => { window.clearInterval(interval); window.removeEventListener("focus", tick); };
-	}, [document]);
-
-	useEffect(() => { set_runtime(initial_runtime()); }, [document]);
+		if (view !== "preview") { return; }
+		const timer = window.setInterval(() => { const timestamp = Date.now(); set_now(timestamp); set_runtime(state => transition(document, state, { type: "tick", now: timestamp })); }, 500);
+		return () => window.clearInterval(timer);
+	}, [document, view]);
 	useEffect(() => {
-		function on_key(event: KeyboardEvent) {
+		const key = (event: KeyboardEvent) => {
 			const target = event.target as HTMLElement;
-			if (event.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) && !target.isContentEditable) {
-				event.preventDefault(); search_input.current?.focus();
-			}
-		}
-		window.addEventListener("keydown", on_key);
-		return () => window.removeEventListener("keydown", on_key);
-	}, []);
+			if (event.key === "Escape") { set_more(false); set_help(false); }
+			if (event.key === "/" && view === "page" && !picker && !["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) && !target.isContentEditable) { event.preventDefault(); set_picker({}); }
+		};
+		window.addEventListener("keydown", key); return () => window.removeEventListener("keydown", key);
+	}, [view, picker]);
 	useEffect(() => {
-		if (!notice) { return; }
-		const timeout = window.setTimeout(() => set_notice(null), 4500);
-		return () => window.clearTimeout(timeout);
-	}, [notice]);
-
-	function leave_workbench() { if (!logic_dirty || window.confirm("Discard unapplied graph changes?")) { on_back(); } }
-	function commit(next: AppDocument) { set_history((current) => change(current, next)); }
-	function update_block(next: Block) { commit({ ...document, blocks: document.blocks.map((block) => block.id === next.id ? next : block) }); }
-	function open_inspector(section: "block" | "app" | "device") { set_inspector(section); set_focus_target("inspector"); }
-	function select_block(id: string) { set_selected_id(id); set_interactive(false); set_view("canvas"); open_inspector("block"); }
-	function open_preview(test_mode: boolean) { set_view("canvas"); set_interactive(test_mode); set_focus_target("preview"); }
-	function toggle_guide(open: boolean) {
-		set_guide_open(open); set_focus_target(open ? "guide" : "help");
-		try { save_guide_dismissed(window.localStorage, !open); }
-		catch (failure) { console.warn(error_message(failure)); set_notice(error_message(failure)); }
+		const warn = (event: BeforeUnloadEvent) => { if (graph_dirty || advanced_dirty || save_failed) { event.preventDefault(); } };
+		window.addEventListener("beforeunload", warn); return () => window.removeEventListener("beforeunload", warn);
+	}, [graph_dirty, advanced_dirty, save_failed]);
+	function commit(next: AppDocument) { try { const valid = checked_document(next); set_history(current => change(current, valid)); set_error(null); } catch (failure) { set_error(message(failure)); } }
+	function edit_graph(next: LogicGraph) { set_graph(next); set_graph_dirty(true); set_error(null); }
+	function can_leave() {
+		if ((graph_dirty || advanced_dirty) && !window.confirm("Discard unsaved connection changes? Your saved routine will stay unchanged.")) { return false; }
+		set_graph_dirty(false); set_advanced_dirty(false); return true;
 	}
-	function guide_action() {
-		if (guide_step === "customize") { select_block((document.blocks.find((block) => block.type === "timer") ?? document.blocks[0]).id); }
-		else if (guide_step === "test") { open_preview(true); }
-		else { open_inspector("device"); }
-	}
-	function dispatch(action: RuntimeAction) { set_runtime((state) => transition(document, state, action)); }
-	function add_block(type: BlockType) {
-		if (document.blocks.length >= 20 || ((type === "timer" || type === "screen_time" || type === "schedule") && document.blocks.some((block) => block.type === type))) { return; }
-		if ((type === "schedule" && has_timer) || (type === "timer" && has_schedule)) { set_notice("A routine runs on a timer or on a schedule, not both. Remove the other one first."); return; }
-		const block = create_block(type);
-		// A schedule only means something if it locks apps, so switch that rule on when the pieces are there.
-		const rules = type === "schedule" && has_shield ? { ...document.rules, block_during_focus: true } : document.rules;
-		commit({ ...document, blocks: [...document.blocks, block], rules, ...(type === "schedule" ? { enabled: false } : {}) }); select_block(block.id); set_view("canvas");
-	}
-	function export_tool() {
+	function show(next: EditorView) { if (next !== view && !(["connections", "data"].includes(next) && ["connections", "data"].includes(view)) && !can_leave()) { return; } set_view(next); set_more(false); set_notice(null); }
+	function back() { if (can_leave()) { on_back(); } }
+	function connect_block(id?: string) { if (view !== "connections" && !can_leave()) { return; } set_graph(graph_from_document(document)); set_graph_source(document); set_selected_node(id ?? null); set_view(id && page_section(graph_from_document(document).nodes.find(node => node.id === id)?.kind ?? "") === "data" ? "data" : "connections"); }
+	function pick(kind: CreationKind) {
 		try {
-			const blob = new Blob([serialize_document(document)], { type: "application/json" });
-			const url = URL.createObjectURL(blob);
-			const link = window.document.createElement("a"); link.href = url; link.download = `${document.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "personal-tool"}.pocketwork.json`;
-			link.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); set_notice("Configuration exported. Import it from Files in the iPhone host.");
-		} catch (failure) { set_error(error_message(failure)); }
+			if (is_page_kind(kind)) { const next = insert_page_block(document, kind, picker?.before); commit(next); set_view("page"); if (kind === "schedule") { set_notice("Added the schedule and its app blocker. It stays off until you enable it on your iPhone."); } if (kind === "screen_time" && !document.blocks.some(block => block.type === "timer" || block.type === "schedule")) { set_notice("Added a 25-minute focus timer for this blocker. Change its duration right on the page."); } }
+			else { const base = graph_dirty ? graph : graph_from_document(document); const next = add_connected_block(base, kind); set_graph(next.graph); if (!graph_dirty) { set_graph_source(document); } set_graph_dirty(true); set_selected_node(next.selected); set_view(page_section(kind) === "data" ? "data" : "connections"); }
+			set_picker(null); set_error(null);
+		} catch (failure) { set_error(message(failure)); set_picker(null); }
 	}
-	function drop_block(target_id: string) {
-		if (!dragged_id || dragged_id === target_id) { return; }
-		const blocks = [...document.blocks]; const source = blocks.findIndex((block) => block.id === dragged_id); const target = blocks.findIndex((block) => block.id === target_id);
-		if (source >= 0 && target >= 0) { const [moved] = blocks.splice(source, 1); blocks.splice(target, 0, moved); commit({ ...document, blocks }); }
-		set_dragged_id(null);
+	function save_connections() {
+		try {
+			if (graph_stale) { throw new Error("This routine changed while you were connecting blocks. Discard this draft and reopen Connections to use the latest version."); }
+			if (graph_error) { throw new Error(graph_error); }
+			const next = compile_graph(document, graph); set_history(current => change(current, next)); set_graph_source(next); set_graph_dirty(false); set_error(null); set_notice("Connections saved. Preview to try your routine without affecting your phone."); set_view("page");
+		} catch (failure) { set_error(message(failure)); }
 	}
-	function update_rule(key: keyof AppDocument["rules"], value: boolean) { commit({ ...document, rules: { ...document.rules, [key]: value } }); }
-	function set_enabled(enabled: boolean) { commit({ ...document, enabled }); }
-
-	return <div className="workbench"><a className="skip-link" href="#canvas">Skip to workbench</a>
-		<header className="topbar"><div className="brand"><Layers2 /><span>pocketwork<span className="brand-period">.</span></span></div><span className="workspace-label">PERSONAL APP WORKBENCH</span><div className="topbar-actions"><button ref={help_ref} type="button" className="button button-quiet quick-start-toggle" aria-expanded={guide_open} aria-controls="quick-start" disabled={!ready} onClick={() => toggle_guide(!guide_open)}><BookOpen />Quick start</button><Button variant="quiet" onClick={() => open_inspector("device")}><Smartphone />iPhone setup</Button><span className="header-divider" /><Button variant="primary" onClick={export_tool} disabled={!ready || !valid}><Download />Export routine</Button></div>
-		</header>
-		<div className="projectbar"><div><div className="breadcrumb"><button type="button" className="breadcrumb-back" onClick={leave_workbench}><ArrowLeft />My routines</button><ChevronRight /><span>Editing</span></div><button className="project-title" type="button" title="Edit routine name and description" onClick={() => open_inspector("app")}><h1>{document.name}</h1><SlidersHorizontal /></button></div><div className="project-meta"><span className={`save-status ${storage_blocked ? "has-error" : ""}`}><span />{storage_blocked ? "Draft recovery needed" : save_state}</span><span className="local-tag">{sync === "off" ? "LOCAL FIRST" : sync === "syncing" ? "SYNCING" : sync === "error" ? "SYNC PAUSED" : "SYNCED"}</span></div></div>
-		{guide_open && <QuickStart step={guide_step} on_step={set_guide_step} on_action={guide_action} on_dismiss={() => toggle_guide(false)} />}
+	function export_routine() {
+		try { const url = URL.createObjectURL(new Blob([serialize_document(document)], { type: "application/json" })); const link = window.document.createElement("a"); link.href = url; link.download = `${document.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "routine"}.pocketwork.json`; link.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); set_more(false); }
+		catch (failure) { set_error(message(failure)); }
+	}
+	function dispatch(action: RuntimeAction) { set_runtime(state => transition(document, state, action)); }
+	const has_native_preview = document.blocks.some(block => block.type !== "note" || Boolean(block.text));
+	const save_label = storage_blocked ? "Storage needs attention" : save_failed ? "Not saved" : graph_dirty || advanced_dirty ? "Unsaved connections" : saving ? "Saving…" : document.schema_version === 4 && !native_format_four ? "Saved here · local-only blocks" : sync === "syncing" ? "Syncing…" : sync === "error" ? "Saved here · sync paused" : sync === "synced" ? "Saved & synced" : "Saved on this browser";
+	return <div className="creation-workspace"><a className="skip-link" href="#routine-editor">Skip to routine</a>
+		<header className="creation-topbar"><nav className="creation-breadcrumb" aria-label="Breadcrumb"><Button variant="quiet" onClick={back}><ArrowLeft /><span>My pages</span></Button><ChevronRight /><span>{document.name}</span></nav><div className="creation-topbar-actions"><span className={`creation-save ${save_failed || storage_blocked ? "is-error" : ""}`} role="status"><Check />{save_label}</span><Button variant={view === "preview" ? "primary" : "quiet"} aria-pressed={view === "preview"} onClick={() => show(view === "preview" ? "page" : "preview")}><Play />{view === "preview" ? "Back to editing" : "Preview"}</Button><div className="creation-more"><Button variant="quiet" aria-label="More page options" aria-expanded={more} onClick={() => set_more(!more)}><MoreHorizontal /></Button>{more && <div className="creation-more-menu"><Button variant="quiet" onClick={export_routine}><Download />Export page</Button><Button variant="quiet" onClick={() => show("advanced")}><Workflow />Advanced wiring</Button><Button variant="quiet" onClick={() => { set_help(true); set_more(false); }}><Smartphone />Use on iPhone</Button></div>}</div></div></header>
+		<div className="creation-toolbar"><div className="creation-tabs" role="tablist" aria-label="Editor view"><button type="button" role="tab" aria-selected={view === "page"} onClick={() => show("page")}><FileText />Page</button><button type="button" role="tab" aria-selected={view === "connections"} onClick={() => show("connections")}><Link2 />Routines</button><button type="button" role="tab" aria-selected={view === "data"} onClick={() => show("data")}><FileText />Data</button>{view === "advanced" && <button type="button" role="tab" aria-selected="true"><Workflow />Advanced wiring</button>}</div><div className="history-controls"><Button variant="quiet" aria-label="Undo edit" disabled={!history.past.length || graph_dirty || advanced_dirty || storage_blocked} onClick={() => set_history(undo)}><Undo2 /></Button><Button variant="quiet" aria-label="Redo edit" disabled={!history.future.length || graph_dirty || advanced_dirty || storage_blocked} onClick={() => set_history(redo)}><Redo2 /></Button></div></div>
 		{(error ?? storage_error) && <div className="alert-banner" role="alert"><Info /><span>{error ?? storage_error}</span>{storage_blocked && <Button onClick={on_replace_unreadable}>Replace unreadable data</Button>}<Button variant="quiet" aria-label="Dismiss error" onClick={() => { set_error(null); on_dismiss_error(); }}><X /></Button></div>}
-		{notice && <div className="notice-banner" role="status"><Check />{notice}</div>}
-		<main className={`workbench-grid ${view === "behavior" ? "has-logic-canvas" : ""}`}>
-			<aside className="library" aria-label="Component library"><div className="panel-heading"><SectionLabel number="01">ADD BLOCKS</SectionLabel><Layers2 /></div>
-				<p className="panel-hint">Add blocks below. Included controls open their settings.</p>
-				<label className="search-field"><Search /><input ref={search_input} placeholder="Find a block…" value={query} onChange={(event) => set_query(event.target.value)} aria-label="Search blocks" /><kbd>/</kbd></label>
-				<div className="library-list">{block_catalog.filter((entry) => `${entry.label} ${entry.description}`.toLowerCase().includes(query.toLowerCase())).map((entry) => {
-					const included = (entry.type === "timer" || entry.type === "screen_time" || entry.type === "schedule") ? document.blocks.find((block) => block.type === entry.type) : undefined;
-					return <button type="button" className="library-item" key={entry.type} disabled={!ready || (!included && document.blocks.length >= 20)} onClick={() => included ? select_block(included.id) : add_block(entry.type)} aria-label={`${included ? "Edit" : "Add"} ${entry.label}`}><span className="block-glyph"><entry.icon /></span><span><strong>{entry.label}</strong><small>{included ? "Added · click to edit" : entry.description}</small></span>{included ? <Check /> : <Plus />}</button>;
-				})}{block_catalog.filter((entry) => `${entry.label} ${entry.description}`.toLowerCase().includes(query.toLowerCase())).length === 0 && <p className="empty-hint">No matching blocks. Try “timer”, “schedule” or “note”.</p>}</div>
-				<div className="outline-heading"><SectionLabel>ON YOUR SCREEN</SectionLabel><span>{document.blocks.length}/20</span></div>
-				<ol className="block-outline">{document.blocks.map((block, index) => {
-					const Icon = block_catalog.find((entry) => entry.type === block.type)!.icon;
-					return <li key={block.id} className={selected_id === block.id ? "is-selected" : ""} draggable onDragStart={() => set_dragged_id(block.id)} onDragEnd={() => set_dragged_id(null)} onDragOver={(event) => event.preventDefault()} onDrop={() => drop_block(block.id)}><button type="button" className="outline-select" onClick={() => { select_block(block.id); set_view("canvas"); }} aria-pressed={selected_id === block.id}><GripVertical /><Icon /><span>{block.title}</span></button><div className="reorder-controls"><button type="button" aria-label={`Move ${block.title} up`} disabled={index === 0} onClick={() => commit(move_block(document, block.id, -1))}><ArrowUp /></button><button type="button" aria-label={`Move ${block.title} down`} disabled={index === document.blocks.length - 1} onClick={() => commit(move_block(document, block.id, 1))}><ArrowDown /></button></div></li>;
-				})}</ol>
-				<div className="library-footer"><MonitorSmartphone /><strong>Build here. Test here. Run on iPhone.</strong><p>This browser previews your routine. Running it on iPhone requires the native app, currently in development.</p><button className="text-button" type="button" onClick={() => open_inspector("device")}>What works on iPhone <ArrowUpRight /></button></div>
-			</aside>
-			<section ref={preview_ref} tabIndex={-1} className="canvas-region" id="canvas" aria-label="Workbench canvas"><div className="canvas-toolbar"><div className="view-tabs" role="tablist" aria-label="Editor view">{([{ id: "canvas", label: "Page", icon: LayoutTemplate }, { id: "behavior", label: "Logic", icon: Workflow }, { id: "configuration", label: "Advanced", icon: Braces }] as const).map((tab) => <button key={tab.id} type="button" role="tab" aria-selected={view === tab.id} onClick={() => set_view(tab.id)}><tab.icon />{tab.label}</button>)}</div><div className="history-controls"><Button variant="quiet" aria-label="Undo edit" disabled={!history.past.length} onClick={() => set_history(undo)}><Undo2 /></Button><Button variant="quiet" aria-label="Redo edit" disabled={!history.future.length} onClick={() => set_history(redo)}><Redo2 /></Button></div></div>
-				{view === "canvas" && <><div className="canvas-caption"><span><Smartphone />iPhone · live preview</span><div className="mode-switch"><button type="button" aria-pressed={!interactive} onClick={() => set_interactive(false)}><MousePointer2 />Edit</button><button type="button" aria-pressed={interactive} onClick={() => set_interactive(true)}><Play />Try it</button></div></div><div className="mode-hint" role="status">{interactive ? <><Play /><span><strong>Test mode.</strong> Use the buttons below. App blocking is only simulated.</span></> : <><MousePointer2 /><span><strong>Edit mode.</strong> Click a block below to change its settings. Use Try it to test buttons.</span></>}</div><div className="device-stage"><PhonePreview document={document} runtime={runtime} now={now} selected_id={selected_id} interactive={interactive} on_select={select_block} dispatch={dispatch} on_toggle_enabled={set_enabled} /></div><div className="preview-footnote"><span className="preview-badge">BROWSER SIMULATION</span><span>{interactive ? "Timer, tasks and counters are temporary here. The On/Off switch is saved with the routine." : "Add blocks from the library. Reorder them in On your screen."}</span></div></>}
-				<div hidden={view !== "behavior"}><LogicCanvas document={document} on_change={commit} disabled={storage_blocked} on_dirty_change={set_logic_dirty} /></div>
-				{view === "configuration" && <div className="configuration-panel"><SectionLabel number="V1">YOUR PORTABLE TOOL</SectionLabel><h2>Configuration, not code.</h2><p>This is the document both the visual editor and native host understand. No API keys, app-selection tokens, or executable scripts are exported.</p><pre tabIndex={0} aria-label="Routine JSON configuration">{JSON.stringify(document, null, 2)}</pre><Button onClick={export_tool}><Download />Download configuration</Button></div>}
-			</section>
-			<aside ref={inspector_ref} tabIndex={-1} className="inspector" aria-label="Inspector"><div className="panel-heading"><SectionLabel number="02">SETTINGS</SectionLabel><SlidersHorizontal /></div><Button className="return-to-preview" variant="quiet" onClick={() => open_preview(interactive)}><MonitorSmartphone />Back to preview</Button><div className="inspector-tabs" role="tablist" aria-label="Inspector section">{(["block", "app", "device"] as const).map((tab) => <button type="button" role="tab" aria-selected={inspector === tab} key={tab} onClick={() => set_inspector(tab)}>{tab === "block" ? "Block" : tab === "app" ? "Routine" : "iPhone"}</button>)}</div>
-				{inspector === "block" && (selected_block ? <div className="inspector-content" key={selected_block.id}><div className="inspector-title"><span className="block-glyph">{(() => { const Icon = block_catalog.find((entry) => entry.type === selected_block.type)!.icon; return <Icon />; })()}</span><div><h2>{block_catalog.find((entry) => entry.type === selected_block.type)!.label}</h2><span className="supporting">Changes appear in the preview. Text saves when you leave a field.</span></div></div>
-					<TextField label="Title" value={selected_block.title} required on_commit={(title) => update_block({ ...selected_block, title })} />
-					{selected_block.type === "heading" && <TextField label="Supporting text" value={selected_block.subtitle} multiline max_length={200} on_commit={(subtitle) => update_block({ ...selected_block, subtitle })} />}
-					{selected_block.type === "timer" && <><label className="field-label"><span>Session length</span><select className="field" value={selected_block.minutes} onChange={(event) => update_block({ ...selected_block, minutes: Number(event.target.value) })}>{Array.from(new Set([15, 20, 25, 30, 45, 60, 90, 120, selected_block.minutes])).sort((left, right) => left - right).map((minutes) => <option key={minutes} value={minutes}>{minutes} minutes</option>)}</select></label><p className="supporting">15–120 minutes. The native Screen Time monitor requires intervals of at least 15 minutes.</p><SectionLabel>CONNECTED BEHAVIOR</SectionLabel><Toggle label="Block during focus" description={has_shield ? "Screen Time apps selected on iPhone" : "Add a Screen Time block to enable"} checked={document.rules.block_during_focus} disabled={!has_shield} on_change={(value) => update_rule("block_during_focus", value)} /><Toggle label="Notify on completion" description="A local notification on iPhone" checked={document.rules.notify_on_complete} on_change={(value) => update_rule("notify_on_complete", value)} /></>}
-					{selected_block.type === "checklist" && <><SectionLabel>TASKS · {selected_block.items.length}/20</SectionLabel>{selected_block.items.map((item, index) => <div className="task-editor" key={item.id}><TextField label={`Task ${index + 1}`} value={item.text} required on_commit={(text) => update_block({ ...selected_block, items: selected_block.items.map((entry) => entry.id === item.id ? { ...entry, text } : entry) })} /><Button variant="quiet" aria-label={`Remove task ${index + 1}`} disabled={selected_block.items.length === 1} onClick={() => update_block({ ...selected_block, items: selected_block.items.filter((entry) => entry.id !== item.id) })}><X /></Button></div>)}<Button disabled={selected_block.items.length >= 20} onClick={() => update_block({ ...selected_block, items: [...selected_block.items, { id: new_id(), text: "Another small step" }] })}><Plus />Add task</Button></>}
-					{selected_block.type === "note" && <TextField label="Your note" value={selected_block.text} multiline max_length={1000} on_commit={(text) => update_block({ ...selected_block, text })} />}
-					{selected_block.type === "counter" && <label className="field-label"><span>Target</span><input className="field" type="number" min={1} max={1000} value={selected_block.target} onChange={(event) => { const target = Number(event.target.value); if (Number.isInteger(target) && target >= 1 && target <= 1000) { update_block({ ...selected_block, target }); } }} /></label>}
-					{selected_block.type === "schedule" && <><SectionLabel>DAYS</SectionLabel><div className="day-picker" role="group" aria-label="Days of the week">{ALL_DAYS.map((day) => <button type="button" key={day} aria-pressed={selected_block.days.includes(day)} onClick={() => { const days = selected_block.days.includes(day) ? selected_block.days.filter((entry) => entry !== day) : [...selected_block.days, day].sort((left, right) => left - right); if (days.length) { update_block({ ...selected_block, days }); } }}>{DAY_LABELS[day - 1]}</button>)}</div><div className="day-presets"><button type="button" className="text-button" onClick={() => update_block({ ...selected_block, days: ALL_DAYS })}>Every day</button><button type="button" className="text-button" onClick={() => update_block({ ...selected_block, days: WEEKDAYS })}>Weekdays</button></div>
-						<div className="time-fields"><label className="field-label"><span>Starts</span><input className="field" type="time" value={selected_block.start} onChange={(event) => { if (event.target.value) { update_block({ ...selected_block, start: event.target.value }); } }} /></label><label className="field-label"><span>Ends</span><input className="field" type="time" value={selected_block.end} onChange={(event) => { if (event.target.value) { update_block({ ...selected_block, end: event.target.value }); } }} /></label></div><p className="supporting">An end time earlier than the start runs past midnight. Switch the routine on from the preview or My routines.</p>
-						<SectionLabel>CONNECTED BEHAVIOR</SectionLabel><Toggle label="Block while active" description={has_shield ? "Screen Time apps selected on iPhone" : "Add a Screen Time block to enable"} checked={document.rules.block_during_focus} disabled={!has_shield} on_change={(value) => update_rule("block_during_focus", value)} /></>}
-					{selected_block.type === "screen_time" && <><SectionLabel>WHAT HAPPENS</SectionLabel><div className="mode-radio" role="radiogroup" aria-label="What happens to the apps">{([["block", "Block", "Lock these groups"], ["allow_only", "Only these", "Lock everything except these groups"], ["limit", "Limit", "Lock after so many minutes"]] as const).map(([mode, label, hint]) => <button type="button" role="radio" key={mode} aria-checked={shield_mode(selected_block) === mode} onClick={() => update_block({ ...selected_block, mode, ...(mode === "limit" ? { limit_minutes: selected_block.limit_minutes ?? 30 } : { limit_minutes: undefined }) })}><strong>{label}</strong><span>{hint}</span></button>)}</div>
-						{shield_mode(selected_block) === "limit" && <label className="field-label"><span>Minutes before it locks</span><select className="field" value={selected_block.limit_minutes ?? 30} onChange={(event) => update_block({ ...selected_block, limit_minutes: Number(event.target.value) })}>{Array.from(new Set([15, 30, 45, 60, 90, 120, 180, selected_block.limit_minutes ?? 30])).sort((left, right) => left - right).map((minutes) => <option key={minutes} value={minutes}>{minutes} minutes</option>)}</select></label>}
-						<SectionLabel>APP GROUPS</SectionLabel>{groups.length === 0 && (selected_block.groups ?? []).length === 0 && <p className="supporting">No groups yet. Name one below; you choose its apps on your iPhone.</p>}
-						<div className="group-picks">{[...groups.map((group) => group.name), ...(selected_block.groups ?? []).filter((name) => !groups.some((group) => group.name.toLowerCase() === name.toLowerCase()))].map((name) => { const on = (selected_block.groups ?? []).some((entry) => entry.toLowerCase() === name.toLowerCase()); return <label key={name} className="toggle-row"><span><span className="toggle-title">{name}</span></span><input type="checkbox" checked={on} onChange={(event) => update_block({ ...selected_block, groups: event.target.checked ? [...(selected_block.groups ?? []), name] : (selected_block.groups ?? []).filter((entry) => entry.toLowerCase() !== name.toLowerCase()) })} /></label>; })}</div>
-						<form className="group-rename" onSubmit={(event) => { event.preventDefault(); const name = new_group.trim(); if (name && !(selected_block.groups ?? []).some((entry) => entry.toLowerCase() === name.toLowerCase())) { update_block({ ...selected_block, groups: [...(selected_block.groups ?? []), name] }); } set_new_group(""); }}><input className="field" aria-label="New group name" placeholder="New group, e.g. Social" value={new_group} maxLength={40} onChange={(event) => set_new_group(event.target.value)} /><Button disabled={!new_group.trim()} onClick={() => { const name = new_group.trim(); if (name && !(selected_block.groups ?? []).some((entry) => entry.toLowerCase() === name.toLowerCase())) { update_block({ ...selected_block, groups: [...(selected_block.groups ?? []), name] }); } set_new_group(""); }}><Plus />Add</Button></form>
-						<p className="supporting">{describe_shield(selected_block)}. {(selected_block.groups ?? []).length ? "The apps in each group are chosen on your iPhone and stay there." : "With no groups, this routine asks you to choose its apps on your iPhone."}</p>
-						<div className="capability-note"><Shield /><strong>Your selection stays on your phone.</strong><p>Choose apps using Apple’s private picker in the native host. Website and category selections are supported there too.</p></div><Toggle label={has_schedule ? "Block while active" : "Block during focus"} description={has_engine ? (has_schedule ? "Locked while the schedule window is open" : "Release when the session ends or is stopped") : "Add a timer or schedule first"} checked={document.rules.block_during_focus} disabled={!has_engine} on_change={(value) => update_rule("block_during_focus", value)} /><Button onClick={() => set_inspector("device")}><Smartphone />View device requirements</Button></>}
-					<div className="inspector-bottom"><Button variant="danger" disabled={document.blocks.length === 1} onClick={() => { const next = remove_block(document, selected_block.id); commit(next); set_selected_id(next.blocks[0].id); }}><Trash2 />Remove block</Button></div>
-				</div> : <div className="empty-hint">Select a block in your screen to edit it.</div>)}
-				{inspector === "app" && <div className="inspector-content"><div className="inspector-title"><LayoutTemplate /><h2>Name your routine</h2></div><TextField label="Routine name" value={document.name} required on_commit={(name) => commit({ ...document, name })} /><TextField label="Description" value={document.description} multiline max_length={200} on_commit={(description) => commit({ ...document, description })} /><div className="capability-note"><strong>Saved with your other routines.</strong><p>Every routine is kept on this browser. Export a file to move one to your iPhone or another computer. There is no cloud sync or account yet.</p></div><Button onClick={leave_workbench}><ArrowLeft />Back to my routines</Button></div>}
-				{inspector === "device" && <div className="inspector-content"><div className="inspector-title"><Smartphone /><h2>From canvas to iPhone</h2></div><span className="preview-badge">NATIVE HOST · DEVELOPMENT</span><p className="supporting">The browser is ready to use. The iPhone host source is included, but it is not an App Store app yet.</p><ol className="device-steps"><li><strong>Build the native host</strong><p>Use a Mac with Xcode. Follow ios/README.md to configure signing, App Groups, and Family Controls.</p></li><li><strong>Export this routine</strong><p>Save the JSON file to iCloud Drive or send it to your iPhone.</p></li><li><strong>Import and grant access</strong><p>Open the host, import from Files, then select the apps to block and allow notifications if desired.</p></li></ol><div className="capability-note"><Info /><strong>Honest permission boundaries</strong><p>Nothing here has Apple approval yet. Real blocking needs signing and device verification. The user can always end a session.</p></div><p className="supporting">Location triggers, widgets, and subscription billing are not part of this build.</p></div>}
-				<div className="runtime-panel"><SectionLabel number="03">TEST ACTIVITY</SectionLabel><div className="runtime-status"><span className={runtime.status === "running" ? "status-dot is-running" : "status-dot"} /><span>{runtime.status === "running" ? "Session running · simulated" : runtime.status === "completed" ? "Session completed" : "Ready when you are"}</span><button type="button" aria-label="Reset preview session" onClick={() => set_runtime(initial_runtime())}><RotateCcw /></button></div>{runtime.events.length ? <ol className="event-log" aria-live="polite">{runtime.events.slice(-3).map((event, index) => <li key={`${event.at}-${index}`}>{event.message}</li>)}</ol> : <p className="supporting">Switch to Try it and start a session to see what your rules do.</p>}{runtime.status === "running" && <Button variant="quiet" onClick={() => dispatch({ type: "tick", now: runtime.ends_at! })}>Simulate timer finishing <ChevronRight /></Button>}</div>
-			</aside>
-		</main><footer className="workbench-footer"><span><span className="status-dot" />Your own little routines.</span><span>LOCAL PROTOTYPE <span className="footer-separator">/</span> SCHEMA V1</span></footer>
+		{notice && <div className="notice-banner" role="status"><Check /><span>{notice}</span><Button variant="quiet" aria-label="Dismiss message" onClick={() => set_notice(null)}><X /></Button></div>}
+		{help && <div className="creation-help"><div>{document.schema_version === 4 && !native_format_four ? <><strong>This draft needs a compatible phone update.</strong><p>These new blocks currently run only in the browser. Sign-in and export do not make them compatible with the installed iPhone app. Any earlier phone version of this routine stays unchanged.</p></> : <><strong>Your routine follows your account.</strong><p>Open Pocketwork on your iPhone with the same sign-in to sync. Choose apps, grant permissions, and enable schedules there. Browser previews never change phone restrictions. Without sign-in, export the routine and import it on the phone.</p></>}</div><Button variant="quiet" aria-label="Close iPhone help" onClick={() => set_help(false)}><X /></Button></div>}
+		<main id="routine-editor">
+			{document.schema_version === 4 && !native_format_four && <div className="creation-help"><Info /><p>Saved only here until the compatible iPhone update is available. Existing phone pages stay unchanged.</p></div>}
+			{view === "page" && <RoutinePage document={document} groups={groups} on_change={commit} on_add={before => set_picker({ before })} on_connect={connect_block} on_error={set_error} />}
+			{(view === "connections" || view === "data") && <><RoutineConnections section={view === "data" ? "data" : "routines"} graph={graph} selected={selected_node} on_select={set_selected_node} on_change={edit_graph} on_add={() => set_picker({ connections_only: true })} on_page={() => show("page")} on_advanced={() => show("advanced")} on_error={set_error} /><div className="connection-savebar"><div><strong>{graph_dirty ? "Finish your connections" : "All connections saved"}</strong><p>{graph_stale && graph_dirty ? "This routine has changed. Reload before saving." : graph_dirty && graph_error ? graph_error : "Only complete, valid connections are saved to your routine."}</p></div>{graph_dirty && <Button variant="quiet" onClick={() => { if (can_leave()) { set_graph(graph_from_document(document)); set_graph_source(document); } }}>Discard changes</Button>}<Button variant="primary" onClick={save_connections} disabled={!graph_dirty || Boolean(graph_error) || graph_stale || storage_blocked}>Save connections</Button></div></>}
+			{view === "advanced" && <LogicCanvas document={document} on_change={commit} disabled={storage_blocked} on_dirty_change={set_advanced_dirty} />}
+			{view === "preview" && <div className={`creation-preview ${has_native_preview ? "has-native-preview" : ""}`}><div className="preview-explanation"><span className="document-eyebrow">TRY YOUR ROUTINE</span><h1>A test run. Nothing on your phone changes.</h1><p>Buttons, entries, and switches here are simulated. Test data resets when you leave this preview.</p>{has_native_preview && <><Button variant="quiet" onClick={() => { set_runtime(initial_runtime()); set_preview_enabled(document.enabled ?? false); }}><RotateCcw />Reset timer</Button>{runtime.status === "running" && <Button variant="quiet" onClick={() => dispatch({ type: "tick", now: runtime.ends_at! })}>Simulate timer finishing</Button>}<p role="status">{runtime.status === "running" ? "Session running · simulated" : runtime.status === "completed" ? "Session completed" : "Ready when you are"}</p>{runtime.events.length > 0 && <ol className="event-log">{runtime.events.slice(-3).map((event, index) => <li key={index}>{event.message}</li>)}</ol>}</>}</div>{has_native_preview && <PhonePreview document={{ ...document, ...(document.enabled !== undefined ? { enabled: preview_enabled } : {}) }} runtime={runtime} now={now} selected_id={null} interactive on_select={() => undefined} dispatch={dispatch} on_toggle_enabled={set_preview_enabled} />}{document.behaviors && <div className="creation-behavior-preview"><BehaviorRunner graph={graph_from_document(document)} simple /></div>}</div>}
+		</main>
+		{picker && <BlockPicker connections_only={picker.connections_only} on_close={() => set_picker(null)} on_pick={pick} />}
 	</div>;
 }

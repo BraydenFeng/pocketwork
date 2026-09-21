@@ -175,7 +175,7 @@ struct LogicEditorView: View {
 				VStack(alignment: .leading, spacing: 20) {
 					if let node = graph.nodes.first(where: { $0.id == id }) {
 						if node.kind == "schedule", graph.nodes.contains(where: { $0.kind == "allowance" }) { Text("Your time windows live in Daily allowance. The schedule keeps the allowance active throughout the day.").supporting() } else if let block = node.block { BlockEditorView(block: Binding(get: { graph.nodes.first { $0.id == id }?.block ?? block }, set: { value in update(id) { $0.block = value } }), groups: library.groups, embedded: true) }
-						if let config = node.config { BehaviorSettings(kind: node.kind, config: Binding(get: { graph.nodes.first { $0.id == id }?.config ?? config }, set: { value in update(id) { $0.config = value } })) }
+						if let config = node.config { BehaviorSettings(kind: node.kind, variables: graph.nodes.filter { $0.kind == "variable" && $0.id != id }, config: Binding(get: { graph.nodes.first { $0.id == id }?.config ?? config }, set: { value in update(id) { $0.config = value } })) }
 						if let policy = node.policy { LogicAllowanceSettings(policy: Binding(get: { graph.nodes.first { $0.id == id }?.policy ?? policy }, set: { value in update(id) { $0.policy = value } })) }
 						if ["home", "usage"].contains(node.kind) { Text("Uses the saved location and distraction selection on this phone. Usage away from that location does not count.").supporting() }
 						SectionLabel(text: "Connections")
@@ -200,10 +200,12 @@ private struct LogicPortSelection: Identifiable { var node: String; var name: St
 
 private struct BehaviorSettings: View {
 	let kind: String
+	let variables: [LogicItem]
 	@Binding var config: BehaviorConfig
 	var body: some View {
 		VStack(alignment: .leading, spacing: 20) {
 			Field(label: "Name") { TextField("Block name", text: $config.label).accessibilityIdentifier("logic.label") }
+			PrimitiveSettingsView(kind: kind, variables: variables, config: $config)
 			if ["variable", "count", "compare", "goal", "app_usage"].contains(kind) {
 				Field(label: kind == "count" ? "Increase by" : kind == "variable" ? "Initial value" : "Target value") { TextField("Value", value: $config.value, format: .number).keyboardType(.numbersAndPunctuation).accessibilityIdentifier("logic.value") }
 			}

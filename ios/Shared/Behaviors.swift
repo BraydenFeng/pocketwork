@@ -14,6 +14,11 @@ struct BehaviorConfig: Codable, Equatable {
 	var operation: String? = nil
 	var metric: String? = nil
 	var groups: [String]? = nil
+	var variable_id: String? = nil
+	var change: String? = nil
+	var timer_mode: String? = nil
+	var end_time: String? = nil
+	var unit: String? = nil
 }
 struct BehaviorNode: Codable, Equatable, Identifiable {
 	var id: String
@@ -35,12 +40,13 @@ struct BehaviorGraph: Codable, Equatable {
 		"not": (["condition":"boolean"], ["result":"boolean"]), "branch": (["condition":"boolean"], ["yes":"boolean", "no":"boolean"]),
 		"delay": (["start":"boolean"], ["done":"boolean"]), "variable": (["set":"number"], ["value":"number"]),
 		"count": (["increment":"boolean", "reset":"boolean"], ["value":"number"]),
-		"compare": (["value":"number"], ["result":"boolean"]), "goal": (["value":"number"], ["reached":"boolean"]),
+		"compare": (["value":"number", "threshold":"number"], ["result":"boolean"]), "goal": (["value":"number"], ["reached":"boolean"]),
 		"streak": (["check_in":"boolean"], ["days":"number"]), "reminder": (["send":"boolean"], ["sent":"boolean"])
-	].merging(BuilderRuntime.ports) { first, _ in first }
+	].merging(BuilderRuntime.ports) { first, _ in first }.merging(PrimitiveRuntime.ports) { first, _ in first }
 	static func node_ports(_ kind: String, _ config: BehaviorConfig?) -> (inputs: [String: String], outputs: [String: String]) {
 		var result = ports[kind] ?? (inputs: [:], outputs: [:])
 		if kind == "form" { for field in config?.fields ?? BuilderRuntime.fields { result.outputs[field.id] = field.type } }
+		if kind == "record" { result.inputs = Dictionary(uniqueKeysWithValues: (config?.fields ?? BuilderRuntime.fields).map { ($0.id, $0.type) }) }
 		return result
 	}
 	func ordered(external: [String: [String: String]], require_inputs: Bool = true) throws -> [BehaviorNode] {
@@ -59,18 +65,19 @@ struct BehaviorGraph: Codable, Equatable {
 		}
 		for node in nodes { for port in Self.node_ports(node.kind, node.config).inputs.keys {
 			if !require_inputs { continue }
-			if (node.kind == "variable" && port == "set") || (node.kind == "count" && port == "reset") || (node.kind == "save_entry" && port == "clear") { continue }
+			if PrimitiveRuntime.optional(node, port) { continue }
 			guard occupied.contains(node.id + "." + port) else { throw DocumentError.invalid("Connect the " + port + " input first.") }
 		} }
+		let dependencies = connections + (try PrimitiveRuntime.dependencies(self, strict: require_inputs))
 		var remaining = nodes; var result: [BehaviorNode] = []
 		while !remaining.isEmpty {
-			guard let index = remaining.firstIndex(where: { node in !connections.contains { edge in edge.to == node.id && remaining.contains { $0.id == edge.from } } }) else { throw DocumentError.invalid("Behavior connections cannot contain a loop.") }
+			guard let index = remaining.firstIndex(where: { node in !dependencies.contains { edge in edge.to == node.id && remaining.contains { $0.id == edge.from } } }) else { throw DocumentError.invalid("Connections cannot loop back to the variable they update. Use Add or Subtract instead.") }
 			result.append(remaining.remove(at: index))
 		}
 		return result
 	}
 }
-struct BehaviorSignal { var value: Double; var token: String; var type: String = "boolean"; var available = true; var text: String?; var record: [String: BuilderValue]?; var rows: [BuilderEntry]? }
+struct BehaviorSignal { var value: Double; var token: String; var type: String = "boolean"; var available = true; var text: String?; var record: [String: BuilderValue]?; var rows: [BuilderEntry]?; var event_token: String? }
 struct BehaviorPending: Codable { var id: String; var at: Double; var token: String }
 struct BehaviorState: Codable {
 	var values: [String: Double] = [:]
@@ -80,6 +87,7 @@ struct BehaviorState: Codable {
 	var sequence = 0
 	var data: BuilderState?
 	var at_location: Bool?
+	var timers: [String: PrimitiveTimerValue]?
 }
 struct BehaviorContext {
 	var now: Date
@@ -92,6 +100,7 @@ struct BehaviorContext {
 	var health: [String: Double] = [:]
 	var reconcile_actions = false
 	var calendar: Calendar = .current
+	var timer_command: PrimitiveTimerCommand?
 }
 struct BehaviorResult {
 	var state: BehaviorState
@@ -106,6 +115,7 @@ enum BehaviorRuntime {
 		var signals = context.external; var messages: [(id: String, message: String)] = []
 		let external = context.external.mapValues { $0.mapValues(\.type) }
 		let calendar = context.calendar
+		let primitive_events = PrimitiveRuntime.requires_four(graph)
 		func day_key(_ date: Date) -> String { let c = calendar.dateComponents([.year,.month,.day], from: date); return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0) }
 		let day = day_key(context.now)
 		let yesterday = day_key(calendar.date(byAdding: .day, value: -1, to: context.now) ?? context.now)
@@ -116,12 +126,33 @@ enum BehaviorRuntime {
 			func input(_ port: String) -> BehaviorSignal { guard let edge = graph.connections.first(where: { $0.to == node.id && $0.input == port }) else { return BehaviorSignal(value: 0, token: "") }; return signals[edge.from]?[edge.output] ?? BehaviorSignal(value: 0, token: "") }
 			func emit(_ port: String, _ value: Double, _ token: String? = nil) { output[port] = BehaviorSignal(value: value, token: token ?? String(value), type: BehaviorGraph.node_ports(node.kind, node.config).outputs[port] ?? "boolean") }
 			func boolean(_ port: String, _ value: Bool, _ token: String? = nil) { emit(port, value ? 1 : 0, token) }
-			func once(_ port: String) -> Bool { let signal = input(port); let key = node.id + "." + port; if signal.value == 0 { state.fired.removeValue(forKey: key); return false }; if state.fired[key] == signal.token { return false }; state.fired[key] = signal.token; return true }
-			if node.kind != "variable" && graph.connections.contains(where: { $0.to == node.id && signals[$0.from]?[$0.output]?.available == false }) {
+			func once(_ port: String) -> Bool { let signal = input(port); let key = node.id + "." + port; if primitive_events { return PrimitiveRuntime.once(signal, state: &state, key: key) }; if !signal.available { return false }; if signal.value == 0 { state.fired.removeValue(forKey: key); return false }; if state.fired[key] == signal.token { return false }; state.fired[key] = signal.token; return true }
+			if !["variable", "elapsed_timer"].contains(node.kind) && graph.connections.contains(where: { $0.to == node.id && signals[$0.from]?[$0.output]?.available == false }) {
+				if node.kind == "app_gate" {
+					actions.append(BuilderAction(id: node.id, kind: "app_gate", token: "unavailable", active: false, groups: node.config.groups))
+					var data = state.data ?? BuilderState(); data.gates[node.id] = false; state.data = data
+				}
 				for (port,type) in BehaviorGraph.node_ports(node.kind, node.config).outputs { output[port] = BehaviorSignal(value: 0,token: "",type: type,available: false) }
 				signals[node.id] = output; continue
 			}
 			switch node.kind {
+			case "elapsed_timer": output = try PrimitiveRuntime.timer(node, state: &state, context: context, input: input, linked: { port in graph.connections.contains { $0.to == node.id && $0.input == port } })
+			case "time_window": let active = PrimitiveRuntime.window_active(node, context: context); boolean("active", active); boolean("outside", !active)
+			case "record":
+				var record: [String: BuilderValue] = [:]
+				for field in c.fields ?? BuilderRuntime.fields { let signal = input(field.id); record[field.id] = field.type == "number" ? .number(signal.value) : field.type == "text" ? .text(signal.text ?? "") : .boolean(signal.value != 0) }
+				output["record"] = BehaviorSignal(value: 0, token: pulse, type: "record", record: record)
+			case "change_value":
+				guard let target = graph.nodes.first(where: { $0.id == c.variable_id }) else { throw DocumentError.invalid("Choose a variable first.") }
+				let changed = once("when")
+				if changed {
+					let current = state.values[target.id] ?? target.config.value
+					let amount = graph.connections.contains { $0.to == node.id && $0.input == "amount" } ? input("amount").value : c.value
+					let value = c.change == "reset" ? target.config.value : c.change == "set" ? amount : c.change == "subtract" ? current - amount : current + amount
+					guard value.isFinite, abs(value) <= 1000000 else { throw DocumentError.invalid("Variable result must be between -1,000,000 and 1,000,000.") }
+					state.values[target.id] = value
+				}
+				boolean("changed", changed, pulse); emit("value", state.values[target.id] ?? target.config.value)
 			case "location": boolean("present", context.at_location == true); boolean("away", context.at_location == false); output["present"]?.available = context.at_location != nil; output["away"]?.available = context.at_location != nil
 			case "button": boolean("pressed", context.tap == node.id, pulse)
 			case "check_in": boolean("done", context.tap == node.id, pulse); if context.tap == node.id { state.days[node.id] = day }
@@ -140,13 +171,15 @@ enum BehaviorRuntime {
 			case "count": if once("reset") { state.values[node.id] = 0 }; if once("increment") { state.values[node.id] = min(1000000, (state.values[node.id] ?? 0) + c.value) }; emit("value", state.values[node.id] ?? 0)
 			case "compare", "goal":
 				let value = input("value").value
+				let target = graph.connections.contains { $0.to == node.id && $0.input == "threshold" } ? input("threshold").value : c.value
 				let result: Bool
-				switch node.kind == "goal" ? "gte" : c.operator { case "gt": result = value > c.value; case "eq": result = value == c.value; case "lt": result = value < c.value; case "lte": result = value <= c.value; default: result = value >= c.value }
+				switch node.kind == "goal" ? "gte" : c.operator { case "gt": result = value > target; case "eq": result = value == target; case "lt": result = value < target; case "lte": result = value <= target; default: result = value >= target }
 				boolean(node.kind == "goal" ? "reached" : "result", result)
 			case "streak": if once("check_in") && state.days[node.id] != day { state.values[node.id] = state.days[node.id] == yesterday ? (state.values[node.id] ?? 0)+1 : 1; state.days[node.id] = day }; emit("days", state.days[node.id] == day || state.days[node.id] == yesterday ? state.values[node.id] ?? 0 : 0)
 			case "reminder": let send = once("send"); if send { messages.append((node.id, c.message)) }; boolean("sent", send, pulse)
-			default: output = try BuilderRuntime.run(node, state: &state, context: context, signals: signals, connections: graph.connections, actions: &actions, day: day)
+			default: output = try BuilderRuntime.run(node, state: &state, context: context, signals: signals, connections: graph.connections, actions: &actions, day: day, primitive_events: primitive_events)
 			}
+			if primitive_events { PrimitiveRuntime.mark_events(node, outputs: &output, input: input) }
 			signals[node.id] = output
 		}
 		state.at_location = context.at_location
@@ -173,6 +206,7 @@ extension BehaviorState {
 		values = values.filter { live.contains($0.key) }; days = days.filter { live.contains($0.key) }
 		fired = fired.filter { stable.contains(String($0.key.split(separator: ".").first ?? "")) }
 		pending = pending.filter { stable.contains($0.id) }
+		timers = timers?.filter { stable.contains($0.key) }
 		// Reading and writing `data` in one statement is an exclusivity violation; work on a copy and assign it back.
 		if var builder = data {
 			builder.inputs = builder.inputs.filter { live.contains($0.key) }

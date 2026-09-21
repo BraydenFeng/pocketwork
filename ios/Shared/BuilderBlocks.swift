@@ -33,7 +33,7 @@ enum BuilderRuntime {
 		"number_input": ([:], ["value":"number", "changed":"boolean"]), "text_input": ([:], ["value":"text", "changed":"boolean"]), "checkbox": ([:], ["checked":"boolean", "changed":"boolean"]),
 		"form": ([:], ["submitted":"boolean", "record":"record"]), "save_entry": (["record":"record", "save":"boolean", "clear":"boolean"], ["rows":"table", "count":"number", "saved":"boolean"]),
 		"aggregate": (["rows":"table"], ["value":"number"]), "calculate": (["a":"number", "b":"number"], ["value":"number"]), "text_compare": (["text":"text"], ["result":"boolean"]),
-		"table": (["rows":"table"], ["rows":"table"]), "chart": (["rows":"table"], ["rows":"table"]), "progress": (["value":"number"], ["value":"number", "fraction":"number"]),
+		"table": (["rows":"table"], ["rows":"table"]), "chart": (["rows":"table"], ["rows":"table"]), "progress": (["value":"number", "target":"number"], ["value":"number", "fraction":"number", "target":"number"]),
 		"health": ([:], ["value":"number"]), "app_gate": (["closed":"boolean"], ["active":"boolean"]), "add_allowance": (["grant":"boolean"], ["granted":"boolean"])
 	]
 	static func validate(_ node: BehaviorNode) throws {
@@ -47,12 +47,12 @@ enum BuilderRuntime {
 		if let operation = c.operation { guard ["add","subtract","multiply","divide","sum","average","minimum","maximum","count","equals","contains","starts_with"].contains(operation), allowed[node.kind]?.contains(operation) ?? true else { throw DocumentError.invalid("Choose an operation supported by this block.") } }
 		if node.kind == "app_gate" { guard !(c.groups ?? []).isEmpty else { throw DocumentError.invalid("Choose at least one app group for App gate.") } }
 	}
-	static func run(_ node: BehaviorNode, state: inout BehaviorState, context: BehaviorContext, signals: [String: [String: BehaviorSignal]], connections: [BehaviorEdge], actions: inout [BuilderAction], day: String) throws -> [String: BehaviorSignal] {
+	static func run(_ node: BehaviorNode, state: inout BehaviorState, context: BehaviorContext, signals: [String: [String: BehaviorSignal]], connections: [BehaviorEdge], actions: inout [BuilderAction], day: String, primitive_events: Bool = false) throws -> [String: BehaviorSignal] {
 		var data = state.data ?? BuilderState(); let c = node.config; let pulse = String(state.sequence); var output: [String: BehaviorSignal] = [:]
 		func input(_ port: String) -> BehaviorSignal { guard let edge = connections.first(where: { $0.to == node.id && $0.input == port }) else { return BehaviorSignal(value: 0, token: "") }; return signals[edge.from]?[edge.output] ?? BehaviorSignal(value: 0, token: "", available: false) }
 		func emit(_ port: String, _ value: Double, token: String? = nil) { let valid = value.isFinite && abs(value) <= 1000000; output[port] = BehaviorSignal(value: valid ? value : 0, token: token ?? String(value), type: BehaviorGraph.node_ports(node.kind, c).outputs[port] ?? "number", available: valid) }
 		func scalar(_ port: String, _ value: BuilderValue) { switch value { case .number(let number): emit(port, number); case .boolean(let boolean): emit(port, boolean ? 1 : 0); case .text(let text): output[port] = BehaviorSignal(value: 0, token: text, type: "text", text: text) } }
-		func once(_ port: String) -> Bool { let value = input(port); let key = node.id + "." + port; if value.value == 0 { state.fired.removeValue(forKey: key); return false }; if state.fired[key] == value.token { return false }; state.fired[key] = value.token; return true }
+		func once(_ port: String) -> Bool { let value = input(port); let key = node.id + "." + port; if primitive_events { return PrimitiveRuntime.once(value, state: &state, key: key) }; if !value.available { return false }; if value.value == 0 { state.fired.removeValue(forKey: key); return false }; if state.fired[key] == value.token { return false }; state.fired[key] = value.token; return true }
 		switch node.kind {
 		case "number_input", "text_input", "checkbox":
 			let incoming = context.inputs[node.id]
@@ -86,7 +86,7 @@ enum BuilderRuntime {
 			switch c.operation ?? "add" { case "subtract": value = a-b; case "multiply": value = a*b; case "divide": value = a/b; default: value = a+b }; emit("value", value)
 		case "text_compare": let text = input("text").text ?? "", target = c.text ?? ""; let matches = c.operation == "contains" ? text.contains(target) : c.operation == "starts_with" ? text.hasPrefix(target) : text == target; emit("result", matches ? 1 : 0)
 		case "table", "chart": output["rows"] = input("rows")
-		case "progress": let value = input("value").value; emit("value", value); emit("fraction", c.value > 0 ? max(0,min(1,value/c.value)) : 0)
+		case "progress": let value = input("value").value; let target = connections.contains { $0.to == node.id && $0.input == "target" } ? input("target").value : c.value; emit("value", value); emit("target", target); emit("fraction", target > 0 ? max(0,min(1,value/target)) : 0)
 		case "health": let value = context.health[c.metric ?? "steps"]; emit("value", value ?? 0); output["value"]?.available = value != nil
 		case "app_gate": let active = input("closed").value != 0; if data.gates[node.id] != active || context.reconcile_actions { actions.append(BuilderAction(id: node.id, kind: node.kind, token: node.id + ":" + String(active), active: active, groups: c.groups ?? [])); data.gates[node.id] = active }; emit("active", active ? 1 : 0)
 		case "add_allowance": let grant = input("grant").value != 0 && data.rewards[node.id] != day; if grant { actions.append(BuilderAction(id: node.id, kind: node.kind, token: node.id + ":" + day, minutes: c.minutes)); data.rewards[node.id] = day }; emit("granted", grant ? 1 : 0, token: day)

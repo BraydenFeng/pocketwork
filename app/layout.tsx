@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./tokens.css";
 import "./globals.css";
+import "./creation.css";
+import "./account.css";
 
 export const metadata: Metadata = { title: "Pocketwork — your own little routines", description: "Build iPhone routines that hold you to what you decided, from small, useful blocks. No code to maintain." };
 

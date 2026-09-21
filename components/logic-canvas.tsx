@@ -5,12 +5,14 @@ import { ArrowRight, Check, CircleHelp, GripVertical, Plus, RotateCcw, Trash2, W
 import { behavior_catalog, is_behavior } from "@/lib/behaviors";
 import { BuilderSettings } from "./builder-settings";
 import { BehaviorRunner } from "./behavior-runner";
+import { PrimitiveSettings } from "./primitive-settings";
 import type { HomePolicy } from "@/lib/home-policy";
 import type { AppDocument, Block } from "@/lib/document";
 import { compile_graph, connect, connection_key, graph_from_document, make_node, node_catalog, node_ports, node_height, NODE_WIDTH, PORT_GAP, PORT_TOP, type Connection, type LogicGraph, type LogicNode, type NodeKind } from "@/lib/logic-graph";
 import { Button, SectionLabel, TextField } from "./ui";
 
 const library_sections: { title: string; kinds: NodeKind[] }[] = [
+	{ title: "Building blocks", kinds: ["elapsed_timer", "time_window", "change_value", "record"] },
 	{ title: "Inputs", kinds: ["number_input", "text_input", "checkbox", "form", "health"] },
 	{ title: "Time & location", kinds: ["timer", "schedule", "clock", "location", "arrive", "leave", "delay"] },
 	{ title: "Data", kinds: ["variable", "count", "streak", "usage", "app_usage", "allowance", "save_entry", "aggregate"] },
@@ -54,7 +56,7 @@ export function LogicCanvas({ document, on_change, disabled = false, on_dirty_ch
 		window.addEventListener("beforeunload", warn); return () => window.removeEventListener("beforeunload", warn);
 	}, [dirty]);
 	function edit(next: LogicGraph) { set_graph(next); set_dirty(true); set_error(null); set_status("Draft connections · apply when ready"); }
-	function update(next: LogicNode) { edit({ ...graph, nodes: graph.nodes.map((item) => item.id === next.id ? next : item) }); }
+	function update(next: LogicNode) { edit({ ...graph, nodes: graph.nodes.map((item) => item.id === next.id ? next : item), connections: next.kind === "change_value" && next.config?.change === "reset" ? graph.connections.filter(edge => edge.to !== next.id || edge.input !== "amount") : graph.connections }); }
 	function input(id: string, port: string) {
 		if (!pending) { set_status("Choose an output on the right of a node first."); return; }
 		try { edit(connect(graph, { from: pending.id, output: pending.port, to: id, input: port })); set_pending(null); }
@@ -121,7 +123,7 @@ function NodeSettings({ node, graph, update, select }: { node: LogicNode; graph:
 		{node.kind === "home" && <p>Uses the location saved on your iPhone. The current phone app calls its setup button Set home here. One saved location is supported.</p>}
 		{node.kind === "usage" && <p>Counts distraction usage only when both Home and Window are true. Away usage never counts. iOS reports whole-minute checkpoints.</p>}
 		{node.kind === "notification" && <p>Connect a timer's finished output. The iPhone schedules a local completion notification; permission is required.</p>}
-		{is_behavior(node.kind) && node.config && <BehaviorSettings node={node} update={update} />}
+		{is_behavior(node.kind) && node.config && <BehaviorSettings node={node} graph={graph} update={update} />}
 		{node.policy && <PolicySettings node={node} update={update} />}
 	</div>;
 }
@@ -145,13 +147,14 @@ function PolicySettings({ node, update }: { node: LogicNode; update: (node: Logi
 	</>;
 }
 
-function BehaviorSettings({ node, update }: { node: LogicNode; update: (node: LogicNode) => void }) {
+function BehaviorSettings({ node, graph, update }: { node: LogicNode; graph: LogicGraph; update: (node: LogicNode) => void }) {
 	const config = node.config!;
 	const patch = (next: Partial<typeof config>) => update({ ...node, config: { ...config, ...next } });
 	return <>
+		<PrimitiveSettings node={node} graph={graph} patch={patch} />
 		<BuilderSettings node={node} patch={patch} />
 		<label>Name<input value={config.label} onChange={event => patch({ label: event.target.value })} maxLength={80} /></label>
-		{["variable", "count", "goal", "compare", "app_usage"].includes(node.kind) && <label>{node.kind === "count" ? "Increase by" : node.kind === "variable" ? "Initial value" : "Target value"}<input type="number" value={config.value} onChange={event => patch({ value: Number(event.target.value) })} /></label>}
+		{["count", "goal", "compare", "app_usage"].includes(node.kind) && <label>{node.kind === "count" ? "Increase by" : "Target value"}<input type="number" value={config.value} onChange={event => patch({ value: Number(event.target.value) })} /></label>}
 		{node.kind === "delay" && <label>Wait (minutes)<input type="number" min="1" max="1440" value={config.minutes} onChange={event => patch({ minutes: Number(event.target.value) })} /></label>}
 		{node.kind === "delay" && <p>Starting again restarts the wait. Pending waits resume when you reopen this routine.</p>}
 		{node.kind === "compare" && <label>Comparison<select value={config.operator} onChange={event => patch({ operator: event.target.value as typeof config.operator })}><option value="gte">At least</option><option value="gt">Greater than</option><option value="eq">Equal to</option><option value="lt">Less than</option><option value="lte">At most</option></select></label>}

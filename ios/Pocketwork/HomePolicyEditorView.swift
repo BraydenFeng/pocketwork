@@ -13,7 +13,7 @@ struct HomePolicyEditorView: View {
 			ScrollView {
 				VStack(alignment: .leading, spacing: 24) {
 					Image(systemName: "house").font(.system(size: 28, weight: .light)).foregroundStyle(Theme.text_faint)
-					TextField("Routine name", text: $draft.name, axis: .vertical).font(.system(size: 30, weight: .semibold)).foregroundStyle(Theme.text).accessibilityIdentifier("editor.name")
+					TextField("Page name", text: $draft.name, axis: .vertical).font(.system(size: 30, weight: .semibold)).foregroundStyle(Theme.text).accessibilityIdentifier("editor.name")
 					Text("A daily allowance, shared across your windows. Only usage at home counts.").supporting()
 					Hairline()
 					ForEach(Array((draft.home_allowance?.rules ?? []).indices), id: \.self) { index in

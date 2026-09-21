@@ -1,4 +1,11 @@
 :root {
+	--editor-page-width: 800px;
+	--editor-page-top: 64px;
+	--editor-page-bottom: 96px;
+	--editor-heading: 40px;
+	--editor-gutter: 48px;
+	--editor-picker: 480px;
+	--editor-overlay: oklch(0.24 0.016 239 / 0.24);
 	--logic-library: 192px;
 	--logic-inspector: 264px;
 	--logic-stage: 580px;

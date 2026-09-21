@@ -3,6 +3,7 @@ import { behavior_ports, behavior_catalog, behavior_config_schema, behavior_kind
 import { home_policy_schema } from "./home-policy";
 import { block_schema, create_block, document_schema, type AppDocument, type Block } from "./document";
 import type { HomePolicy } from "./home-policy";
+import { requires_format_four } from "./primitives";
 
 export type NodeKind = BehaviorKind | "timer" | "schedule" | "apps" | "notification" | "home" | "usage" | "allowance";
 export type LogicNode = { id: string; kind: NodeKind; x: number; y: number; block?: Block; policy?: HomePolicy; config?: BehaviorConfig };
@@ -34,7 +35,7 @@ export function connection_key(edge: Connection): string { return `${edge.from}.
 export function node_ports(node: LogicNode) { if (is_behavior(node.kind)) { const ports = behavior_ports({ kind: node.kind, config: node.config ?? behavior_config_schema.parse({}) }); return { inputs: Object.keys(ports.inputs), outputs: Object.keys(ports.outputs) }; } return node_catalog[node.kind]; }
 export function node_height(node: LogicNode): number { const ports = node_ports(node); return PORT_TOP + Math.max(ports.inputs.length, ports.outputs.length) * PORT_GAP + 16; }
 export function make_node(kind: NodeKind, x = 48, y = 48): LogicNode {
-	if (is_behavior(kind)) { return { id: crypto.randomUUID(), kind, x, y, config: behavior_config_schema.parse({ label: behavior_catalog[kind].title }) }; }
+	if (is_behavior(kind)) { return { id: crypto.randomUUID(), kind, x, y, config: behavior_config_schema.parse({ label: behavior_catalog[kind].title, ...(kind === "elapsed_timer" ? { value: 25, timer_mode: "countdown" } : kind === "variable" ? { value: 0 } : kind === "change_value" ? { change: "add" } : {}) }) }; }
 	const block = kind === "timer" || kind === "schedule" ? create_block(kind) : kind === "apps" ? create_block("screen_time") : undefined;
 	const policy: HomePolicy | undefined = kind === "allowance" ? { timezone: "America/Los_Angeles", away_usage_counts: false, outside_windows: "unrestricted", rules: [{ days: [1, 2, 3, 4, 5, 6, 7], allowance_minutes: 30, windows: [{ start: "06:30", end: "20:30" }] }] } : undefined;
 	return { id: block?.id ?? crypto.randomUUID(), kind, x, y, ...(block ? { block } : {}), ...(policy ? { policy } : {}) };
@@ -108,7 +109,7 @@ export function compile_graph(base: AppDocument, graph: LogicGraph): AppDocument
 	} else { delete result.home_allowance; result.schema_version = 1; }
 	if (by_kind("schedule")) { result.enabled = base.blocks.some((block) => block.id === by_kind("schedule")?.id) ? base.enabled ?? false : false; } else { delete result.enabled; }
 	const behaviors = behavior_part(graph);
-	if (behaviors.nodes.length) { behavior_order(behaviors, external_ports(graph), true); result.behaviors = behaviors_schema.parse(behaviors); result.schema_version = 3; } else { delete result.behaviors; }
+	if (behaviors.nodes.length) { behavior_order(behaviors, external_ports(graph), true); result.behaviors = behaviors_schema.parse(behaviors); result.schema_version = requires_format_four(behaviors) ? 4 : 3; } else { delete result.behaviors; }
 	const parsed = document_schema.safeParse(result);
 	if (!parsed.success) { throw new Error(parsed.error.issues[0].message); }
 	return parsed.data;

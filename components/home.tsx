@@ -1,5 +1,7 @@
 "use client";
 
+import { native_format_four } from "@/lib/release-flags";
+
 import { useRef } from "react";
 import { useState } from "react";
 import { ArrowRight, Check, CloudOff, Copy, Info, Layers2, LogIn, LogOut, Pencil, Plus, RefreshCw, Shield, Trash2, Upload, X } from "lucide-react";
@@ -56,24 +58,24 @@ export function Home({ library, now, error, notice, storage_blocked, phone_statu
 		finally { if (file_input.current) { file_input.current.value = ""; } }
 	}
 
-	return <div className="workbench home"><a className="skip-link" href="#my-tools">Skip to my routines</a>
-		<header className="topbar"><div className="brand"><Layers2 /><span>pocketwork<span className="brand-period">.</span></span></div><span className="workspace-label">PERSONAL APP WORKBENCH</span><div className="topbar-actions">{cloud_available && (account
+	return <div className="workbench home"><a className="skip-link" href="#my-tools">Skip to my pages</a>
+		<header className="topbar"><div className="brand"><Layers2 /><span>pocketwork<span className="brand-period">.</span></span></div><span className="workspace-label">PAGES / ROUTINES / DATA</span><div className="topbar-actions">{cloud_available && (account
 				? <span className="account-chip"><Button onClick={on_connect_agent}>Copy agent connection</Button><span className="account-email">{account.email ?? "Signed in"}</span><Button variant="quiet" onClick={on_sign_out}><LogOut />Sign out</Button></span>
-				: <><Button variant="primary" onClick={() => on_sign_in("apple")}><LogIn />Sign in with Apple</Button>{process.env.NEXT_PUBLIC_GOOGLE_ENABLED === "true" && <Button onClick={() => on_sign_in("google")}>Google</Button>}</>)}<Button onClick={() => on_create(blank_tool())}><Plus />New routine</Button><Button onClick={() => file_input.current?.click()}><Upload />Add from file</Button></div>
-			<input ref={file_input} className="file-input" type="file" accept=".json,application/json" aria-label="Import routine file" onChange={(event) => { void import_file(event.target.files?.[0]); }} />
+				: <><Button variant="primary" onClick={() => on_sign_in("apple")}><LogIn />Sign in with Apple</Button>{process.env.NEXT_PUBLIC_GOOGLE_ENABLED === "true" && <Button onClick={() => on_sign_in("google")}>Google</Button>}</>)}<Button onClick={() => on_create(blank_tool())}><Plus />New page</Button><Button onClick={() => file_input.current?.click()}><Upload />Add from file</Button></div>
+			<input ref={file_input} className="file-input" type="file" accept=".json,application/json" aria-label="Import page file" onChange={(event) => { void import_file(event.target.files?.[0]); }} />
 		</header>
-		<div className="projectbar home-intro"><div><h1>My routines</h1><p className="supporting">{account ? "Create here. Open Pocketwork on your iPhone with the same sign-in to sync, then choose which apps to block." : cloud_available ? "Sign in and your routines follow you to your iPhone. Until then they live on this browser." : "Your own little tools. Create a routine and make it yours."}</p></div><span className={`save-status ${storage_blocked || sync === "error" ? "has-error" : ""}`}>{sync === "syncing" ? <RefreshCw className="is-spinning" /> : sync === "error" ? <CloudOff /> : <span />}{saved_where}</span></div>
+		<div className="projectbar home-intro"><div><h1>My pages</h1><p className="supporting">{account ? "Create here. Open Pocketwork on your iPhone with the same sign-in to sync, then choose which apps to block." : cloud_available ? "Sign in and your pages follow you to your iPhone. Until then they live on this browser." : "Your own little tools. Pages hold your routines and data."}</p></div><span className={`save-status ${storage_blocked || sync === "error" ? "has-error" : ""}`}>{sync === "syncing" ? <RefreshCw className="is-spinning" /> : sync === "error" ? <CloudOff /> : <span />}{saved_where}</span></div>
 		{error && <div className="alert-banner" role="alert"><Info /><span>{error}</span>{storage_blocked && <Button onClick={on_replace_unreadable}>Replace unreadable data</Button>}<Button variant="quiet" aria-label="Dismiss error" onClick={on_dismiss_error}><X /></Button></div>}
 		{notice && <div className="notice-banner" role="status"><Check />{notice}<Button variant="quiet" aria-label="Dismiss message" onClick={on_dismiss_notice}><X /></Button></div>}
 		<main className="home-main">
 			<section className="home-section" id="my-tools" aria-labelledby="my-tools-heading">
-				<div className="home-section-heading"><SectionLabel number="01">MY ROUTINES</SectionLabel><h2 id="my-tools-heading">{tools.length ? "Pick up where you left off." : "Nothing here yet."}</h2></div>
-				{tools.length ? <ul className="tool-grid" aria-label="Your routines">{tools.map((entry) => {
+				<div className="home-section-heading"><SectionLabel number="01">MY PAGES</SectionLabel><h2 id="my-tools-heading">{tools.length ? "Pick up where you left off." : "Nothing here yet."}</h2></div>
+				{tools.length ? <ul className="tool-grid" aria-label="Your pages">{tools.map((entry) => {
 					const schedule = entry.document.blocks.find((block) => block.type === "schedule");
 					return <li key={entry.document.id} className="tool-card">
-					<button type="button" className="tool-open" onClick={() => on_open(entry.document.id)} aria-label={`Open ${entry.document.name}`}><strong>{entry.document.name}</strong><span className="tool-summary">{summarize_tool(entry.document)}</span>{entry.document.description && <span className="supporting">{entry.document.description}</span>}<span className="tool-meta">{phone_line(entry.document) ?? (entry.document.home_allowance ? (entry.document.enabled ? "Home allowance enabled" : "Home allowance off") : schedule?.type === "schedule" ? describe_status(schedule, entry.document.enabled === true, now) : format_edited(entry.updated_at, now))}</span></button>
+					<button type="button" className="tool-open" onClick={() => on_open(entry.document.id)} aria-label={`Open ${entry.document.name}`}><strong>{entry.document.name}</strong><span className="tool-summary">{summarize_tool(entry.document)}</span>{entry.document.description && <span className="supporting">{entry.document.description}</span>}<span className="tool-meta">{entry.document.schema_version === 4 && !native_format_four ? "Local draft · phone update required" : phone_line(entry.document) ?? (entry.document.home_allowance ? (entry.document.enabled ? "Home allowance enabled" : "Home allowance off") : schedule?.type === "schedule" ? describe_status(schedule, entry.document.enabled === true, now) : format_edited(entry.updated_at, now))}</span></button>
 					<div className="tool-actions">{is_standing(entry.document) && !entry.document.home_allowance && <label className="card-switch"><input type="checkbox" role="switch" aria-label={`Switch ${entry.document.name} on or off`} checked={entry.document.enabled === true} onChange={(event) => on_toggle(entry.document.id, event.target.checked)} /><span>{entry.document.enabled ? "On" : "Off"}</span></label>}<button type="button" className="text-button" onClick={() => on_duplicate(entry.document.id)} aria-label={`Duplicate ${entry.document.name}`}><Copy />Duplicate</button><button type="button" className="text-button is-danger" onClick={() => on_delete(entry.document.id)} aria-label={`Delete ${entry.document.name}`}><Trash2 />Delete</button></div>
-				</li>; })}</ul> : <p className="empty-hint home-empty">Click New routine to start with a blank canvas. Add the blocks and rules you want.</p>}
+				</li>; })}</ul> : <p className="empty-hint home-empty">Start with a blank page. Add routines to make things happen, and data to keep track. Your first three pages are free, including MCP and sync.</p>}
 			</section>
 			<section className="home-section" aria-labelledby="groups-heading">
 				<div className="home-section-heading"><SectionLabel number="02">APP GROUPS</SectionLabel><h2 id="groups-heading">Name the apps once. Every routine can use them.</h2><p className="supporting">Groups like Social or Work are named here and filled with real apps on your iPhone, privately. A routine can block a group, allow only a group, or limit it to so many minutes.</p></div>
@@ -87,6 +89,6 @@ export function Home({ library, now, error, notice, storage_blocked, phone_statu
 				</ul>
 			</section>
 
-		</main><footer className="workbench-footer"><span><span className="status-dot" />Your own little tools.</span><span>PERSONAL WORKSPACE <span className="footer-separator">/</span> SCHEMA V1</span></footer>
+		</main><footer className="workbench-footer"><span><span className="status-dot" />Your own little tools.</span><span><a href="/account">Account & plan</a> · <a href="/privacy">Privacy</a> · <a href="/support">Support</a></span></footer>
 	</div>;
 }

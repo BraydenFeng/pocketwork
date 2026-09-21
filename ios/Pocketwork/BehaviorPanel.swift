@@ -18,6 +18,8 @@ struct BehaviorPanel: View {
 	@State private var error: String?
 	@State private var busy = false
 	@State private var paused = false
+	@State private var visible = false
+	@State private var epoch = 0
 	@State private var timer_end: Date?
 	private let clock = Timer.publish(every: CommandLine.arguments.contains("--ui-testing") ? 3600 : 1, on: .main, in: .common).autoconnect()
 	private var storage_key: String { "behaviors.v1." + library.behavior_owner_key + "." + document.id }
@@ -43,12 +45,16 @@ struct BehaviorPanel: View {
 				}
 				ForEach(graph.nodes) { node in
 					if node.kind == "button" || node.kind == "check_in" { Button(node.config.label.isEmpty ? node.kind : node.config.label) { Task { await run(tap: node.id) } }.buttonStyle(QuietButtonStyle()).disabled(paused || busy).accessibilityIdentifier("behavior." + node.id) }
-					else if ["count","streak","variable","goal"].contains(node.kind) { HStack { Text(node.config.label).heading_font(15); Spacer(); Text(display(node)).supporting() } }
+					else if node.kind == "elapsed_timer" { PrimitiveTimerView(node: node, outputs: outputs[node.id] ?? [:], command: { command in Task { await run(timer_command: command) } }).disabled(busy || paused) }
+					else if ["count","streak","variable","goal","app_usage"].contains(node.kind) { HStack { Text(node.config.label).heading_font(15); Spacer(); Text(display(node)).supporting() } }
 					else { BuilderNodeView(node: node, state: state.data, outputs: outputs[node.id] ?? [:], input: { value in Task { await run(inputs: [node.id: value]) } }, submit: { values in Task { await run(submission: BuilderSubmission(node: node.id, values: values)) } }).disabled(busy) }
 				}
 				ForEach(Array(messages.enumerated()), id: \.offset) { _, message in Text(message).supporting() }
 				if let error { Text(error).foregroundStyle(Theme.danger).font(.system(size: 13)) }
-			}.onAppear { load(graph); Task { if graph.nodes.contains(where: { $0.kind == "health" }) { await health.refresh(graph.nodes.filter { $0.kind == "health" }.map { $0.config.metric ?? "steps" }) }; await run() } }
+			}.onAppear { visible = true; load(graph); Task { if graph.nodes.contains(where: { $0.kind == "health" }) { await health.refresh(graph.nodes.filter { $0.kind == "health" }.map { $0.config.metric ?? "steps" }) }; await run() } }
+			.onDisappear { visible = false; release_gates() }
+			.onChange(of: paused) { _, value in if value { release_gates() } else { reconcile_actions = true } }
+			.onChange(of: scene_phase) { _, value in if value != .active { release_gates() } else { reconcile_actions = true } }
 			.sheet(isPresented: $groups_open) { NavigationStack { GroupsView().toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { groups_open = false; reconcile_actions = true } } } } }
 			.onChange(of: graph) { _, next in load(next) }
 			.onChange(of: library.behavior_owner_key) { _, _ in load(graph) }
@@ -56,8 +62,15 @@ struct BehaviorPanel: View {
 		}
 	}
 	private func display(_ node: BehaviorNode) -> String {
-		guard let value = outputs[node.id]?.values.first else { return "0" }
-		return node.kind == "goal" ? (value.value != 0 ? "Reached" : "In progress") : String(format: "%.0f", value.value)
+		let port = node.kind == "app_usage" ? "minutes" : node.kind == "streak" ? "days" : node.kind == "goal" ? "reached" : "value"
+		guard let value = outputs[node.id]?[port], value.available else { return "Unavailable" }
+		return node.kind == "goal" ? (value.value != 0 ? "Goal reached" : "In progress") : value.value.formatted(.number.precision(.fractionLength(0...2))) + (node.config.unit.map { " " + $0 } ?? (node.kind == "app_usage" ? " minutes" : ""))
+	}
+	private func release_gates() {
+		epoch += 1; reconcile_actions = true
+		guard !CommandLine.arguments.contains("--ui-testing") else { return }
+		let id = document.id
+		Task { do { try await HomeWorker.run { try BuilderAppRules.prune(document: id, nodes: []) } } catch { self.error = "Could not release this page's app restrictions: " + error.localizedDescription } }
 	}
 	private func load(_ graph: BehaviorGraph) {
 		do {
@@ -67,10 +80,10 @@ struct BehaviorPanel: View {
 			state.at_location = nil
 		} catch { self.error = "Could not load behavior progress: " + error.localizedDescription; paused = true }
 	}
-	@MainActor private func run(tap: String? = nil, inputs: [String: BuilderValue] = [:], submission: BuilderSubmission? = nil) async {
-		guard let graph = document.behaviors, !busy, !paused || tap != nil || !inputs.isEmpty || submission != nil else { return }; paused = false
+	@MainActor private func run(tap: String? = nil, inputs: [String: BuilderValue] = [:], submission: BuilderSubmission? = nil, timer_command: PrimitiveTimerCommand? = nil) async {
+		guard let graph = document.behaviors, visible, scene_phase == .active, !busy, !paused else { return }
 		busy = true; defer { busy = false }
-		let key = storage_key
+		let key = storage_key, run_epoch = epoch
 		do {
 			let now = Date(); let testing = CommandLine.arguments.contains("--ui-testing")
 			var used: Double?
@@ -79,7 +92,7 @@ struct BehaviorPanel: View {
 				let snapshot = try await HomeWorker.run { try HomeEngine.snapshot() }
 				if let policy = snapshot.document?.home_allowance { used = snapshot.ledger.day == policy.day_key(now) ? Double(snapshot.ledger.used_minutes) : 0; let base = policy.rule(at: now)?.allowance_minutes ?? 0; allowance = snapshot.ledger.day == policy.day_key(now) ? snapshot.ledger.budget(base) : base }
 			}
-			guard key == storage_key else { return }
+			guard key == storage_key, run_epoch == epoch, visible, !paused, scene_phase == .active else { return }
 			if let session = sessions.session, session.document_id == document.id { timer_end = session.ends_at }
 			var external: [String: [String: BehaviorSignal]] = [:]
 			for (id, ports) in document.behavior_external_ports { external[id] = ports.mapValues { BehaviorSignal(value: 0, token: "", type: $0) } }
@@ -97,7 +110,7 @@ struct BehaviorPanel: View {
 				external["daily-allowance"] = ["reached":signal(reached,String(reached))]
 				external["daily-allowance"]?["reached"]?.available = used != nil
 			}
-			let result = try BehaviorRuntime.run(graph, state: state, context: BehaviorContext(now: now, at_location: location, usage_minutes: used, tap: tap, external: external, inputs: inputs, submission: submission, health: health.values, reconcile_actions: reconcile_actions))
+			let result = try BehaviorRuntime.run(graph, state: state, context: BehaviorContext(now: now, at_location: location, usage_minutes: used, tap: tap, external: external, inputs: inputs, submission: submission, health: health.values, reconcile_actions: reconcile_actions, timer_command: timer_command))
 			if !testing {
 				let id = document.id, groups = library.groups, active_nodes = Set(graph.nodes.filter { $0.kind == "app_gate" }.map(\.id)), reconcile = reconcile_actions
 				try await HomeWorker.run {
@@ -108,6 +121,7 @@ struct BehaviorPanel: View {
 					}
 				}
 			}
+			guard run_epoch == epoch, key == storage_key else { return }
 			reconcile_actions = false
 			let data = try JSONEncoder().encode(SavedBehaviors(graph: graph, state: result.state))
 			UserDefaults.standard.set(data, forKey: key)
@@ -116,6 +130,6 @@ struct BehaviorPanel: View {
 				let content = UNMutableNotificationContent(); content.title = document.name; content.body = effect.message; content.sound = .default
 				try await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "behavior." + document.id + "." + effect.id + "." + String(state.sequence), content: content, trigger: nil))
 			} }
-		} catch { self.error = "Could not run behavior: " + error.localizedDescription; paused = true }
+		} catch { self.error = "Could not run behavior: " + error.localizedDescription; paused = true; release_gates() }
 	}
 }

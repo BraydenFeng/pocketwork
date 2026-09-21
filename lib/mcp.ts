@@ -1,3 +1,4 @@
+import { native_format_four } from "./release-flags";
 import { z } from "zod";
 import { behavior_catalog } from "./behaviors";
 import { document_schema } from "./document";
@@ -29,7 +30,7 @@ export async function call_mcp_tool(cloud: Cloud, account: Account, name: string
 		const chart = render_history_png(found.status);
 		return { content: [{ type: "text", text: `${summary} ${chart.caption}` }, { type: "image", data: chart.png.toString("base64"), mimeType: "image/png" }] };
 	}
-	if (name === "get_capabilities") { return content({ graph_schema: z.toJSONSchema(graph_schema), graph_nodes: node_catalog, behaviors: behavior_catalog, execution: "New behaviors require the format-3 phone update. They run while the routine is open, including location transitions and allowance-meter usage. Existing Screen Time enforcement remains background capable. Browser Test logic simulates events. Progress is device-local; no AI API is used.", document_schema: z.toJSONSchema(document_schema, { unrepresentable: "any" }), home_allowance: "One home allowance per phone, daily shared windows, home-only whole-minute usage checkpoints; a final partial minute may be lost at departure. Home geofence is 150 m and OS callbacks may be delayed. Phone setup/permissions required. Cloud changes apply when the phone app opens." }); }
+	if (name === "get_capabilities") { return content({ model: "Pages hold routines (actions) and data (values, entries, displays). API routine names are kept for compatibility. Three free pages at a time; MCP and sync are free. Existing pages stay usable after cancellation.", native_format_four, graph_schema: z.toJSONSchema(graph_schema), graph_nodes: node_catalog, behaviors: behavior_catalog, execution: "Format-3 behaviors require their phone update and run while the routine is open. Format-4 primitives (general timers, variable change actions, independent time windows, records and connected targets) are local web drafts only; cloud save tools reject them until compatible native support ships. Existing Screen Time enforcement remains background capable. Browser Preview simulates events. Progress is device-local; no AI API is used.", document_schema: z.toJSONSchema(document_schema, { unrepresentable: "any" }), home_allowance: "One home allowance per phone, daily shared windows, home-only whole-minute usage checkpoints; a final partial minute may be lost at departure. Home geofence is 150 m and OS callbacks may be delayed. Phone setup/permissions required. Cloud changes apply when the phone app opens." }); }
 	if (name === "get_routine_graph") {
 		const { id } = z.object({ id: z.string() }).strict().parse(args);
 		const document = (await fetch_library(cloud, account))?.library.tools.find((entry) => entry.document.id === id)?.document;
@@ -39,6 +40,7 @@ export async function call_mcp_tool(cloud: Cloud, account: Account, name: string
 	if (name === "save_routine_graph") {
 		const { base_document, graph } = z.object({ base_document: document_schema, graph: graph_schema }).strict().parse(args);
 		const updated = compile_graph(base_document, graph);
+		if (updated.schema_version === 4 && !native_format_four) { throw new Error("Format-4 building blocks are currently local web drafts. Do not sync them until the compatible native update is released."); }
 		for (let attempt = 0; attempt < 5; attempt++) {
 			const remote = await fetch_library(cloud, account);
 			const current = remote?.library.tools.find((entry) => entry.document.id === base_document.id)?.document;
@@ -54,6 +56,7 @@ export async function call_mcp_tool(cloud: Cloud, account: Account, name: string
 	if (!["save_routine", "delete_routine", "seed_home_allowance"].includes(name)) { throw new Error("Unknown routine tool."); }
 	const id = name === "delete_routine" ? z.object({ id: z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/) }).strict().parse(args).id : null;
 	const document = name === "save_routine" ? z.object({ document: document_schema }).strict().parse(args).document : personal_routine;
+	if (!id && document.schema_version === 4 && !native_format_four) { throw new Error("Format-4 building blocks are currently local web drafts. Do not sync them until the compatible native update is released."); }
 	for (let attempt = 0; attempt < 5; attempt++) {
 		const remote = await fetch_library(cloud, account);
 		const library = remote?.library ?? empty_library;

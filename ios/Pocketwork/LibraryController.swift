@@ -9,6 +9,8 @@ final class LibraryController: ObservableObject {
 	@Published private(set) var routines: [Routine] = []
 	@Published var error_message: String?
 	@Published private(set) var storage_blocked = false
+	@Published var pro_until: Date?
+	var has_pro: Bool { (pro_until ?? .distantPast) > .now }
 	private let defaults: UserDefaults
 	private var owner: String?
 	var behavior_owner_key: String { owner ?? "local" }
@@ -107,7 +109,13 @@ final class LibraryController: ObservableObject {
 		else { next = id != nil && old_owner == nil ? library : .empty }
 		defaults.set(try next.encoded(), forKey: key)
 		if id != nil && old_owner == nil { defaults.removeObject(forKey: Self.library_key); defaults.removeObject(forKey: Self.legacy_key) }
-		owner = id; storage_blocked = false; library = next
+		owner = id; pro_until = nil; storage_blocked = false; library = next
+	}
+	func purge_account() {
+		let prefix = "behaviors.v1." + behavior_owner_key + "."
+		for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(prefix) { defaults.removeObject(forKey: key) }
+		defaults.removeObject(forKey: current_key)
+		library = .empty; owner = nil; pro_until = nil
 	}
 
 	func receive_cloud(_ next: ToolLibrary) throws {
@@ -118,6 +126,8 @@ final class LibraryController: ObservableObject {
 
 	private func persist(_ next: ToolLibrary) throws {
 		guard !storage_blocked else { throw DocumentError.invalid("Saved tools need attention before new changes can be kept. Choose Replace unreadable data from the menu.") }
+		let old_ids = Set(library.tools.map(\.id))
+		if !has_pro && next.tools.count > 3 && next.tools.contains(where: { !old_ids.contains($0.id) }) { throw DocumentError.invalid("Your free plan holds 3 pages. Delete one to make room, or upgrade in Account & sync. Existing pages stay available.") }
 		defaults.set(try next.encoded(), forKey: current_key)
 		defaults.removeObject(forKey: Self.legacy_key)
 		library = next

@@ -30,7 +30,7 @@ struct ToolView: View {
 						HStack(spacing: 8) {
 							RoundedRectangle(cornerRadius: 3).fill(Theme.text).frame(width: 12, height: 12)
 							if editor.active {
-								TextField("Routine name", text: Binding(get: { editor.draft?.name ?? "" }, set: { editor.draft?.name = $0 })).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text_dim).accessibilityIdentifier("page.name")
+								TextField("Page name", text: Binding(get: { editor.draft?.name ?? "" }, set: { editor.draft?.name = $0 })).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text_dim).accessibilityIdentifier("page.name")
 							} else {
 								Button { begin_editing(document) } label: { HStack(spacing: 6) { Text(document.name).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text_dim); Image(systemName: "pencil").font(.system(size: 11)).foregroundStyle(Theme.text_faint) } }
 									.buttonStyle(.plain).disabled(!can_edit(document)).accessibilityLabel("Edit \(document.name)")
@@ -97,7 +97,7 @@ struct ToolView: View {
 				VStack(spacing: 12) {
 					Image(systemName: "square.stack.3d.up").font(.system(size: 28)).foregroundStyle(Theme.text_faint)
 					Text("This routine was deleted").heading_font(17)
-					Text("Go back to My routines to pick another.").supporting()
+					Text("Go back to My pages to pick another.").supporting()
 				}
 				.frame(maxWidth: .infinity, maxHeight: .infinity)
 				.page()

@@ -25,15 +25,17 @@ struct LogicEditing: Equatable {
 		"notification": (["finished":"boolean"], [:])
 	]
 	static let sections: [(title: String, kinds: [String])] = [
+		("Building blocks", ["elapsed_timer", "variable", "change_value", "time_window", "record"]),
 		("Inputs", ["number_input", "text_input", "checkbox", "form", "health"]),
 		("Time & location", ["timer", "schedule", "clock", "location", "arrive", "leave", "delay"]),
-		("Data", ["variable", "count", "streak", "usage", "app_usage", "allowance", "save_entry", "aggregate"]),
+		("Data", ["count", "streak", "usage", "app_usage", "allowance", "save_entry", "aggregate"]),
 		("Logic", ["compare", "and", "or", "not", "branch", "goal", "calculate", "text_compare"]),
 		("Actions", ["button", "check_in", "apps", "notification", "reminder", "app_gate", "add_allowance"]),
 		("Display", ["table", "chart", "progress"])
 	]
 	static let names = ["timer":"Timer", "schedule":"Time window", "home":"At location", "location":"At location", "usage":"Count usage", "allowance":"Daily allowance", "apps":"Control apps", "notification":"Notify me", "button":"Button", "check_in":"Check in", "arrive":"Arrive", "leave":"Leave", "clock":"At a time", "app_usage":"App usage", "and":"All conditions", "or":"Any condition", "not":"Not", "branch":"Branch", "delay":"Delay", "variable":"Variable", "count":"Counter", "compare":"Compare", "goal":"Goal", "streak":"Streak", "reminder":"Reminder"].merging(BuilderRuntime.names) { first, _ in first }
-	static func title(_ kind: String) -> String { names[kind] ?? kind }
+	static let primitive_names = ["elapsed_timer":"Timer", "change_value":"Change variable", "time_window":"Time window", "record":"Record"]
+	static func title(_ kind: String) -> String { primitive_names[kind] ?? names[kind] ?? kind }
 	static let supported: Set<String> = ["timer.active>apps.gate", "timer.finished>notification.finished", "schedule.active>apps.gate", "home.present>usage.home", "schedule.active>usage.window", "usage.used>allowance.used", "allowance.reached>apps.gate", "home.present>apps.home", "schedule.outside>apps.outside"]
 
 	init(document: AppDocument) {
@@ -74,7 +76,7 @@ struct LogicEditing: Equatable {
 	}
 	mutating func remove(_ id: String) { nodes.removeAll { $0.id == id }; connections.removeAll { $0.from == id || $0.to == id } }
 	mutating func add(_ kind: String) throws -> String {
-		guard Self.names[kind] != nil, nodes.count < 55 else { throw DocumentError.invalid("This routine has reached its block limit.") }
+		guard Self.names[kind] != nil || Self.primitive_names[kind] != nil, nodes.count < 55 else { throw DocumentError.invalid("This routine has reached its block limit.") }
 		let is_behavior = BehaviorGraph.ports[kind] != nil
 		guard is_behavior || !nodes.contains(where: { $0.kind == kind }) else { throw DocumentError.invalid("This routine already has a \(Self.title(kind)).") }
 		guard !((kind == "timer" && nodes.contains { $0.kind == "schedule" }) || (kind == "schedule" && nodes.contains { $0.kind == "timer" })) else { throw DocumentError.invalid("Use either a timer or a repeating time window in a routine.") }
@@ -83,7 +85,9 @@ struct LogicEditing: Equatable {
 		let fixed = ["home":"home-condition", "usage":"usage-meter", "allowance":"daily-allowance", "notification":"completion-notification"]
 		let id = block?.id ?? fixed[kind] ?? UUID().uuidString
 		guard !nodes.contains(where: { $0.id == id }) else { throw DocumentError.invalid("This block ID is already in use.") }
-		let config: BehaviorConfig? = is_behavior ? BehaviorConfig(label: Self.title(kind), value: 1, minutes: 5, time: "18:00", days: [1,2,3,4,5,6,7], message: "Time for your routine.", operator: "gte") : nil
+		var config: BehaviorConfig? = is_behavior ? BehaviorConfig(label: Self.title(kind), value: kind == "elapsed_timer" ? 25 : kind == "variable" ? 0 : 1, minutes: 5, time: "18:00", days: [1,2,3,4,5,6,7], message: "Time for your routine.", operator: "gte") : nil
+		if kind == "elapsed_timer" { config?.timer_mode = "countdown" }
+		if kind == "change_value" { config?.change = "add" }
 		let policy: HomePolicy? = kind == "allowance" ? HomePolicy(timezone: "America/Los_Angeles", away_usage_counts: false, outside_windows: "unrestricted", rules: [HomeDayRule(days: [1,2,3,4,5,6,7], allowance_minutes: 30, windows: [HomeWindow(start: "06:30", end: "20:30")])]) : nil
 		var position = 0
 		while nodes.contains(where: { abs($0.x - Double(position % 3) * 300 - 40) < 280 && abs($0.y - Double(position / 3) * 260 - 40) < max($0.height, 220) }) { position += 1 }
@@ -113,7 +117,7 @@ struct LogicEditing: Equatable {
 		} else { result.home_allowance = nil }
 		result.enabled = result.is_standing ? (base.schedule?.id == result.schedule?.id ? base.enabled ?? false : false) : nil
 		result.behaviors = behaviors.nodes.isEmpty ? nil : behaviors
-		result.schema_version = result.behaviors != nil ? 3 : result.home_allowance != nil ? 2 : 1
+		result.schema_version = result.behaviors.map { PrimitiveRuntime.requires_four($0) ? 4 : 3 } ?? (result.home_allowance != nil ? 2 : 1)
 		try result.validate()
 		return result
 	}

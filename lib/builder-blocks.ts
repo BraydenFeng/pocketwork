@@ -29,7 +29,7 @@ export const builder_catalog = {
 	text_compare: entry("Compare text", "Match text or look for a phrase", "Logic", { text: "text" }, { result: "boolean" }),
 	table: entry("Table", "Display saved entries", "Display", { rows: "table" }, { rows: "table" }),
 	chart: entry("Chart", "Plot a numeric field over time", "Display", { rows: "table" }, { rows: "table" }),
-	progress: entry("Progress bar", "Show a number against a target", "Display", { value: "number" }, { value: "number", fraction: "number" }),
+	progress: entry("Progress bar", "Show a number against a target", "Display", { value: "number", target: "number" }, { value: "number", fraction: "number", target: "number" }),
 	health: entry("Apple Health", "Read a daily health metric on iPhone", "Inputs", {}, { value: "number" }),
 	app_gate: entry("App gate", "Block selected groups while a condition is true", "Actions", { closed: "boolean" }, { active: "boolean" }),
 	add_allowance: entry("Add screen time", "Add minutes to the active home allowance, once per day", "Actions", { grant: "boolean" }, { granted: "boolean" }),
@@ -72,7 +72,7 @@ export function builder_node(node: BehaviorNode, state: BehaviorState, context: 
 		case "calculate": { const a = Number(input("a").value), b = Number(input("b").value); number_result(c.operation === "subtract" ? a-b : c.operation === "multiply" ? a*b : c.operation === "divide" ? a/b : a+b); break; }
 		case "text_compare": { const value = String(input("text").value), target = c.text ?? ""; emit("result", c.operation === "contains" ? value.includes(target) : c.operation === "starts_with" ? value.startsWith(target) : value === target); break; }
 		case "table": case "chart": emit("rows", input("rows").value); break;
-		case "progress": { const value = Number(input("value").value); emit("value", value); emit("fraction", c.value > 0 ? Math.max(0,Math.min(1,value/c.value)) : 0); break; }
+		case "progress": { const value = Number(input("value").value); const source = input("target"); const target = source.token === "" ? c.value : Number(source.value); emit("value", value); emit("target", target); emit("fraction", target > 0 ? Math.max(0,Math.min(1,value/target)) : 0); break; }
 		case "health": emit("value", context.health?.[c.metric ?? "steps"] ?? unavailable("value").signal.value); break;
 		case "app_gate": { const active = Boolean(input("closed").value); if (data.gates[node.id] !== active || context.reconcile_actions) { actions.push({ id: node.id, kind: "app_gate", token: `${node.id}:${active}`, active, groups: c.groups ?? [] }); data.gates[node.id] = active; } emit("active", active); break; }
 		case "add_allowance": { const grant = Boolean(input("grant").value) && data.rewards[node.id] !== day; if (grant) { actions.push({ id: node.id, kind: "add_allowance", token: `${node.id}:${day}`, minutes: c.minutes }); data.rewards[node.id] = day; } emit("granted", grant, day); break; }

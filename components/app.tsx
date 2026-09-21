@@ -4,10 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppDocument } from "@/lib/document";
 import { connect_cloud, current_account, fetch_library, push_library, sign_in_with_google, sign_out, watch_account, type Account, type Cloud } from "@/lib/cloud";
 import { add_group, delete_tool, duplicate_tool, empty_library, find_tool, import_tool, load_library, remove_group, rename_group, save_library, upsert_tool, LIBRARY_KEY, library_schema, type Library } from "@/lib/library";
-import { merge_libraries, same_library } from "@/lib/sync";
+import { cloud_compatible_library, merge_libraries, same_library } from "@/lib/sync";
 import { fetch_status, type StatusReport } from "@/lib/status";
 import { HomeAllowance } from "./home-allowance";
 import { Home } from "./home";
+import { fetch_plan } from "@/lib/account-client";
+import { assert_page_limit, free_plan, plan_active, type PagePlan } from "@/lib/page-plan";
 import { Workbench } from "./workbench";
 
 export type SyncState = "off" | "syncing" | "synced" | "error";
@@ -29,6 +31,7 @@ export function PocketworkApp() {
 	const [cloud, set_cloud] = useState<Cloud | null>(null);
 	const [account, set_account] = useState<Account | null>(null);
 	const [sync, set_sync] = useState<SyncState>("off");
+	const [plan, set_plan] = useState<PagePlan>(free_plan);
 	// What the phone last shared, when the person has opted in there. Read-only on the web.
 	const [phone_status, set_phone_status] = useState<StatusReport | null>(null);
 	// Autosaves from the editor arrive in quick succession; the ref keeps each one building on the last.
@@ -41,6 +44,14 @@ export function PocketworkApp() {
 	const storage = useCallback(() => ({ getItem: (key: string) => window.localStorage.getItem(active_owner.current ? `${key}.${active_owner.current}` : key), setItem: (key: string, value: string) => window.localStorage.setItem(active_owner.current ? `${key}.${active_owner.current}` : key, value) }), []);
 	useEffect(() => { library_ref.current = library; }, [library]);
 	useEffect(() => { account_ref.current = account; }, [account]);
+	useEffect(() => {
+		set_plan(free_plan);
+		if (!cloud || !account) { return; }
+		let cancelled = false;
+		const refresh = () => { void fetch_plan(cloud).then(value => { if (!cancelled) { set_plan(value); } }).catch(failure => { if (!cancelled) { set_error(error_message(failure)); } }); };
+		refresh(); window.addEventListener("focus", refresh);
+		return () => { cancelled = true; window.removeEventListener("focus", refresh); };
+	}, [cloud, account]);
 	useEffect(() => {
 		if (!notice) { return; }
 		const timeout = window.setTimeout(() => set_notice(null), 4500);
@@ -97,7 +108,8 @@ export function PocketworkApp() {
 				const merged = remote ? merge_libraries(library_ref.current, remote.library, Date.now()) : library_ref.current;
 				library_schema.parse(merged);
 				if (!same_library(merged, library_ref.current)) { library_ref.current = merged; set_library(merged); save_library(storage(), merged); }
-				if (remote && same_library(merged, remote.library) || await push_library(connection, who, merged, remote)) {
+				const compatible = cloud_compatible_library(merged, remote?.library ?? null);
+				if (remote && same_library(compatible, remote.library) || await push_library(connection, who, compatible, remote)) {
 					if (account_ref.current?.id !== who.id) { return; }
 					last_pushed.current = JSON.stringify(merged);
 					if (!same_library(merged, library_ref.current)) { continue; }
@@ -153,6 +165,7 @@ export function PocketworkApp() {
 	// The URL carries which routine is open so the browser back button returns to My routines.
 	function navigate(id: string | null) {
 		const url = new URL(window.location.href);
+		url.searchParams.delete("view");
 		if (id) { url.searchParams.set("routine", id); } else { url.searchParams.delete("routine"); }
 		try { window.history.pushState(null, "", url); } catch (failure) { console.warn(error_message(failure)); }
 		set_open_id(id);
@@ -160,6 +173,7 @@ export function PocketworkApp() {
 	}
 
 	function persist(next: Library) {
+		assert_page_limit(library_ref.current, next, plan_active(plan));
 		library_ref.current = next;
 		set_library(next);
 		if (storage_blocked) { return; }
@@ -174,10 +188,11 @@ export function PocketworkApp() {
 	const save_tool = useCallback((document: AppDocument) => {
 		if (active_owner.current !== (account?.id ?? null)) { return; }
 		const next = upsert_tool(library_ref.current, document, Date.now());
+		assert_page_limit(library_ref.current, next, plan_active(plan));
 		library_ref.current = next;
 		set_library(next);
 		if (!storage_blocked) { save_library(storage(), next); }
-	}, [storage_blocked, storage, account?.id]);
+	}, [storage_blocked, storage, account?.id, plan]);
 
 	function create_tool(document: AppDocument) {
 		try { persist(upsert_tool(library, document, Date.now())); set_error(null); navigate(document.id); }
