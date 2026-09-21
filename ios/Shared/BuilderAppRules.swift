@@ -4,11 +4,11 @@ import ManagedSettings
 
 enum BuilderAppRules {
 	private static var shield: ManagedSettingsStore { ManagedSettingsStore(named: ManagedSettingsStore.Name("pocketwork.builder.apps")) }
-	private static func update(_ edit: (inout [String: FamilyActivitySelection]) throws -> Void) throws {
+	private static func update(reset: Bool = false, _ edit: (inout [String: FamilyActivitySelection]) throws -> Void) throws {
 		guard let group = Bundle.main.object(forInfoDictionaryKey: "PocketworkAppGroup") as? String, let folder = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group) else { throw DocumentError.invalid("App rule storage is unavailable.") }
 		let selections = try HomeFileLock.with_lock(at: folder.appendingPathComponent("builder-apps.lock")) { () -> [String: FamilyActivitySelection] in
 			let file = folder.appendingPathComponent("builder-apps.json")
-			var rules = FileManager.default.fileExists(atPath: file.path) ? try JSONDecoder().decode([String: FamilyActivitySelection].self, from: Data(contentsOf: file)) : [:]
+			var rules = !reset && FileManager.default.fileExists(atPath: file.path) ? try JSONDecoder().decode([String: FamilyActivitySelection].self, from: Data(contentsOf: file)) : [:]
 			try edit(&rules); try JSONEncoder().encode(rules).write(to: file, options: .atomic); return rules
 		}
 		var merged = FamilyActivitySelection()
@@ -33,5 +33,8 @@ enum BuilderAppRules {
 		try update { rules in let key = document + "." + node; if active { rules[key] = selection } else { rules.removeValue(forKey: key) } }
 	}
 	static func prune(document: String, nodes: Set<String>) throws { try update { rules in rules = rules.filter { !$0.key.hasPrefix(document + ".") || nodes.contains(String($0.key.dropFirst(document.count + 1))) } } }
-	static func clear() throws { try update { $0 = [:] } }
+	static func clear() throws {
+		defer { shield.clearAllSettings() }
+		try update(reset: true) { $0 = [:] }
+	}
 }

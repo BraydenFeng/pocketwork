@@ -29,13 +29,14 @@ Status: release preparation, not permission to submit. Vercel deployment alone d
 - Configure a server In-App Purchase API key in `APP_STORE_*`. Native transactions carry an `appAccountToken` tied to the signed-in Supabase UUID; purchases cannot be claimed by another account. Restore must use the original Pocketwork account. Subscription transfer after account deletion is not automated; cancelling before deletion is clearly disclosed.
 - Supply `POCKETWORK_WEBSITE_URL` when generating/building the phone project. Turn on `PocketworkSubscriptionsEnabled` in the generated Info properties only for a configured, tested release. The source defaults to false; a product that fails to load cannot be purchased.
 - Verify Family Controls distribution entitlements for both the app and FocusMonitor, matching App Groups and provisioning profiles for all targets. Existing successful TestFlight uploads do not prove this launch's setup or App Review acceptance.
-- CI only runs native tests when dispatched with `ios=true` or a commit contains `[ios]`. The user approved ONE verification dispatch for this change, not a TestFlight upload or App Store submission. Avoid `[ios]` in the commit when using dispatch so it does not run twice.
+- CI only runs native tests when dispatched with `ios=true` or a commit contains `[ios]`. After the first run, the user authorized further verification builds. This does not authorize TestFlight upload or App Store submission. Avoid `[ios]` in the commit when using dispatch so it does not run twice.
 
 ## Account deletion verification
 
 - In Account, confirm deletion; Apple-linked accounts reauthenticate with the matching Apple identity. The server consumes a hashed single-use, ten-minute state, checks the nonce/subject/signature, revokes Apple's token, then deletes the Supabase user. Failed revocation does not claim successful deletion.
 - Verify Apple and Google test accounts; cancellation, wrong Apple identity, expired/replayed state, network failure, and retry. Confirm cloud library/status/subscription rows cascade away and auth no longer works. Device cleanup releases restrictions, clears saved sign-in and that account's library/progress. Verify these behaviors on a physical phone.
 - Other devices and exported files are not remotely erased. Check sign-out/removal on them separately. Deleting Pocketwork does not cancel Apple billing; both web and phone expose Manage subscriptions and warn about this.
+- Follow-up cleanup also clears this phone's shared saved location/geofence, home ledger/policy, and current account's app-group selections/plans. Other accounts' cached libraries are left alone. Cleanup attempts continue when one device service fails; the app signs out and reports incomplete cleanup instead of claiming everything was removed. Test recovery from local storage/keychain errors on a physical phone.
 
 ## Privacy / review metadata
 

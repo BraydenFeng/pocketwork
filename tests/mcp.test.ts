@@ -3,11 +3,21 @@ import { compile_graph, graph_from_document, make_node } from "../lib/logic-grap
 import { call_mcp_tool } from "../lib/mcp";
 import { personal_routine } from "../lib/personal-routine";
 import { empty_library } from "../lib/library";
+import * as release_flags from "../lib/release-flags";
 import { fetch_library, push_library, type Cloud } from "../lib/cloud";
 vi.mock("../lib/cloud", () => ({ fetch_library: vi.fn(), push_library: vi.fn() }));
+vi.mock("../lib/release-flags", () => ({ native_format_four: false }));
 const cloud = {} as Cloud;
 const account = { id: "owner", email: "test@example.com" };
-beforeEach(() => { vi.resetAllMocks(); });
+beforeEach(() => { vi.resetAllMocks(); vi.spyOn(release_flags, "native_format_four", "get").mockReturnValue(false); });
+it.each([false, true])("reports the actual format-4 rollout flag (%s)", async (enabled) => {
+	vi.spyOn(release_flags, "native_format_four", "get").mockReturnValue(enabled);
+	const result = await call_mcp_tool(cloud, account, "get_capabilities", {});
+	const capabilities = JSON.parse(result.content[0].text!);
+	expect(capabilities.native_format_four).toBe(enabled);
+	expect(capabilities.execution).toContain(enabled ? "completion actions run on reopening" : "cloud save tools reject them");
+	expect(fetch_library).not.toHaveBeenCalled();
+});
 it("never publishes primitive drafts to an older phone through MCP", async () => {
 	const graph = graph_from_document(personal_routine); graph.nodes.push(make_node("elapsed_timer"));
 	const document = compile_graph(personal_routine, graph);

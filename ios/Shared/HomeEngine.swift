@@ -20,8 +20,12 @@ enum HomeEngine {
 	static let prefix = "pocketwork.home."
 	static var center: DeviceActivityCenter { DeviceActivityCenter() }
 	static var shield: ManagedSettingsStore { ManagedSettingsStore(named: ManagedSettingsStore.Name(prefix + "shield")) }
-	private static func transaction<T>(_ action: (inout HomeState) throws -> T) throws -> T {
+	private static func storage_folder() throws -> URL {
 		guard let group = Bundle.main.object(forInfoDictionaryKey: "PocketworkAppGroup") as? String, let folder = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group) else { throw DocumentError.invalid("Home storage is unavailable.") }
+		return folder
+	}
+	private static func transaction<T>(_ action: (inout HomeState) throws -> T) throws -> T {
+		let folder = try storage_folder()
 		return try HomeFileLock.with_lock(at: folder.appendingPathComponent("home.lock")) {
 			let file = folder.appendingPathComponent("home-state.json")
 			var state = FileManager.default.fileExists(atPath: file.path) ? try JSONDecoder().decode(HomeState.self, from: Data(contentsOf: file)) : HomeState()
@@ -63,6 +67,19 @@ enum HomeEngine {
 		try transaction { $0.enabled = false; $0.ledger.pause() }
 		shield.clearAllSettings()
 		center.stopMonitoring(center.activities.filter { $0.rawValue.hasPrefix(prefix) })
+	}
+	static func forget_account_data() throws {
+		defer {
+			shield.clearAllSettings()
+			center.stopMonitoring(center.activities.filter { $0.rawValue.hasPrefix(prefix) })
+		}
+		try erase_saved_state(in: storage_folder())
+	}
+	static func erase_saved_state(in folder: URL) throws {
+		try HomeFileLock.with_lock(at: folder.appendingPathComponent("home.lock")) {
+			// Deletion must also work when the old file can no longer be decoded.
+			try JSONEncoder().encode(HomeState()).write(to: folder.appendingPathComponent("home-state.json"), options: .atomic)
+		}
 	}
 	static func configure(_ document: AppDocument, plan: SharedStore.ShieldPlan, enabled: Bool) throws {
 		try document.validate()

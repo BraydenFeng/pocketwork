@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { verified_plan_response } from "../lib/server/subscription";
-const user = "e5a6ad6a-10fb-45c1-b5a7-b380b67d79b9";
+const user = "11111111-1111-4111-8111-111111111111";
 function token(value: unknown) { return `header.${Buffer.from(JSON.stringify(value)).toString("base64url")}.signature`; }
 function reply(status = 1, extra = {}, renewal = {}) { return { data: [{ lastTransactions: [{ status, signedTransactionInfo: token({ bundleId: "bundle", productId: "pro", appAccountToken: user, originalTransactionId: "123", expiresDate: 2000, environment: "Production", ...extra }), signedRenewalInfo: token(renewal) }] }] }; }
 it("accepts matching Apple-returned subscription and its account token", () => {
@@ -17,6 +17,6 @@ it("accepts only a current billing grace period", () => {
 	expect(verified_plan_response(reply(4, { expiresDate: 900 }, { gracePeriodExpiresDate: 1500 }), user, "bundle", "pro", false, 1000).pro).toBe(true);
 	expect(verified_plan_response(reply(4, { expiresDate: 900 }), user, "bundle", "pro", false, 1000).pro).toBe(false);
 });
-it.each([{ appAccountToken: "31a4d69e-d3d0-44b0-8b29-7f8c9cd8db62" }, { bundleId: "other" }, { productId: "other" }, { environment: "Sandbox" }])("rejects a mismatched purchase %j", fields => {
+it.each([{ appAccountToken: "22222222-2222-4222-8222-222222222222" }, { bundleId: "other" }, { productId: "other" }, { environment: "Sandbox" }])("rejects a mismatched purchase %j", fields => {
 	expect(() => verified_plan_response(reply(1, fields), user, "bundle", "pro", false, 1000)).toThrow("does not belong");
 });

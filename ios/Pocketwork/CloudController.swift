@@ -167,12 +167,33 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 	}
 	private func finish_deletion() async throws {
 		generation += 1; pending_save?.cancel()
-		for entry in library?.library.tools ?? [] { await sessions?.forget(entry.id) }
-		_ = await sessions?.clear_everything()
-		let code = SecItemDelete(keychain_query as CFDictionary)
-		guard code == errSecSuccess || code == errSecItemNotFound else { throw DocumentError.invalid("Account deleted. Clearing this iPhone's sign-in failed; retry or remove the app's local data.") }
+		let document_ids = library?.library.tools.map(\.id) ?? []
+		let group_ids = library?.groups.map(\.id) ?? []
+		let failures = await AccountCleanup.run([
+			("Sessions", {
+				self.sessions?.error_message = nil
+				for id in document_ids { await self.sessions?.forget(id) }
+				_ = await self.sessions?.clear_everything()
+				if let error = self.sessions?.error_message { throw DocumentError.invalid(error) }
+			}),
+			("Saved location", { try await HomeLocationController.shared.forget_account_data() }),
+			("Page restrictions", { try await HomeWorker.run { try BuilderAppRules.clear() } }),
+			("App selections", {
+				let shared = try SharedStore()
+				for id in document_ids { shared.remove_selection(for: id); shared.remove_plan(for: id); shared.set_standing(id, enabled: false) }
+				for id in group_ids { shared.remove_group_selection(id) }
+			}),
+			("Saved sign-in", {
+				let code = SecItemDelete(self.keychain_query as CFDictionary)
+				guard code == errSecSuccess || code == errSecItemNotFound else { throw DocumentError.invalid("Could not remove this iPhone's saved sign-in (\(code)).") }
+			})
+		])
 		library?.purge_account(); session = nil; signed_in = false; email = nil
 		StatusReporter.sharing = false; share_status = false; last_report = nil; status_shared_at = nil
+		if !failures.isEmpty {
+			status = "Account deleted. This iPhone's cleanup needs attention."
+			throw DocumentError.invalid("Your cloud account was deleted, but device cleanup did not fully finish. Use Clear all focus restrictions and remove local app data before reusing this iPhone. " + failures.joined(separator: " · "))
+		}
 		status = "Account deleted. Your cloud pages and this iPhone's account library were removed."
 	}
 
