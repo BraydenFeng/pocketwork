@@ -5,13 +5,20 @@ import { assert_page_limit, plan_active } from "./page-plan";
 
 export type Account = { id: string; email: string | null };
 export type Cloud = { client: SupabaseClient };
+let browser_cloud: { url: string; key: string; connection: Cloud } | null = null;
 
 // Returns null when the project is not configured, in which case everything stays on this device.
 export function connect_cloud(): Cloud | null {
 	const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 	const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 	if (!url || !key) { return null; }
-	try { return { client: createClient(url, key) }; }
+	if (typeof window !== "undefined" && browser_cloud?.url === url && browser_cloud.key === key) { return browser_cloud.connection; }
+	try {
+		const connection = { client: createClient(url, key) };
+		// React remounts must not start competing session readers during the OAuth callback.
+		if (typeof window !== "undefined") { browser_cloud = { url, key, connection }; }
+		return connection;
+	}
 	catch (error) { console.warn(`Cloud sync unavailable: ${error instanceof Error ? error.message : "could not create the client."}`); return null; }
 }
 

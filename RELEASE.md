@@ -2,6 +2,13 @@
 
 Status: release preparation, not permission to submit. Vercel deployment alone does not make this App Store-ready. Public publisher/support details were deliberately deferred by the owner.
 
+## Account entry, September 26
+
+- iPhone home and web home expose Create account and Sign in even without cloud configuration. Both use the same Apple OAuth flow (Google only when enabled); first sign-in creates the account. Missing configuration disables provider actions with an explanation, and local pages remain usable.
+- The phone defaults to the deployed Pocketwork website for account/legal links. TestFlight uploads now fail early when the Supabase URL or public key is missing. This does not verify provider setup or redirect allowlists.
+- Browser tests use a fake Supabase project with intercepted OAuth and sync responses, including cancellation and guest-page migration. They do not create a real Apple/Google account or prove production sign-in. Run `POCKETWORK_AUTH_TEST_MODE=unconfigured` with the account-entry browser test to verify the unavailable state.
+- Before releasing, complete a real Apple sign-in and phone/web sync with a disposable test account, and Google if enabled. Do not enable subscriptions or the format-4 rollout as part of this UI change.
+
 ## Product and rollout
 
 - Pages contain routines (actions/conditions/controls) and data (values, entries, displays). Existing `routine` MCP tool names and JSON keys remain compatible.
