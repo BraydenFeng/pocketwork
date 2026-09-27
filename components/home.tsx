@@ -4,7 +4,7 @@ import { native_format_four } from "@/lib/release-flags";
 
 import { useRef } from "react";
 import { useState } from "react";
-import { ArrowRight, Check, CloudOff, Copy, Info, Layers2, LogIn, LogOut, Pencil, Plus, RefreshCw, Shield, Trash2, Upload, X } from "lucide-react";
+import { ArrowRight, Check, CloudOff, Copy, Info, Layers2, LogOut, Pencil, Plus, RefreshCw, Shield, Trash2, Upload, X } from "lucide-react";
 import type { Account } from "@/lib/cloud";
 import type { SyncState } from "./app";
 import { is_standing, MAX_DOCUMENT_BYTES, parse_document, type AppDocument } from "@/lib/document";
@@ -14,9 +14,9 @@ import { format_edited, routines_using_group, sorted_tools, summarize_tool, type
 import { blank_tool } from "@/lib/templates";
 import { Button, SectionLabel } from "./ui";
 
-export function Home({ library, now, error, notice, storage_blocked, phone_status, cloud_available, account, sync, on_sign_in, on_sign_out, on_connect_agent, on_open, on_create, on_delete, on_duplicate, on_import, on_toggle, on_add_group, on_rename_group, on_remove_group, on_error, on_dismiss_error, on_dismiss_notice, on_replace_unreadable }: {
+export function Home({ library, now, error, notice, storage_blocked, phone_status, cloud_available, account, sync, on_sign_out, on_connect_agent, on_open, on_create, on_delete, on_duplicate, on_import, on_toggle, on_add_group, on_rename_group, on_remove_group, on_error, on_dismiss_error, on_dismiss_notice, on_replace_unreadable }: {
 	library: Library; now: number; error: string | null; notice: string | null; storage_blocked: boolean; phone_status: StatusReport | null;
-	cloud_available: boolean; account: Account | null; sync: SyncState; on_sign_in: (provider: "apple" | "google") => void; on_sign_out: () => void; on_connect_agent: () => void;
+	cloud_available: boolean; account: Account | null; sync: SyncState; on_sign_out: () => void; on_connect_agent: () => void;
 	on_open: (id: string) => void; on_create: (document: AppDocument) => void; on_delete: (id: string) => void; on_duplicate: (id: string) => void; on_import: (document: AppDocument) => void; on_toggle: (id: string, enabled: boolean) => void;
 	on_add_group: (name: string) => void; on_rename_group: (id: string, name: string) => void; on_remove_group: (id: string) => void;
 	on_error: (message: string) => void; on_dismiss_error: () => void; on_dismiss_notice: () => void; on_replace_unreadable: () => void;
@@ -59,9 +59,9 @@ export function Home({ library, now, error, notice, storage_blocked, phone_statu
 	}
 
 	return <div className="workbench home"><a className="skip-link" href="#my-tools">Skip to my pages</a>
-		<header className="topbar"><div className="brand"><Layers2 /><span>pocketwork<span className="brand-period">.</span></span></div><span className="workspace-label">PAGES / ROUTINES / DATA</span><div className="topbar-actions">{cloud_available && (account
+		<header className="topbar"><div className="brand"><Layers2 /><span>pocketwork<span className="brand-period">.</span></span></div><span className="workspace-label">PAGES / ROUTINES / DATA</span><div className="topbar-actions">{account
 				? <span className="account-chip"><Button onClick={on_connect_agent}>Copy agent connection</Button><span className="account-email">{account.email ?? "Signed in"}</span><Button variant="quiet" onClick={on_sign_out}><LogOut />Sign out</Button></span>
-				: <><Button variant="primary" onClick={() => on_sign_in("apple")}><LogIn />Sign in with Apple</Button>{process.env.NEXT_PUBLIC_GOOGLE_ENABLED === "true" && <Button onClick={() => on_sign_in("google")}>Google</Button>}</>)}<Button onClick={() => on_create(blank_tool())}><Plus />New page</Button><Button onClick={() => file_input.current?.click()}><Upload />Add from file</Button></div>
+				: <><a className="button button-primary" href="/account?mode=create">Create account</a><a className="button" href="/account?mode=signin">Sign in</a></>}<Button onClick={() => on_create(blank_tool())}><Plus />New page</Button><Button onClick={() => file_input.current?.click()}><Upload />Add from file</Button></div>
 			<input ref={file_input} className="file-input" type="file" accept=".json,application/json" aria-label="Import page file" onChange={(event) => { void import_file(event.target.files?.[0]); }} />
 		</header>
 		<div className="projectbar home-intro"><div><h1>My pages</h1><p className="supporting">{account ? "Create here. Open Pocketwork on your iPhone with the same sign-in to sync, then choose which apps to block." : cloud_available ? "Sign in and your pages follow you to your iPhone. Until then they live on this browser." : "Your own little tools. Pages hold your routines and data."}</p></div><span className={`save-status ${storage_blocked || sync === "error" ? "has-error" : ""}`}>{sync === "syncing" ? <RefreshCw className="is-spinning" /> : sync === "error" ? <CloudOff /> : <span />}{saved_where}</span></div>

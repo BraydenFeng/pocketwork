@@ -16,6 +16,26 @@ final class ScreenshotTests: XCTestCase {
 		app.launch()
 	}
 
+	func test_account_entry_without_cloud_configuration() throws {
+		XCTAssertTrue(app.buttons["home.create-account"].waitForExistence(timeout: 10))
+		XCTAssertTrue(app.buttons["home.sign-in"].isHittable)
+		try snap("14-account-home")
+		app.buttons["home.create-account"].tap()
+		XCTAssertTrue(app.navigationBars["Create account"].waitForExistence(timeout: 10))
+		XCTAssertTrue(app.buttons["account.apple"].exists)
+		XCTAssertFalse(app.buttons["account.apple"].isEnabled)
+		XCTAssertTrue(app.staticTexts["account.unavailable"].exists)
+		try snap("15-create-account-unavailable")
+		app.buttons["account.dismiss"].tap()
+		app.buttons["home.sign-in"].tap()
+		XCTAssertTrue(app.navigationBars["Sign in"].waitForExistence(timeout: 10))
+		app.buttons["account.dismiss"].tap()
+		app.buttons["New page"].tap()
+		XCTAssertTrue(app.navigationBars["New page"].waitForExistence(timeout: 10))
+		app.buttons["Cancel"].tap()
+		XCTAssertTrue(app.buttons["home.create-account"].exists)
+	}
+
 	func test_walkthrough_screens() throws {
 		XCTAssertTrue(app.navigationBars["My pages"].waitForExistence(timeout: 10))
 		try snap("01-home-empty")

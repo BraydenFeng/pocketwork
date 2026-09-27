@@ -1,14 +1,45 @@
-import { describe, expect, it, vi } from "vitest";
-import { createClient } from "@supabase/supabase-js";
-import { fetch_library, push_library } from "../lib/cloud";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { AuthApiError, createClient } from "@supabase/supabase-js";
+import { connect_cloud, fetch_library, push_library, sign_in_with_google } from "../lib/cloud";
 import { empty_library } from "../lib/library";
 
 const account = { id: "f81d4fae-7dec-11d0-a765-00a0c91e6bf6", email: "test@example.com" };
+afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 function connection(status: number, body: unknown) {
 	const request = vi.fn(async () => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } }));
 	const client = createClient("https://example.supabase.co", "test-key", { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: request } });
 	return { cloud: { client }, request };
 }
+
+describe("account access", () => {
+	it("reuses one browser session client across React remounts", () => {
+		vi.stubGlobal("window", { location: { origin: "https://pocketwork.example", pathname: "/account" } });
+		vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
+		vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "test-public-key");
+		const first = connect_cloud();
+		expect(first).not.toBeNull();
+		expect(connect_cloud()).toBe(first);
+	});
+	it.each(["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"])("does not claim cloud access without %s", (missing) => {
+		vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
+		vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "test-public-key");
+		vi.stubEnv(missing, "");
+		expect(connect_cloud()).toBeNull();
+	});
+	it.each(["apple", "google"] as const)("uses the same %s OAuth flow for new and returning accounts", async (provider) => {
+		vi.stubGlobal("window", { location: { origin: "https://pocketwork.example", pathname: "/account" } });
+		const { cloud } = connection(200, {});
+		const authorize = vi.spyOn(cloud.client.auth, "signInWithOAuth").mockResolvedValue({ data: { provider, url: "https://example.supabase.co/auth/v1/authorize" }, error: null });
+		await sign_in_with_google(cloud, provider);
+		expect(authorize).toHaveBeenCalledWith({ provider, options: { redirectTo: "https://pocketwork.example/account" } });
+	});
+	it("reports provider errors without pretending sign-in succeeded", async () => {
+		vi.stubGlobal("window", { location: { origin: "https://pocketwork.example", pathname: "/account" } });
+		const { cloud } = connection(200, {});
+		vi.spyOn(cloud.client.auth, "signInWithOAuth").mockResolvedValue({ data: { provider: "apple", url: null }, error: new AuthApiError("Provider unavailable", 400, "provider_disabled") });
+		await expect(sign_in_with_google(cloud, "apple")).rejects.toThrow("Sign-in did not start");
+	});
+});
 describe("cloud concurrency boundary", () => {
 	it("constrains writes to the signed-in owner and exact read revision", async () => {
 		const { cloud, request } = connection(200, [{ user_id: account.id }]);

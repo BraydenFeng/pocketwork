@@ -15,7 +15,7 @@ struct HomeView: View {
 	@State private var pending_delete: LibraryEntry?
 	@State private var editing: RoutineDraft?
 	@State private var picking_group: AppGroup?
-	@State private var showing_account = false
+	@State private var account_intent: AccountIntent?
 	private let logger = Logger(subsystem: "Pocketwork", category: "FileImport")
 
 	var body: some View {
@@ -23,7 +23,16 @@ struct HomeView: View {
 			ScrollView {
 				VStack(alignment: .leading, spacing: 0) {
 					intro
-					if !cloud.signed_in { AccountView() }
+					if !cloud.signed_in {
+						VStack(alignment: .leading, spacing: Theme.gap) {
+							Text("Save your pages to an account").heading_font(15)
+							Text("Open them on your iPhone or computer. You can also keep using this device without an account.").supporting()
+							ViewThatFits(in: .horizontal) {
+								HStack(spacing: Theme.gap) { account_buttons }
+								VStack(alignment: .leading, spacing: Theme.gap) { account_buttons }
+							}
+						}.padding(Theme.pad)
+					}
 					Hairline()
 					section(number: "01", label: "My pages", heading: library.sorted_tools.isEmpty ? "Nothing here yet." : "Pick up where you left off.", supporting: library.sorted_tools.isEmpty ? "Create a page here, or sign in to bring in pages from your computer." : nil) {
 						if library.storage_blocked { storage_warning }
@@ -60,7 +69,7 @@ struct HomeView: View {
 				ToolbarItem(placement: .topBarLeading) { brand }
 				ToolbarItem(placement: .topBarTrailing) {
 					Menu {
-						Button("Account & sync", systemImage: "person.crop.circle") { showing_account = true }
+						Button("Account & sync", systemImage: "person.crop.circle") { account_intent = cloud.signed_in ? .manage : .sign_in }
 						Button("App groups", systemImage: "square.grid.2x2") { showing_groups = true }
 						Button("Add from file", systemImage: "square.and.arrow.down") { showing_import = true }
 						Button(role: .destructive) { Task { for id in await sessions.clear_everything() { library.set_enabled(id, false) } } } label: { Label("Clear all focus restrictions", systemImage: "lock.open") }.disabled(sessions.is_busy)
@@ -71,7 +80,7 @@ struct HomeView: View {
 			.sheet(item: $picking_group) { group in AppGroupSelectionSheet(group: group) }
 			// A widget tap arrives as com.braydenfeng.pocketwork://routine/<id>; the sign-in callback uses a different host and is handled elsewhere.
 			.onOpenURL { url in if let id = WidgetSnapshot.routine_id(from: url), library.tool(id) != nil { path = [RoutineRoute(id: id)] } }
-			.sheet(isPresented: $showing_account) { NavigationStack { ScrollView { AccountView() }.navigationTitle("Account & sync").toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showing_account = false } } } } }
+			.sheet(item: $account_intent) { intent in NavigationStack { ScrollView { AccountView(intent: intent) }.page().navigationTitle(cloud.signed_in ? "Account & sync" : intent.title).navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .confirmationAction) { Button(cloud.signed_in ? "Done" : "Not now") { account_intent = nil }.accessibilityIdentifier("account.dismiss") } } } }
 			.fileImporter(isPresented: $showing_import, allowedContentTypes: [.json]) { result in import_file(result) }
 			.confirmationDialog("Delete \"\(pending_delete?.document.name ?? "this routine")\"? This cannot be undone.", isPresented: Binding(get: { pending_delete != nil }, set: { if !$0 { pending_delete = nil } }), titleVisibility: .visible) {
 				Button("Delete", role: .destructive) {
@@ -83,6 +92,13 @@ struct HomeView: View {
 			.alert("Couldn’t complete that action", isPresented: Binding(get: { library.error_message != nil }, set: { if !$0 { library.error_message = nil } })) {
 				Button("OK") { library.error_message = nil }
 			} message: { Text(library.error_message ?? "") }
+		}
+	}
+
+	private var account_buttons: some View {
+		Group {
+			Button("Create account") { account_intent = .create }.buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("home.create-account")
+			Button("Sign in") { account_intent = .sign_in }.buttonStyle(QuietButtonStyle()).accessibilityIdentifier("home.sign-in")
 		}
 	}
 

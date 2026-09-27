@@ -17,6 +17,11 @@ jobs:
       ASC_ISSUER_ID: f468a1c0-aa8d-4b2b-ba03-b085f9f307d0
     steps:
       - uses: actions/checkout@v4
+      - name: Require account configuration
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_URL" && test -n "$SUPABASE_ANON_KEY" || { echo "Missing Supabase configuration. Refusing to ship a build without account access."; exit 1; }
+          [[ "$SUPABASE_URL" == https://* ]] || { echo "Supabase URL must use HTTPS."; exit 1; }
       - name: Select an upload-supported Xcode
         run: |
           set -euo pipefail

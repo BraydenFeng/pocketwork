@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppDocument } from "@/lib/document";
-import { connect_cloud, current_account, fetch_library, push_library, sign_in_with_google, sign_out, watch_account, type Account, type Cloud } from "@/lib/cloud";
+import { connect_cloud, current_account, fetch_library, push_library, sign_out, watch_account, type Account, type Cloud } from "@/lib/cloud";
 import { add_group, delete_tool, duplicate_tool, empty_library, find_tool, import_tool, load_library, remove_group, rename_group, save_library, upsert_tool, LIBRARY_KEY, library_schema, type Library } from "@/lib/library";
 import { cloud_compatible_library, merge_libraries, same_library } from "@/lib/sync";
 import { fetch_status, type StatusReport } from "@/lib/status";
@@ -241,11 +241,6 @@ export function PocketworkApp() {
 		attempt(() => remove_group(library, id));
 	}
 
-	async function start_sign_in(provider: "apple" | "google") {
-		if (!cloud) { return; }
-		try { await sign_in_with_google(cloud, provider); } catch (failure) { set_error(error_message(failure)); }
-	}
-
 	async function copy_agent_connection() {
 		if (!cloud) { return; }
 		try {
@@ -272,7 +267,7 @@ export function PocketworkApp() {
 	}
 
 	return <Home library={library} now={Date.now()} error={error} notice={notice} storage_blocked={storage_blocked} phone_status={account ? phone_status : null}
-		on_connect_agent={() => { void copy_agent_connection(); }} cloud_available={cloud !== null} account={account} sync={sync} on_sign_in={(provider) => { void start_sign_in(provider); }} on_sign_out={() => { void finish_sign_out(); }}
+		on_connect_agent={() => { void copy_agent_connection(); }} cloud_available={cloud !== null} account={account} sync={sync} on_sign_out={() => { void finish_sign_out(); }}
 		on_open={navigate} on_create={create_tool} on_delete={remove_tool} on_duplicate={copy_tool} on_import={add_imported} on_toggle={toggle_tool}
 		on_add_group={create_group} on_rename_group={change_group_name} on_remove_group={drop_group}
 		on_error={set_error} on_dismiss_error={() => set_error(null)} on_dismiss_notice={() => set_notice(null)} on_replace_unreadable={replace_unreadable} />;

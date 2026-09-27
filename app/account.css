@@ -7,3 +7,4 @@
 .legal-page a { color: var(--c-accent); text-underline-offset: var(--s-1); }
 .legal-page footer { border-top: var(--hairline); }
 .legal-page .account-error { color: var(--c-danger); }
+.account-auth-actions { display: flex; flex-wrap: wrap; gap: var(--s-3); margin-block: var(--s-5); }
