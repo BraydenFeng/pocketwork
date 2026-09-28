@@ -11,6 +11,6 @@ export async function POST(request: Request) {
 	try {
 		const user = await require_user(request);
 		const { transaction_id } = z.object({ transaction_id: z.string().regex(/^\d{1,32}$/) }).strict().parse(await json_body(request));
-		return Response.json(await refresh_subscription(user.id, transaction_id));
+		return Response.json(await refresh_subscription(user.id, transaction_id), { headers: { "Cache-Control": "no-store" } });
 	} catch (error) { return api_failure(error); }
 }

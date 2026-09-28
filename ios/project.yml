@@ -39,7 +39,7 @@ targets:
         SupabaseAnonKey: $(SUPABASE_ANON_KEY)
         PocketworkWebsiteURL: $(POCKETWORK_WEBSITE_URL)
         PocketworkProProductID: com.braydenfeng.pocketwork.pro.monthly
-        PocketworkSubscriptionsEnabled: false
+        PocketworkSubscriptionsEnabled: true
         ITSAppUsesNonExemptEncryption: false
         NSSupportsLiveActivities: true
         NSHealthShareUsageDescription: Read the health metrics you choose as inputs to your personal routines.

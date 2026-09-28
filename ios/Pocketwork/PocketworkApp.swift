@@ -42,7 +42,7 @@ struct PocketworkApp: App {
 					await cloud.attach(library, sessions); await subscriptions.attach(cloud); await subscriptions.refresh()
 				}
 				.onChange(of: cloud.account_id) { _, _ in Task { await subscriptions.refresh() } }
-				.onChange(of: scene_phase) { _, phase in if phase == .active { Task { await cloud.sync() }; HomeScreenBridge.reconcile(session: sessions.session) } }
+				.onChange(of: scene_phase) { _, phase in if phase == .active { Task { await subscriptions.refresh(); await cloud.sync() }; HomeScreenBridge.reconcile(session: sessions.session) } }
 				// Widgets read a snapshot, not the library; refresh it whenever routines or the session change.
 				.onAppear { HomeScreenBridge.publish(library: library.library, session: sessions.session) }
 				.onChange(of: library.library) { _, next in HomeScreenBridge.publish(library: next, session: sessions.session) }

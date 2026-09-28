@@ -1,6 +1,15 @@
 # Pocketwork launch checklist
 
-Status: release preparation, not permission to submit. Vercel deployment alone does not make this App Store-ready. Public publisher/support details were deliberately deferred by the owner.
+Status: release preparation, not permission to submit. Vercel deployment alone does not make this App Store-ready.
+
+## Billing verification, September 27
+
+- The owner authorized billing enablement and final checks, and approved publishing "Viral App Development" with braydenfeng888@gmail.com as the support contact. This is the requested public branding, not verification of Apple's legal seller name.
+- Native purchases are enabled in the project. The app verifies its StoreKit environment, routes verified transactions to the matching server endpoint, and finishes them only after server delivery. Purchase status refreshes on foreground return; restore errors remain visible.
+- Production verification requires `APP_STORE_ENVIRONMENT=Production` and alone can write `page_subscriptions`. `/api/subscription/sandbox` authenticates the user, verifies the Apple account token/bundle/product/environment, and returns a temporary test result without writing live entitlements. TestFlight Pro is memory-only on that phone and is cleared when switching accounts. It does not raise the live cloud page allowance; extra test pages stay on-device. Full paid cloud-sync testing still needs isolated staging or a real approved production transaction.
+- Automated tests cover environment isolation, mismatched accounts/products, inactive subscriptions, server failures, and native plan expiration. They do not replace a real sandbox purchase, restore, refund, or device enforcement test.
+- Commercial hosting remains a gate: the Vercel team was observed on Hobby, whose terms limit it to non-commercial personal use. The owner must choose/authorize commercial hosting before accepting revenue.
+- Before submission: verify live database policies and account-deletion/revocation configuration, finish Apple review metadata and screenshots, run real-device checks, and resolve the existing Screen Time/page-limit review risk below. Do not describe this build as publicly approved or production purchases as proven.
 
 ## Account entry, September 26
 
@@ -26,7 +35,7 @@ Status: release preparation, not permission to submit. Vercel deployment alone d
 4. Test quota with authenticated test accounts through PostgREST directly as well as MCP: 3 succeeds; 4 fails; another user's rows are inaccessible; writing `page_subscriptions` is forbidden; deletion frees a slot; expired Pro can edit/delete old pages but cannot add a fourth. SQL has not been exercised against a live database here.
 5. Configure Supabase Apple OAuth and redirect allowlists for the Vercel origin and `com.braydenfeng.pocketwork://auth/callback`. Google remains opt-in; configure its credentials and consent screen before enabling its web/native flags.
 6. In the same Apple Services ID used by Supabase, register the website domain and the exact return URL `https://YOUR_DOMAIN/api/account/apple-callback`. Set `APPLE_SIGNIN_*` for token exchange/revocation. Team ID is the Sign in with Apple issuer; it is not the App Store Connect issuer UUID.
-7. Set `NEXT_PUBLIC_SUBSCRIPTIONS_ENABLED=true` only after the subscription backend and SQL policies work. `APP_STORE_ENVIRONMENT=Sandbox` is for an isolated staging deployment/test database; production must use `Production`. Never let Sandbox transactions grant production entitlements.
+7. Set `NEXT_PUBLIC_SUBSCRIPTIONS_ENABLED=true` only after the subscription backend and SQL policies work. The live service requires `APP_STORE_ENVIRONMENT=Production`. Sandbox verification is stateless on its separate endpoint and must never write live entitlements.
 8. Plan status refreshes via Apple's server API. Database additions above the free limit require a verification no older than five minutes; ordinary clients refresh before adding. Refund/expiry changes are reflected on refresh, not by an unverified client receipt. No server-notification endpoint is currently deployed. Retest refund and offline recovery behavior before launch.
 9. Run `npm run check:release`. It checks presence and safe shapes, not live credentials or approval. Do not publish until manual items below are complete.
 
@@ -34,7 +43,7 @@ Status: release preparation, not permission to submit. Vercel deployment alone d
 
 - Create the monthly auto-renewing product `com.braydenfeng.pocketwork.pro.monthly`, subscription group, display name, review screenshot, availability, and price. Complete paid-app agreement, tax, and banking setup. Submit the initial subscription with the app version as required by App Store Connect.
 - Configure a server In-App Purchase API key in `APP_STORE_*`. Native transactions carry an `appAccountToken` tied to the signed-in Supabase UUID; purchases cannot be claimed by another account. Restore must use the original Pocketwork account. Subscription transfer after account deletion is not automated; cancelling before deletion is clearly disclosed.
-- Supply `POCKETWORK_WEBSITE_URL` when generating/building the phone project. Turn on `PocketworkSubscriptionsEnabled` in the generated Info properties only for a configured, tested release. The source defaults to false; a product that fails to load cannot be purchased.
+- Supply `POCKETWORK_WEBSITE_URL` when generating/building the phone project. `PocketworkSubscriptionsEnabled` is now true for purchase verification; a product that fails to load cannot be purchased. Real-device purchase tests and Apple review still gate public release.
 - Verify Family Controls distribution entitlements for both the app and FocusMonitor, matching App Groups and provisioning profiles for all targets. Existing successful TestFlight uploads do not prove this launch's setup or App Review acceptance.
 - CI only runs native tests when dispatched with `ios=true` or a commit contains `[ios]`. After the first run, the user authorized further verification builds. This does not authorize TestFlight upload or App Store submission. Avoid `[ios]` in the commit when using dispatch so it does not run twice.
 
@@ -47,7 +56,7 @@ Status: release preparation, not permission to submit. Vercel deployment alone d
 
 ## Privacy / review metadata
 
-- Publisher name and monitored support email: REQUIRED, deferred by owner.
+- Publisher name and monitored support email: approved by the owner above; verify the deployed pages show them before submission.
 - Public privacy URL, support URL, terms URL: populate from the deployed stable domain, not localhost.
 - Privacy manifest includes required reasons for app/shared UserDefaults and elapsed-time use. Confirm the archived app and extensions contain their manifests and review Xcode's privacy report.
 - App Privacy labels must match actual configuration: email, user ID, synced page definitions/app-group names, optional status/minute history, subscription identifiers/status. These are used for app functionality, linked to the account, not advertising tracking. Health readings, selected app tokens, and saved location are processed on-device; user-entered page text is synced and may itself contain sensitive content.
