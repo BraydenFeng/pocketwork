@@ -11,7 +11,7 @@ describe("block descriptions", () => {
 		["variable", "Store a number"],
 		["time_window", "Active between two times"],
 		["app_usage", "Apple Screen Time integration"],
-	] as const)("uses the same plain description for %s in the picker and connections", (kind, detail) => {
+	] as const)("uses the same plain description for %s in the picker and page", (kind, detail) => {
 		expect(creation_catalog.find(item => item.kind === kind)?.detail).toBe(detail);
 		expect(behavior_catalog[kind].detail).toBe(detail);
 	});
@@ -57,7 +57,7 @@ describe("document-first creation", () => {
 	});
 });
 
-describe("named connections", () => {
+describe("named block references", () => {
 	it("makes a log with a real submission-to-storage connection", () => {
 		const base = blank_tool(); const result = add_connected_block(graph_from_document(base), "log");
 		expect(result.graph.nodes.map(node => node.kind)).toEqual(["form", "save_entry"]);
@@ -78,7 +78,7 @@ describe("named connections", () => {
 		const base = blank_tool(); const first = add_connected_block(graph_from_document(base), "log"); const second = add_connected_block(first.graph, "log");
 		const chart = add_connected_block(second.graph, "chart");
 		expect(chart.graph.connections.filter(edge => edge.to === chart.selected)).toHaveLength(0);
-		expect(validate_connections(base, chart.graph)).toContain("Connect");
+		expect(validate_connections(base, chart.graph)).toContain("Finish Chart");
 	});
 	it("offers only compatible inputs and excludes loops", () => {
 		const base = blank_tool(); const log = add_connected_block(graph_from_document(base), "log"); const chart = add_connected_block(log.graph, "chart");

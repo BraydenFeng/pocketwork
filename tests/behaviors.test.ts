@@ -17,7 +17,7 @@ describe("connected behavior runtime", () => {
 	it("rejects cycles, numeric-to-boolean wiring and missing required inputs", () => {
 		const config = behavior_config_schema.parse({});
 		const graph = behaviors_schema.parse({nodes:[{id:"a",kind:"not",x:0,y:0,config},{id:"b",kind:"not",x:0,y:0,config}],connections:[{from:"a",output:"result",to:"b",input:"condition"},{from:"b",output:"result",to:"a",input:"condition"}]});
-		expect(() => behavior_order(graph,{},true)).toThrow("loop"); graph.connections=[]; expect(() => behavior_order(graph,{},true)).toThrow("input first");
+		expect(() => behavior_order(graph,{},true)).toThrow("loop"); graph.connections=[]; expect(() => behavior_order(graph,{},true)).toThrow("choose condition");
 		graph.connections=[{from:"source",output:"value",to:"a",input:"condition"}]; expect(() => behavior_order(graph,{source:{value:"number"}})).toThrow("same value type");
 	});
 	it("persists new nodes and connections with format 3 without changing existing blocking", () => {

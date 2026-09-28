@@ -39,12 +39,12 @@ describe("executable logic graphs", () => {
 	});
 	it("rejects missing home guards instead of silently changing enforcement", () => {
 		const graph = graph_from_document(personal_routine); graph.connections = graph.connections.filter((edge) => edge.input !== "home");
-		expect(() => compile_graph(personal_routine, graph)).toThrow("Home allowances need");
+		expect(() => compile_graph(personal_routine, graph)).toThrow("Home allowances require");
 	});
 	it("rejects incompatible ports and occupied inputs", () => {
 		const graph = graph_from_document(personal_routine);
 		expect(() => connect(graph, { from: "home-condition", output: "present", to: "daily-allowance", input: "used" })).toThrow("do not match");
-		expect(() => connect(graph, graph.connections[0])).toThrow("already connected");
+		expect(() => connect(graph, graph.connections[0])).toThrow("already has a source");
 	});
 	it("rejects duplicate engines and forged node blocks", () => {
 		const graph = graph_from_document(starter_document); graph.nodes.push(make_node("timer"));

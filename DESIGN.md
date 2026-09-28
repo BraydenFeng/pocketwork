@@ -1,5 +1,13 @@
 # Pocketwork — interface brief
 
+## September 27: one page, no graph
+
+Brayden rejected the remaining node canvas, Connections workflow, and separate Routines/Data tabs. The web creator is now one Notion-like document. A page contains its content, routines, and data in a single vertical flow. The saved graph may remain an internal runtime format, but the interface must never ask a person to place nodes, draw wires, open advanced wiring, or save connections.
+
+The tone stays editorial minimalism. The creator should feel like writing and arranging a small personal tool, not programming a workflow diagram. Blocks are added from the page or with `/`, edited in place, and saved automatically as soon as their required properties are complete. References between blocks appear as ordinary sentence-like properties such as “When,” “Use value from,” or “Show entries from.”
+
+Three signature moves: the document glyph and editable title; small PAGE / ROUTINES / DATA section labels within one continuous page; and expandable block rows whose properties sit directly beneath the block. There is no editor-mode tab bar and no graph deep link. Native presets and foreground-only blocks keep their capability notes, but those notes are secondary to the thing being built.
+
 ## September 20: primitives before recipes
 
 Block descriptions should be short and literal: "Stopwatch or countdown", "Store a number", "Active between two times". Brayden rejected explanatory filler and contrast phrases such as "not a blocker". Name integrations plainly, such as "Apple Screen Time integration", and explain their actual data limits in settings.
@@ -10,15 +18,15 @@ Keep the document-first structure and tokens above the abstraction change. Three
 
 ## Web creation, September 19: document first
 
-Brayden rejected the three-panel workbench as clunky and requested a Notion-like creation process. This supersedes the workbench layout below for the default web editor, not its saved document format or the advanced logic canvas.
+Brayden rejected the three-panel workbench as clunky and requested a Notion-like creation process. This supersedes the old workbench and advanced logic canvas while preserving the saved document format.
 
 The tone is editorial minimalism: a quiet, left-aligned document, editable title, readable blocks, and generous space around the page. Reuse Pocketwork's existing paper, graphite, typography, and tokens. The original home remains the visual reference; do not redesign it or change native enforcement.
 
-Three signature moves: a small document glyph above the editable title; a narrow gutter with insertion and block actions; and compact, human-readable controls inside the timer, schedule, and app-blocking blocks. No permanent library, inspector, device bezel, onboarding wizard, or node canvas in the creation view. Add block and slash search share one keyboard-accessible picker. Preview and advanced logic are deliberate secondary destinations. Routine edits save automatically with explicit local/sync/error states. Preview never activates a real scheduled routine.
+Three signature moves: a small document glyph above the editable title; a narrow gutter with insertion and block actions; and compact, human-readable controls inside the timer, schedule, and app-blocking blocks. No permanent library, inspector, device bezel, onboarding wizard, node canvas, or advanced wiring destination. Add block and slash search share one keyboard-accessible picker. Preview is a deliberate secondary destination. Routine edits save automatically with explicit local/sync/error states. Preview never activates a real scheduled routine.
 
 Creation opens an empty text block, not sample motivational content. Text, tasks, numbers, and times are edited where they appear. Dependent native blocks are inserted together so ordinary creation never requires wiring a graph. Existing rules and connected behaviors must survive edits; invalid drafts never replace the saved routine. Test against the original home palette and this single-column document structure at desktop, tablet, and phone widths.
 
-Brayden's subsequent clarification: the page also contains connected controls and visualizations. The default Connections view uses named sources, typed input pickers, and expandable block settings instead of ports and wires. Forms can record entries; charts, tables, and progress displays use the same existing behavior schema as MCP and the native runner. Advanced wiring stays available. Native timer/schedule enforcement and foreground-only connected behaviors must be labelled separately. This web editing change does not claim arbitrary background execution, cross-routine data references, or a new native release.
+Brayden's subsequent clarification: the page also contains controls and visualizations. Named source properties and expandable block settings express relationships without a separate Connections view. Forms can record entries; charts, tables, and progress displays use the same existing behavior schema as MCP and the native runner. Native timer/schedule enforcement and foreground-only behaviors must be labelled separately. This web editing change does not claim arbitrary background execution, cross-routine data references, or a new native release.
 
 ## What this product is
 
@@ -26,21 +34,21 @@ A person assembles a personal iPhone tool from supported native blocks, sees exa
 
 ## Tone
 
-Compact industrial workbench, selected by Brayden: light canvas, component library, live iPhone preview. Quiet, precise, and approachable; no fake analytics or decorative dashboards.
+Editorial utility page: quiet paper, graphite structure, compact controls, and a deliberate preview. Precise and approachable; no fake analytics or decorative dashboards.
 
 ## Constraints
 
-Next.js App Router and TypeScript editor; SwiftUI native host. Desktop uses a library/canvas/inspector arrangement. Narrow screens stack the same regions. Accessible names, visible keyboard focus, 14px application body, reduced motion support. The browser simulates native restrictions and must never claim it is actually blocking apps.
+Next.js App Router and TypeScript editor; SwiftUI native host. Desktop and narrow screens use the same continuous document with responsive gutters. Accessible names, visible keyboard focus, 14px application body, reduced motion support. The browser simulates native restrictions and must never claim it is actually blocking apps.
 
 ## The one memorable thing
 
-A small, live personal app sits beside its human-readable behavior recipe, like a tool on a workbench rather than code in an IDE.
+A personal app reads like a short document: content, routines, and data in one editable page instead of code or a workflow diagram.
 
 ## Three signature moves
 
-1. Numbered ruled section rails: BUILD / BEHAVIOR / DEVICE, with consistent small uppercase labels and a fixed glyph column.
-2. Every native capability has a plain-language availability note; preview and device are visibly different states, never a misleading permission checkbox.
-3. A restrained device bezel anchors the live preview; selected blocks gain a single structural side rule, mirrored by the inspector heading.
+1. PAGE / ROUTINES / DATA labels divide one continuous document without creating separate modes.
+2. Every native capability has a plain-language availability note; preview and device are visibly different states.
+3. Expanded blocks reveal short, sentence-like properties in place; incomplete blocks remain visible without replacing the saved page.
 
 ## Skin
 
@@ -59,23 +67,23 @@ A small, live personal app sits beside its human-readable behavior recipe, like 
 
 ## Launch model, September 20
 
-Pages are the saved workspaces. Each page holds routines (actions, controls, and conditions) and data (values, records, and displays). Show Page, Routines, and Data as three views of the same document, not three disconnected editors. Sources can connect across these views. Preserve the original home layout and existing paper/graphite tokens.
+Pages are the saved workspaces. Each page holds routines (actions, controls, and conditions) and data (values, records, and displays). Show Page, Routines, and Data as sections in the same document, not separate views. Blocks can reference one another through named properties. Preserve the original home layout and existing paper/graphite tokens.
 
 Launch assumption: three free pages at a time; free MCP and sync. Pro raises the page allowance, not Screen Time permissions. Existing pages remain accessible after cancellation. Account, privacy, support, and terms use the same ruled document layout and existing controls. Show missing launch configuration honestly; never offer a purchase before a StoreKit product loads. Page-limit monetization still requires App Review assessment.
 
-QA: reviewed accessible structure and named controls, then desktop, 768px, and 375px screenshots. Reused existing measured AA text/surface tokens; design lint passes. Removed repeated rollout wording from the connection panel after narrow-screen review. Account empty state and legal-page layouts are browser-verified; authenticated purchase/deletion device screens still require signed-device testing.
+QA: review accessible structure and named controls, then desktop, 768px, and 375px screenshots. Reuse existing measured AA text/surface tokens and keep design lint passing. Account empty state and legal-page layouts are browser-verified; authenticated purchase/deletion device screens still require signed-device testing.
 
 ## Front door
 
-My tools comes before the workbench. A person sees only their saved routines as cards and a New routine action that opens a blank editor. The ready-made routine catalog was removed at Brayden’s request on 2026-09-13. Routines are named for the outcome (Deep work, Phone-free bedtime), not the blocks, and every one enforces something rather than only tracking it. Cards say what a tool does in one mono line (25 min session, blocks apps, 3 tasks). The browser back button always returns to the list.
+My pages comes before the editor. A person sees only their saved pages and a New page action that opens a blank document. The ready-made routine catalog was removed at Brayden’s request on 2026-09-13. Pages are named for their purpose, not their blocks. The browser back button always returns to the list.
 
 ## First-use guidance
 
-Keep the existing workbench, not a separate onboarding wizard. A dismissible, replayable three-step guide leads from customizing the current draft to testing it and understanding iPhone setup. It never replaces a saved tool or claims that visiting a step completes it. Use literal labels and show edit/test instructions beside the preview. On stacked layouts, selecting a block takes the user to its settings with a direct route back to the preview.
+Keep guidance inside the page editor, not in a separate onboarding wizard. A dismissible, replayable guide can lead from adding the first block to previewing it and understanding iPhone setup. It never replaces a saved page or claims that visiting a step completes it. Use literal labels and keep editing in the document at every width.
 
 ## Done for this slice
 
-My tools home with routines, duplicate, delete, and import; editable blocks and rules; interactive preview; persisted drafts; undo/redo; validated JSON import/export; native file import and permission-aware session runner; isolated tests; production web build; design lint; browser checks. Native device verification remains explicitly pending on Windows.
+My pages home with duplicate, delete, and import; editable blocks and rules; interactive preview; persisted drafts; undo/redo; validated JSON import/export; native file import and permission-aware session runner; isolated tests; production web build; design lint; browser checks. Native device verification remains explicitly pending on Windows.
 
 ## Phone workspace, September 13
 
@@ -85,15 +93,6 @@ Brayden requested a Notion/Obsidian-inspired phone interface and direct home-scr
 Phone editing follow-up: Edit opens the actual routine page in place. Preserve its heading rail, timer and counter cards, checklist rows, and note typography. Text becomes editable where it already lives; only configuration controls replace live actions. A quiet bottom bar offers Cancel, Add block, and behavior settings. Save returns to the same running page. Home allowances likewise keep their existing page and edit budgets inside its schedule cards. No block list or separate inspector is the default editing destination.
 
 
-## Connected logic workspace
+## Retired graph direction
 
-Brayden selected a Supabase-diagram-like node canvas alongside the Page view. Repeat three structures: compact node cards with labelled input/output ports, graphite connection wires with one selected accent, and a separate inspector for node settings. Node positions are workspace geometry; connections translate into the existing executable native routine schema. Unsupported combinations must fail explicitly rather than imply arbitrary code execution. Keep Page and Logic visibly accessible for home allowances as well as ordinary routines. Native capability boundaries remain visible, and draft graphs require Apply before their rules sync.
-
-## Behavior library organization
-
-Brayden requested less clutter and room for future data features on 2026-09-13. Show four collapsed sections: Time & location, Data, Logic, Actions. Search opens matching groups. Entries are compact names; descriptions belong in node settings. New nodes occupy free canvas space. Keep the graph, settings and optional Test logic distinct. Version-3 behaviors currently execute while a routine is open; do not imply arbitrary background execution or cloud-synced progress.
-
-
-## Native connected editor
-
-The iPhone Page editor opens a full-screen Logic workspace. Keep the original page appearance and use the existing paper, graphite, hairline and blue tokens. A bottom Add block action opens collapsed Time & location, Data, Logic and Actions groups. The canvas pans in both directions and has explicit zoom controls; node headings drag while 44-point ports open a compatible-connection picker. Find a block jumps through larger graphs. Settings use a sheet so the small screen does not carry desktop sidebars. Apply returns the graph to the page draft; Save uses the existing validated cloud save. Back confirms discarding graph changes. Invalid connections, cycles and incomplete graphs cannot overwrite the saved routine. New behaviors retain their foreground execution limits.
+The September 13 node-canvas direction is historical and must not appear in the web creator. Its typed graph remains an internal storage and runtime representation only. The document editor is the sole creation surface.

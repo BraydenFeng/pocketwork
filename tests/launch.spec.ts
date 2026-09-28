@@ -15,15 +15,14 @@ test("free pages preserve existing edits and a deletion makes room", async ({ pa
 	await page.getByRole("button", { name: "New page", exact: true }).click();
 	await expect(page.getByLabel("Page name", { exact: true })).toHaveValue("Untitled page");
 });
-test("routines and data are distinct views of one editable page", async ({ page }) => {
+test("routines and data live in one editable page", async ({ page }) => {
 	await page.goto("/"); await page.getByRole("button", { name: "New page", exact: true }).click();
 	await page.getByRole("button", { name: "Add a block", exact: true }).click(); await page.getByRole("button", { name: "Add Variable", exact: true }).click();
-	await expect(page.getByRole("tab", { name: "Data", exact: true })).toHaveAttribute("aria-selected", "true");
-	await page.getByRole("tab", { name: "Routines", exact: true }).click();
-	await expect(page.getByRole("button", { name: "Configure Variable", exact: true })).toHaveCount(0);
-	await page.getByRole("tab", { name: "Data", exact: true }).click();
-	await expect(page.getByRole("button", { name: "Configure Variable", exact: true })).toBeVisible();
-	await page.getByRole("button", { name: "Save connections", exact: true }).click();
+	await expect(page.getByRole("heading", { name: "Routines", exact: true })).toBeVisible();
+	await expect(page.getByRole("heading", { name: "Data", exact: true })).toBeVisible();
+	await expect(page.getByRole("button", { name: "Edit Variable", exact: true })).toBeVisible();
+	await expect(page.getByRole("tablist", { name: "Editor view" })).toHaveCount(0);
+	await expect(page.getByText(/Saved (on this browser|here · local-only blocks)/).first()).toBeVisible();
 });
 test("account and launch documents are usable at desktop and phone sizes", async ({ page }) => {
 	for (const width of [1440, 768, 375]) {

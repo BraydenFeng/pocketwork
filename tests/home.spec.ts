@@ -83,8 +83,7 @@ test("a scheduled routine gets a switch instead of a start button, on the card a
 	await page.getByRole("switch", { name: "Switch Every night on or off" }).check();
 	await expect(page.getByText(/^(On · next|Active now)/)).toBeVisible();
 	await page.getByRole("button", { name: "More page options", exact: true }).click();
-	await page.getByRole("button", { name: "Advanced wiring", exact: true }).click();
-	await expect(page.getByRole("button", { name: "Configure Time window" })).toBeVisible();
+	await expect(page.getByRole("button", { name: "Advanced wiring", exact: true })).toHaveCount(0);
 	await page.getByRole("button", { name: "My pages", exact: true }).click();
 	const card = page.locator(".tool-card:not(.is-template)", { hasText: "Phone-free bedtime" });
 	await expect(card.getByRole("switch", { name: "Switch Phone-free bedtime on or off" })).not.toBeChecked();

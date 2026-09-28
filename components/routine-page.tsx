@@ -1,19 +1,36 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDown, ArrowUp, ChevronDown, GripVertical, Plus, Smartphone, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, GripVertical, Plus, Smartphone, Trash2 } from "lucide-react";
+import { is_behavior } from "@/lib/behaviors";
 import { describe_shield, move_block, new_id, shield_mode, type AppDocument, type Block } from "@/lib/document";
-import { connected_summary, node_name, page_kinds, remove_page_block } from "@/lib/creation";
-import { graph_from_document } from "@/lib/logic-graph";
+import { generated_storage, remove_page_block } from "@/lib/creation";
+import type { LogicGraph } from "@/lib/logic-graph";
 import { ALL_DAYS, DAY_LABELS, WEEKDAYS } from "@/lib/schedule";
 import type { AppGroup } from "@/lib/library";
 import { BlockIcon, InlineText, NumberField } from "./creation-controls";
+import { RoutineBlocks } from "./routine-blocks";
 import { Button, Toggle } from "./ui";
 
-export function RoutinePage({ document, groups, on_change, on_add, on_connect, on_error }: { document: AppDocument; groups: AppGroup[]; on_change: (document: AppDocument) => void; on_add: (before?: string) => void; on_connect: (id?: string) => void; on_error: (message: string) => void }) {
+type PickerScope = "all" | "page" | "routines" | "data";
+
+export function RoutinePage({ document, groups, graph, selected, graph_dirty, graph_error, on_change, on_graph_change, on_select, on_discard_graph, on_add, on_error }: {
+	document: AppDocument;
+	groups: AppGroup[];
+	graph: LogicGraph;
+	selected: string | null;
+	graph_dirty: boolean;
+	graph_error: string | null;
+	on_change: (document: AppDocument) => void;
+	on_graph_change: (graph: LogicGraph) => void;
+	on_select: (id: string | null) => void;
+	on_discard_graph: () => void;
+	on_add: (scope: PickerScope, before?: string) => void;
+	on_error: (message: string) => void;
+}) {
 	const [menu, set_menu] = useState<string | null>(null);
 	const [dragged, set_dragged] = useState<string | null>(null);
-	const graph = graph_from_document(document);
+	const custom_blocks = graph.nodes.filter(node => is_behavior(node.kind) && !generated_storage(graph, node));
 	function update(block: Block) { on_change({ ...document, blocks: document.blocks.map(item => item.id === block.id ? block : item) }); }
 	function remove(id: string) { try { on_change(remove_page_block(document, id)); set_menu(null); } catch (error) { on_error(error instanceof Error ? error.message : "Could not remove this block."); } }
 	function drop(id: string) {
@@ -26,19 +43,17 @@ export function RoutinePage({ document, groups, on_change, on_add, on_connect, o
 		<div className="document-sigil" aria-hidden="true"><BlockIcon kind="note" /></div>
 		<h1 className="document-title" aria-label={document.name}><InlineText label="Page name" value={document.name} required placeholder="Untitled page" on_commit={name => on_change({ ...document, name })} /></h1>
 		<InlineText label="Description" value={document.description} placeholder="Add a description…" max_length={200} on_commit={description => on_change({ ...document, description })} className="document-description" />
-		<div className="document-properties"><span><Smartphone />{document.blocks.some(block => block.type === "schedule") ? "Scheduled on iPhone" : document.blocks.some(block => block.type === "timer") ? "Start when you need it" : "Your own little tool"}</span>{document.behaviors?.nodes.length ? <button type="button" onClick={() => on_connect()}>{document.behaviors.nodes.length} connected blocks <ChevronDown /></button> : <span>Changes save automatically</span>}</div>
+		<div className="document-properties"><span><Smartphone />{document.blocks.some(block => block.type === "schedule") ? "Scheduled on iPhone" : document.blocks.some(block => block.type === "timer") ? "Start when you need it" : "Your own little tool"}</span><span>{custom_blocks.length ? `${custom_blocks.length} custom block${custom_blocks.length === 1 ? "" : "s"}` : "Changes save automatically"}</span></div>
 		<ol className="document-blocks" aria-label="Page blocks">{document.blocks.map((block, index) => <li key={block.id} className="document-row" data-block-id={block.id} onDragOver={event => { if (dragged) { event.preventDefault(); } }} onDrop={() => drop(block.id)}>
-			<div className="block-gutter"><button type="button" aria-label={`Insert before ${block.title}`} onClick={() => on_add(block.id)}><Plus /></button><button type="button" draggable aria-label={`Actions for ${block.title}`} aria-expanded={menu === block.id} onDragStart={event => { set_dragged(block.id); event.dataTransfer.setData("text/plain", block.id); }} onDragEnd={() => set_dragged(null)} onClick={() => set_menu(menu === block.id ? null : block.id)}><GripVertical /></button></div>
+			<div className="block-gutter"><button type="button" aria-label={`Insert before ${block.title}`} onClick={() => on_add("page", block.id)}><Plus /></button><button type="button" draggable aria-label={`Actions for ${block.title}`} aria-expanded={menu === block.id} onDragStart={event => { set_dragged(block.id); event.dataTransfer.setData("text/plain", block.id); }} onDragEnd={() => set_dragged(null)} onClick={() => set_menu(menu === block.id ? null : block.id)}><GripVertical /></button></div>
 			{menu === block.id && <div className="block-action-menu" onKeyDown={event => { if (event.key === "Escape") { set_menu(null); } }}><Button variant="quiet" disabled={index === 0} onClick={() => { on_change(move_block(document, block.id, -1)); set_menu(null); }}><ArrowUp />Move up</Button><Button variant="quiet" disabled={index === document.blocks.length - 1} onClick={() => { on_change(move_block(document, block.id, 1)); set_menu(null); }}><ArrowDown />Move down</Button><Button variant="danger" onClick={() => remove(block.id)}><Trash2 />Remove block</Button></div>}
-			<NativeBlock block={block} document={document} groups={groups} on_change={update} on_document={on_change} on_add={() => on_add(block.id)} />
+			<NativeBlock block={block} document={document} groups={groups} on_change={update} on_document={on_change} on_add={() => on_add("all", block.id)} />
 		</li>)}</ol>
-		{document.behaviors?.nodes.filter(node => page_kinds.has(node.kind)).map(node => <section className="connected-page-block" key={node.id}>
-			<div className="connected-page-heading"><BlockIcon kind={node.kind} /><strong>{node.config.label || node.kind}</strong><Button variant="quiet" onClick={() => on_connect(node.id)}>Configure</Button></div>
-			<p className="supporting">{connected_summary(graph, node)}</p>
-			{node.kind === "chart" || node.kind === "table" ? <div className="data-placeholder"><BlockIcon kind={node.kind} /><span>Your {node.kind} will show saved entries.<small>Use Preview to test with sample entries of your own.</small></span></div> : node.kind === "progress" ? <div className="data-placeholder"><span>Target: {node.config.value}<small>Uses your connected value. No test data yet.</small></span></div> : <span className="connected-kind">{node.kind === "form" ? `${node.config.fields?.length ?? 1} input field${(node.config.fields?.length ?? 1) === 1 ? "" : "s"}` : node_name(node)}</span>}
-		</section>)}
-		<button type="button" className="document-add" onClick={() => on_add()}><Plus /><span>Add a block</span><kbd aria-hidden="true">/</kbd></button>
-		<div className="document-bottom-note">Start simple. Add a timer, a log, or something you want to see.</div>
+		<button type="button" className="document-add" onClick={() => on_add("all")}><Plus /><span>Add a block</span><kbd aria-hidden="true">/</kbd></button>
+		{graph_dirty && graph_error && <div className="document-draft-warning" role="alert"><div><strong>This block needs one more setting.</strong><p>{graph_error}</p></div><Button variant="quiet" onClick={on_discard_graph}>Discard unfinished block</Button></div>}
+		<RoutineBlocks graph={graph} selected={selected} section="routines" on_select={on_select} on_change={on_graph_change} on_add={() => on_add("routines")} on_error={on_error} />
+		<RoutineBlocks graph={graph} selected={selected} section="data" on_select={on_select} on_change={on_graph_change} on_add={() => on_add("data")} on_error={on_error} />
+		<div className="document-bottom-note">Type / in an empty text block to add anything.</div>
 	</div>;
 }
 
@@ -55,7 +70,7 @@ function NativeBlock({ block, document, groups, on_change, on_document, on_add }
 		{block.type === "screen_time" && <><label className="document-select"><span>What happens</span><select aria-label="App blocking mode" value={shield_mode(block)} onChange={event => { const mode = event.target.value as "block" | "allow_only" | "limit"; on_change({ ...block, mode, groups: mode !== "block" && !block.groups?.length ? [groups[0]?.name ?? "Distractions"] : block.groups, limit_minutes: mode === "limit" ? block.limit_minutes ?? 30 : undefined }); }}><option value="block">Block these apps</option><option value="allow_only">Allow only these apps</option><option value="limit">Give these apps a time limit</option></select></label>{shield_mode(block) === "limit" && <NumberField label="Minutes before blocking" value={block.limit_minutes ?? 30} min={15} max={1440} unit="minutes" on_commit={limit_minutes => on_change({ ...block, limit_minutes })} />}
 			<div className="document-group-picks" role="group" aria-label="App groups">{[...new Set([...groups.map(group => group.name), ...(block.groups ?? [])])].map(name => <label key={name}><input type="checkbox" checked={(block.groups ?? []).some(value => value.toLowerCase() === name.toLowerCase())} onChange={event => on_change({ ...block, groups: event.target.checked ? [...(block.groups ?? []), name] : (block.groups ?? []).filter(value => value.toLowerCase() !== name.toLowerCase()) })} />{name}</label>)}</div>
 			<details className="document-details"><summary>Add an app group</summary><form className="document-inline-actions" onSubmit={event => { event.preventDefault(); const name = new_group.trim(); if (name && !(block.groups ?? []).some(value => value.toLowerCase() === name.toLowerCase())) { on_change({ ...block, groups: [...(block.groups ?? []), name] }); set_new_group(""); } }}><input aria-label="New group name" placeholder="Social, games, work…" maxLength={40} value={new_group} onChange={event => set_new_group(event.target.value)} /><Button type="submit" disabled={!new_group.trim()}>Add group</Button></form></details>
-			<p className="supporting">{describe_shield(block)}. Choose the actual apps privately on your iPhone.</p><p className="capability-state">{document.rules.block_during_focus ? `Applies only while your ${document.blocks.some(item => item.type === "schedule") ? "schedule is active" : "focus timer is running"}.` : "Not connected to blocking yet."}</p>{!document.rules.block_during_focus && document.blocks.some(item => item.type === "timer" || item.type === "schedule") && <Button onClick={() => on_document({ ...document, rules: { ...document.rules, block_during_focus: true } })}>Enable blocking during this routine</Button>}
+			<p className="supporting">{describe_shield(block)}. Choose the actual apps privately on your iPhone.</p><p className="capability-state">{document.rules.block_during_focus ? `Applies only while your ${document.blocks.some(item => item.type === "schedule") ? "schedule is active" : "focus timer is running"}.` : "Blocking is off for this routine."}</p>{!document.rules.block_during_focus && document.blocks.some(item => item.type === "timer" || item.type === "schedule") && <Button onClick={() => on_document({ ...document, rules: { ...document.rules, block_during_focus: true } })}>Enable blocking during this routine</Button>}
 		</>}
 	</section>;
 }
