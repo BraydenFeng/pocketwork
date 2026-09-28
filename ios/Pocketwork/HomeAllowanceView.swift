@@ -1,3 +1,4 @@
+import Combine
 import FamilyControls
 import SwiftUI
 
@@ -8,12 +9,15 @@ struct HomeAllowanceView: View {
 	@EnvironmentObject private var library: LibraryController
 	@EnvironmentObject private var sessions: SessionController
 	@EnvironmentObject private var home: HomeLocationController
+	@Environment(\.scenePhase) private var scene_phase
 	@State private var picking_group: AppGroup?
 	@StateObject private var editor = RoutinePageEditing()
+	@StateObject private var allowance = HomeAllowanceDisplay()
 	@State private var opened = false
+	@State private var visible = false
 	@State private var showing_logic = false
-	@State private var remaining: Int?
 	private let ui_testing = CommandLine.arguments.contains("--ui-testing")
+	private let refresh_clock = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
 	private let days = ["", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 	var body: some View {
 		ScrollView {
@@ -39,7 +43,7 @@ struct HomeAllowanceView: View {
 				Group {
 				if !editor.active, document.behaviors != nil { BehaviorPanel(document: document) }
 				Text(home.status).heading_font(15)
-				if let remaining { Text("\(remaining) minutes left today").supporting() }
+				if let remaining = allowance.remaining { Text("\(remaining) minutes left today").supporting() }
 				Button(home.has_home ? "Update home to here" : "Set home here") { home.set_here() }.buttonStyle(QuietButtonStyle())
 				if !home.always_allowed { Button("Allow background home detection") { home.allow_background() }.buttonStyle(QuietButtonStyle()) }
 				Button("Choose Distractions") { picking_group = library.groups.first { $0.name == document.shield?.group_names.first } }.buttonStyle(QuietButtonStyle())
@@ -53,7 +57,11 @@ struct HomeAllowanceView: View {
 				if let error = home.error_message ?? sessions.error_message { Text(error).foregroundStyle(Theme.danger).font(.system(size: 13)) }
 			}.padding(Theme.pad).disabled(editor.saving)
 		}.page().navigationTitle("Home allowance").navigationBarTitleDisplayMode(.inline)
-		.onAppear { if !ui_testing { home.restore(); refresh() }; if !opened { opened = true; if edit_on_open { editor.begin(document) } } }
+		.onAppear { visible = true; if !ui_testing { home.restore(); refresh() }; if !opened { opened = true; if edit_on_open { editor.begin(document) } } }
+		.onDisappear { visible = false }
+		.onReceive(refresh_clock) { _ in refresh_if_active() }
+		.onChange(of: scene_phase) { _, _ in refresh_if_active() }
+		.onChange(of: document.home_allowance) { _, _ in refresh_if_active() }
 		.navigationBarBackButtonHidden(editor.active)
 		.scrollDismissesKeyboard(.interactively)
 		.toolbar { ToolbarItem(placement: .topBarTrailing) {
@@ -66,5 +74,15 @@ struct HomeAllowanceView: View {
 		.sheet(item: $picking_group) { group in AppGroupSelectionSheet(group: group) }
 	}
 
-	private func refresh() { guard !ui_testing else { return }; Task { do { let state = try await HomeWorker.run { try HomeEngine.snapshot() }; let used = state.ledger.day == document.home_allowance?.day_key(.now) ? state.ledger.used_minutes : 0; let base = document.home_allowance?.rule(at: .now)?.allowance_minutes ?? 0; let budget = state.ledger.day == document.home_allowance?.day_key(.now) ? state.ledger.budget(base) : base; remaining = max(0, budget - used) } catch { sessions.report(error) } } }
+	private func refresh_if_active() {
+		guard visible, scene_phase == .active else { return }
+		refresh()
+	}
+	private func refresh() {
+		guard !ui_testing else { return }
+		Task {
+			do { try await allowance.refresh(policy: document.home_allowance) }
+			catch { sessions.report(error) }
+		}
+	}
 }
