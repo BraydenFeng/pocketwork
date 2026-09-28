@@ -33,8 +33,9 @@ test("native settings are editable inline and preview is a separate mode", async
 	await expect(page.getByLabel("Session length")).toBeEditable();
 	await expect(page.getByLabel("App blocking mode")).toBeEnabled();
 	await expect(page.getByText(/Choose the actual apps privately on your iPhone/)).toBeVisible();
-	await page.getByRole("tab", { name: "Routines", exact: true }).click();
-	await page.getByRole("tab", { name: "Page", exact: true }).click();
+	await expect(page.getByRole("tablist", { name: "Editor view" })).toHaveCount(0);
+	await expect(page.getByRole("heading", { name: "Routines", exact: true })).toBeVisible();
+	await expect(page.getByRole("heading", { name: "Data", exact: true })).toBeVisible();
 	await page.getByRole("button", { name: "Preview", exact: true }).click();
 	await expect(page.getByRole("button", { name: "Start focusing", exact: true })).toBeEnabled();
 	await page.getByRole("button", { name: "Back to editing", exact: true }).click();

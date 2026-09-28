@@ -26,7 +26,7 @@ export const behavior_catalog: Record<BehaviorKind, { title: string; detail: str
 	time_window: { title: "Time window", detail: "Active between two times", category: "Time", inputs: {}, outputs: { active: "boolean", outside: "boolean" } },
 	record: { title: "Record", detail: "Group values into one entry", category: "Data", inputs: { value: "number" }, outputs: { record: "record" } },
 	location: { title: "At location", detail: "Inside the saved place on your phone", category: "Triggers", inputs: {}, outputs: { present: "boolean", away: "boolean" } },
-	button: { title: "Button", detail: "Run a connection with one tap", category: "Triggers", inputs: {}, outputs: { pressed: "boolean" } },
+	button: { title: "Button", detail: "Run an action with one tap", category: "Triggers", inputs: {}, outputs: { pressed: "boolean" } },
 	check_in: { title: "Check-in", detail: "Record showing up", category: "Accountability", inputs: {}, outputs: { done: "boolean" } },
 	arrive: { title: "Arrive at location", detail: "When you enter the saved place", category: "Triggers", inputs: {}, outputs: { arrived: "boolean" } },
 	leave: { title: "Leave location", detail: "When you exit the saved place", category: "Triggers", inputs: {}, outputs: { left: "boolean" } },
@@ -57,14 +57,14 @@ export function behavior_order(graph: Behaviors, external: Record<string, Record
 	for (const edge of graph.connections) {
 		const from = graph.nodes.find(n => n.id === edge.from); const to = graph.nodes.find(n => n.id === edge.to);
 		const output = from ? behavior_ports(from).outputs[edge.output] : external[edge.from]?.[edge.output];
-		if (!to || !output || output !== behavior_ports(to).inputs[edge.input]) { throw new Error("These ports do not match. Connect the same value type."); }
+		if (!to || !output || output !== behavior_ports(to).inputs[edge.input]) { throw new Error("These values do not match. Choose a source with the same value type."); }
 		const input = `${edge.to}.${edge.input}`;
-		if (occupied.has(input)) { throw new Error("This input is already connected."); } occupied.add(input);
+		if (occupied.has(input)) { throw new Error("This property already has a source."); } occupied.add(input);
 	}
 	if (require_inputs) {
 		for (const node of graph.nodes) { for (const port of Object.keys(behavior_ports(node).inputs)) {
 			if (optional_input(node, port)) { continue; }
-			if (!occupied.has(`${node.id}.${port}`)) { throw new Error(`Connect ${behavior_catalog[node.kind].title}'s ${port} input first.`); }
+			if (!occupied.has(`${node.id}.${port}`)) { throw new Error(`Finish ${behavior_catalog[node.kind].title}: choose ${port.replaceAll("_", " ")}.`); }
 		} }
 	}
 	const dependencies = [...graph.connections, ...variable_dependencies(graph, require_inputs)];
@@ -76,7 +76,7 @@ export function behavior_order(graph: Behaviors, external: Record<string, Record
 	const ordered: BehaviorNode[] = []; const remaining = [...graph.nodes];
 	while (remaining.length) {
 		const index = remaining.findIndex(n => !dependencies.some(e => e.to === n.id && remaining.some(p => p.id === e.from)));
-		if (index < 0) { throw new Error("Connections cannot loop back. A change action cannot depend on the variable it updates; use Add or Subtract instead."); }
+		if (index < 0) { throw new Error("Blocks cannot loop back to themselves. A change action cannot use the variable it updates; use Add or Subtract instead."); }
 		ordered.push(remaining.splice(index, 1)[0]);
 	}
 	return ordered;

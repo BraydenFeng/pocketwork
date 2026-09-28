@@ -25,7 +25,7 @@ export const builder_catalog = {
 	form: entry("Form", "Named fields submitted together", "Inputs", {}, { submitted: "boolean", record: "record" }),
 	save_entry: entry("Save entry", "Keep submitted records and their timestamps", "Data", { record: "record", save: "boolean", clear: "boolean" }, { rows: "table", count: "number", saved: "boolean" }),
 	aggregate: entry("Summarize data", "Sum, average, count or find a range", "Data", { rows: "table" }, { value: "number" }),
-	calculate: entry("Calculate", "Arithmetic on two connected numbers", "Logic", { a: "number", b: "number" }, { value: "number" }),
+	calculate: entry("Calculate", "Arithmetic with two numbers", "Logic", { a: "number", b: "number" }, { value: "number" }),
 	text_compare: entry("Compare text", "Match text or look for a phrase", "Logic", { text: "text" }, { result: "boolean" }),
 	table: entry("Table", "Display saved entries", "Display", { rows: "table" }, { rows: "table" }),
 	chart: entry("Chart", "Plot a numeric field over time", "Display", { rows: "table" }, { rows: "table" }),

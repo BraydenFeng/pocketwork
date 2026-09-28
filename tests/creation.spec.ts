@@ -47,10 +47,9 @@ test("a form, saved log and chart work together without drawing any wires", asyn
 	await page.getByLabel("Name for My log", { exact: true }).press("Tab");
 	await page.getByLabel("Field name", { exact: true }).fill("Minutes at gym");
 	await expect(page.getByLabel("Field ID", { exact: true })).toHaveCount(0);
-	await page.getByRole("button", { name: "Save connections", exact: true }).click();
 	await add_block(page, "Chart");
 	await expect(page.getByLabel("Show data from: Chart", { exact: true })).not.toHaveValue("");
-	await page.getByRole("button", { name: "Save connections", exact: true }).click();
+	await expect(page.getByText("Saved on this browser", { exact: true })).toBeVisible();
 	await page.getByRole("button", { name: "Preview", exact: true }).click();
 	await page.getByLabel("Minutes at gym", { exact: true }).fill("45");
 	await page.getByRole("button", { name: "Submit Gym log", exact: true }).click();
@@ -61,7 +60,7 @@ test("a form, saved log and chart work together without drawing any wires", asyn
 	await page.getByRole("button", { name: "Back to editing", exact: true }).click();
 	await expect(page.getByText("Saved on this browser", { exact: true })).toBeVisible();
 	await page.reload();
-	await expect(page.locator(".connected-page-block")).toHaveCount(2);
+	await expect(page.locator(".document-logic-block")).toHaveCount(2);
 	await page.getByRole("button", { name: "Preview", exact: true }).click();
 	await expect(page.getByText("No entries yet.", { exact: true })).toBeVisible();
 });
@@ -69,12 +68,10 @@ test("a form, saved log and chart work together without drawing any wires", asyn
 test("a switch controls named app groups without advanced wiring", async ({ page }) => {
 	await page.goto("/"); await page.getByRole("button", { name: "New page", exact: true }).click();
 	await add_block(page, "Switch");
-	await page.getByRole("button", { name: "Save connections", exact: true }).click();
 	await add_block(page, "Control app access");
 	await page.getByLabel("Block apps when: Control app access", { exact: true }).selectOption({ label: "Switch · switched on" });
 	await page.getByLabel("App groups to control", { exact: true }).fill("Social, Games");
 	await page.getByLabel("App groups to control", { exact: true }).press("Tab");
-	await page.getByRole("button", { name: "Save connections", exact: true }).click();
 	await expect(page.getByText("Saved on this browser", { exact: true })).toBeVisible();
 	await page.reload();
 	const groups = await page.evaluate(() => JSON.parse(localStorage.getItem("pocketwork.library.v1")!).tools[0].document.behaviors.nodes.find((node: { kind: string }) => node.kind === "app_gate").config.groups);
@@ -86,18 +83,15 @@ test("a switch controls named app groups without advanced wiring", async ({ page
 	await expect(page.getByText("Simulated: app gate open", { exact: true }).last()).toBeVisible();
 });
 
-test("incomplete connections cannot replace a saved routine and require a discard decision", async ({ page }) => {
+test("an incomplete block cannot replace a saved page and can be discarded", async ({ page }) => {
 	await seed_library(page, [starter_document]); await page.goto(STARTER_URL);
 	await add_block(page, "Chart");
-	await expect(page.getByRole("button", { name: "Save connections", exact: true })).toBeDisabled();
+	await expect(page.getByText("Block needs a setting", { exact: true })).toBeVisible();
+	await expect(page.locator(".document-draft-warning")).toContainText("Finish Chart");
 	expect(await page.evaluate(() => JSON.parse(localStorage.getItem("pocketwork.library.v1")!).tools[0].document.behaviors)).toBeUndefined();
-	page.once("dialog", dialog => dialog.dismiss());
-	await page.getByRole("tab", { name: "Page", exact: true }).click();
-	await expect(page.getByRole("heading", { name: "Data", exact: true })).toBeVisible();
-	page.once("dialog", dialog => dialog.accept());
-	await page.getByRole("button", { name: "Discard changes", exact: true }).click();
-	await page.getByRole("tab", { name: "Page", exact: true }).click();
+	await page.getByRole("button", { name: "Discard unfinished block", exact: true }).click();
 	await expect(page.getByLabel("Page name", { exact: true })).toHaveValue(starter_document.name);
+	await expect(page.getByRole("button", { name: "Edit Chart", exact: true })).toHaveCount(0);
 });
 
 test("block ordering and undo stay accessible without an inspector", async ({ page }) => {
@@ -121,17 +115,17 @@ test("previewing a scheduled routine never enables it on the account", async ({ 
 	await expect(page.getByText("Off until you enable it on your iPhone", { exact: true })).toBeVisible();
 });
 
-test("page and connections reflow and retain readable contrast", async ({ page }) => {
+test("the unified page reflows and retains readable contrast", async ({ page }) => {
 	await seed_library(page, [starter_document]);
 	for (const width of [1440, 768, 375]) {
 		await page.setViewportSize({ width, height: 1000 }); await page.goto(STARTER_URL);
 		await expect(page.getByLabel("Page name", { exact: true })).toBeVisible();
+		await expect(page.getByRole("heading", { name: "Routines", exact: true })).toBeVisible();
+		await expect(page.getByRole("heading", { name: "Data", exact: true })).toBeVisible();
+		await expect(page.locator(".logic-node, .logic-wire")).toHaveCount(0);
 		expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 		await page.screenshot({ path: `test-results/editor-page-${width}.png`, fullPage: true });
-		await page.getByRole("tab", { name: "Routines", exact: true }).click();
-		expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-		await page.screenshot({ path: `test-results/editor-connections-${width}.png`, fullPage: true });
-		await page.getByRole("button", { name: "Add a connected block", exact: true }).click();
+		await page.getByRole("button", { name: "Add routine block", exact: true }).click();
 		await page.screenshot({ path: `test-results/editor-picker-${width}.png` });
 		await page.getByLabel("Find a block", { exact: true }).press("Escape");
 	}

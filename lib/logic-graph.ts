@@ -43,12 +43,12 @@ export function make_node(kind: NodeKind, x = 48, y = 48): LogicNode {
 export function connect(graph: LogicGraph, edge: Connection): LogicGraph {
 	const from = graph.nodes.find((node) => node.id === edge.from);
 	const to = graph.nodes.find((node) => node.id === edge.to);
-	if (!from || !to) { throw new Error("Both ends of the connection need a node."); }
+	if (!from || !to) { throw new Error("Both blocks must still exist."); }
 	if (is_behavior(to.kind)) {
 		const output = is_behavior(from.kind) ? behavior_ports({ kind: from.kind, config: from.config ?? behavior_config_schema.parse({}) }).outputs[edge.output] : legacy_ports(from)[edge.output];
-		if (!output || output !== behavior_ports({ kind: to.kind, config: to.config ?? behavior_config_schema.parse({}) }).inputs[edge.input]) { throw new Error("These ports do not match. Connect the same value type."); }
+		if (!output || output !== behavior_ports({ kind: to.kind, config: to.config ?? behavior_config_schema.parse({}) }).inputs[edge.input]) { throw new Error("These values do not match. Choose a source with the same value type."); }
 	} else if (!supported.has(`${from.kind}.${edge.output}>${to.kind}.${edge.input}`)) { throw new Error("These ports do not match. Choose a compatible input."); }
-	if (graph.connections.some((item) => item.to === edge.to && item.input === edge.input)) { throw new Error("This input is already connected. Remove its connection first."); }
+	if (graph.connections.some((item) => item.to === edge.to && item.input === edge.input)) { throw new Error("This property already has a source. Clear it first."); }
 	const result = { ...graph, connections: [...graph.connections, edge] };
 	behavior_order(behavior_part(result), external_ports(result));
 	return result;
@@ -95,10 +95,10 @@ export function compile_graph(base: AppDocument, graph: LogicGraph): AppDocument
 	});
 	for (const block of blocks) { if (!result.blocks.some((item) => item.id === block.id)) { result.blocks.push(block); } }
 	result.rules = { block_during_focus: linked("timer", "active", "apps", "gate") || linked("schedule", "active", "apps", "gate"), notify_on_complete: linked("timer", "finished", "notification", "finished") };
-	if (by_kind("notification") && !result.rules.notify_on_complete) { throw new Error("Connect the timer's finished output to Notify me."); }
+	if (by_kind("notification") && !result.rules.notify_on_complete) { throw new Error("Set Notify me to use the timer's finished event."); }
 	if (home) {
 		const required: [NodeKind, string, NodeKind, string][] = [["home", "present", "usage", "home"], ["schedule", "active", "usage", "window"], ["usage", "used", "allowance", "used"], ["allowance", "reached", "apps", "gate"], ["home", "present", "apps", "home"]];
-		if (by_kind("timer") || !required.every((edge) => linked(...edge))) { throw new Error("Home allowances need Home + Time window → Count usage → Daily allowance → Control apps, plus a Home connection to Control apps."); }
+		if (by_kind("timer") || !required.every((edge) => linked(...edge))) { throw new Error("Home allowances require Home and Time window for Count usage, Daily allowance, and Control apps."); }
 		const policy = by_kind("allowance")?.policy;
 		if (!policy) { throw new Error("Set the daily allowances and windows."); }
 		result.home_allowance = structuredClone(policy);

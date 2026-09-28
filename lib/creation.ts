@@ -83,7 +83,7 @@ export function remove_page_block(document: AppDocument, id: string): AppDocumen
 		? { ...document, blocks: [{ id: new_id(), type: "note" as const, title: "Text", text: "" }], rules: { block_during_focus: false, notify_on_complete: false }, enabled: undefined }
 		: remove_block(document, id);
 	if (next.blocks.some(block => block.type === "schedule") && !next.blocks.some(block => block.type === "screen_time")) { throw new Error("This schedule needs an app blocker. Remove the schedule first."); }
-	if (document.behaviors?.connections.some(edge => edge.from === id)) { throw new Error("Other blocks use this block. Disconnect them in Connections before removing it."); }
+	if (document.behaviors?.connections.some(edge => edge.from === id)) { throw new Error("Other blocks use this block. Choose a different input for them before removing it."); }
 	return checked_document(next);
 }
 
@@ -126,11 +126,33 @@ export function set_source(graph: LogicGraph, target: string, input: string, val
 	return connect(base, { from: source.node, output: source.output, to: target, input });
 }
 
+export function fill_single_sources(graph: LogicGraph): LogicGraph {
+	let next = structuredClone(graph);
+	const variables = next.nodes.filter(node => node.kind === "variable");
+	if (variables.length === 1) {
+		next.nodes = next.nodes.map(node => node.kind === "change_value" && !node.config?.variable_id
+			? { ...node, config: { ...node.config!, variable_id: variables[0].id } }
+			: node);
+	}
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const node of next.nodes.filter(item => is_behavior(item.kind))) {
+			for (const input of node_ports(node).inputs) {
+				if (optional_input({ kind: node.kind as BehaviorKind, config: node.config! }, input) || next.connections.some(edge => edge.to === node.id && edge.input === input)) { continue; }
+				const options = source_options(next, node.id, input);
+				if (options.length === 1) { next = set_source(next, node.id, input, options[0].id); changed = true; }
+			}
+		}
+	}
+	return next;
+}
+
 export function add_connected_block(graph: LogicGraph, kind: BehaviorKind | "log"): { graph: LogicGraph; selected: string } {
 	const node = make_node(kind === "log" ? "form" : kind, 40, graph.nodes.length * 240);
 	if (kind !== "log") { node.config!.label = creation_catalog.find(item => item.kind === kind)?.title ?? node.config!.label; }
 	if (kind === "log") { node.config = behavior_config_schema.parse({ label: "My log", fields: [{ id: "value", label: "Value", type: "number", required: true }] }); }
-	if (graph.nodes.filter(item => is_behavior(item.kind)).length + (kind === "log" ? 2 : 1) > 48) { throw new Error("Use at most 48 connected blocks in one routine."); }
+	if (graph.nodes.filter(item => is_behavior(item.kind)).length + (kind === "log" ? 2 : 1) > 48) { throw new Error("Use at most 48 custom blocks in one page."); }
 	let next: LogicGraph = { ...graph, nodes: [...graph.nodes, node] };
 	if (kind === "change_value") { const variables = graph.nodes.filter(item => item.kind === "variable"); if (variables.length === 1) { node.config!.variable_id = variables[0].id; } }
 	if (kind === "log") {
@@ -140,17 +162,19 @@ export function add_connected_block(graph: LogicGraph, kind: BehaviorKind | "log
 		next = connect(next, { from: node.id, output: "record", to: storage.id, input: "record" });
 		next = connect(next, { from: node.id, output: "submitted", to: storage.id, input: "save" });
 	}
-	for (const input of node_ports(node).inputs) {
-		if (optional_input({ kind: node.kind as BehaviorKind, config: node.config! }, input)) { continue; }
-		const options = source_options(next, node.id, input);
-		if (options.length === 1) { next = set_source(next, node.id, input, options[0].id); }
-	}
-	return { graph: next, selected: node.id };
+	return { graph: fill_single_sources(next), selected: node.id };
 }
 
 export function connected_summary(graph: LogicGraph, node: LogicNode): string {
 	const sources = graph.connections.filter(edge => edge.to === node.id).map(edge => graph.nodes.find(item => item.id === edge.from)).filter((item): item is LogicNode => Boolean(item));
-	return sources.length ? `From ${[...new Set(sources.map(node_name))].join(", ")}` : is_behavior(node.kind) ? behavior_catalog[node.kind].detail : node_catalog[node.kind].detail;
+	return sources.length ? `Uses ${[...new Set(sources.map(node_name))].join(", ")}` : is_behavior(node.kind) ? behavior_catalog[node.kind].detail : node_catalog[node.kind].detail;
+}
+
+export function generated_storage(graph: LogicGraph, node: LogicNode): boolean {
+	if (node.kind !== "save_entry" || node.config?.label !== "Saved entries") { return false; }
+	const record = graph.connections.find(edge => edge.to === node.id && edge.input === "record");
+	const save = graph.connections.find(edge => edge.to === node.id && edge.input === "save");
+	return Boolean(record && save && record.from === save.from && graph.nodes.some(item => item.id === record.from && item.kind === "form"));
 }
 
 export function numeric_fields(graph: LogicGraph, node: LogicNode): { id: string; label: string }[] {
@@ -170,7 +194,7 @@ export function validate_connections(base: AppDocument, graph: LogicGraph): stri
 		for (const node of graph.nodes.filter(item => is_behavior(item.kind))) {
 			for (const input of node_ports(node).inputs) {
 				if (optional_input({ kind: node.kind as BehaviorKind, config: node.config! }, input)) { continue; }
-				if (!graph.connections.some(edge => edge.to === node.id && edge.input === input)) { return `Connect ${node_name(node)}: ${input_name(node.kind, input).toLowerCase()}.`; }
+				if (!graph.connections.some(edge => edge.to === node.id && edge.input === input)) { return `Finish ${node_name(node)}: choose ${input_name(node.kind, input).toLowerCase()}.`; }
 			}
 		}
 		compile_graph(base, graph);
@@ -179,5 +203,5 @@ export function validate_connections(base: AppDocument, graph: LogicGraph): stri
 		}
 		return null;
 	}
-	catch (failure) { return failure instanceof Error ? failure.message : "Check the connections before saving."; }
+	catch (failure) { return failure instanceof Error ? failure.message : "Finish the block settings before leaving this page."; }
 }

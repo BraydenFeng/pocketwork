@@ -55,7 +55,7 @@ export function variable_dependencies(graph: Behaviors, strict: boolean): { from
 	for (const node of graph.nodes.filter(item => item.kind === "change_value")) {
 		const target = graph.nodes.find(item => item.id === node.config.variable_id);
 		if (!target || target.kind !== "variable") { if (strict || node.config.variable_id) { throw new Error(`Choose an existing variable for ${node.config.label || "Change variable"}.`); } continue; }
-		if (graph.connections.some(edge => edge.to === target.id && edge.input === "set")) { throw new Error("A variable cannot use both a continuous source and change actions. Disconnect its value source first."); }
+		if (graph.connections.some(edge => edge.to === target.id && edge.input === "set")) { throw new Error("A variable cannot use both an ongoing source and change actions. Clear its value source first."); }
 		dependencies.push({ from: node.id, to: target.id });
 	}
 	return dependencies;

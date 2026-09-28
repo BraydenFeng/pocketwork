@@ -45,13 +45,13 @@ export const document_schema = z.object({
 }).strict().superRefine((document, context) => {
 	if (document.schema_version < 3 && (document.schema_version === 2) !== Boolean(document.home_allowance)) { context.addIssue({ code: "custom", message: "Home allowances require routine format 2." }); }
 	if (document.home_allowance && (!document.blocks.some((b) => b.type === "schedule") || !document.rules.block_during_focus || !document.blocks.some((b) => b.type === "screen_time" && b.mode === "block" && b.groups?.length === 1))) { context.addIssue({ code: "custom", message: "Home allowances require a schedule and one distraction group in block mode." }); }
-	if ((document.schema_version >= 3) !== Boolean(document.behaviors)) { context.addIssue({ code: "custom", message: "Connected behaviors require routine format 3 or 4 and the updated phone app." }); }
+	if ((document.schema_version >= 3) !== Boolean(document.behaviors)) { context.addIssue({ code: "custom", message: "Custom blocks require page format 3 or 4 and the updated phone app." }); }
 	if (document.behaviors && requires_format_four(document.behaviors) && document.schema_version !== 4) { context.addIssue({ code: "custom", message: "These building blocks require routine format 4 and a compatible phone update." }); }
 	if (document.behaviors) {
 		const ports: Record<string, Record<string, "boolean" | "number">> = {};
 		for (const block of document.blocks) { if (block.type === "timer") { ports[block.id] = { active: "boolean", finished: "boolean" }; } if (block.type === "schedule") { ports[block.id] = { active: "boolean", outside: "boolean" }; } }
 		if (document.home_allowance) { ports["home-condition"] = { present: "boolean" }; ports["usage-meter"] = { used: "number" }; ports["daily-allowance"] = { reached: "boolean" }; }
-		try { behavior_order(document.behaviors, ports, true); } catch (failure) { context.addIssue({ code: "custom", message: failure instanceof Error ? failure.message : "Invalid behavior connections." }); }
+		try { behavior_order(document.behaviors, ports, true); } catch (failure) { context.addIssue({ code: "custom", message: failure instanceof Error ? failure.message : "Invalid block setup." }); }
 	}
 	const ids = new Set<string>();
 	for (const block of document.blocks) {

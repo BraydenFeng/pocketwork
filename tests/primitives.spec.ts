@@ -12,7 +12,7 @@ async function name_block(page: Page, current: string, name: string) {
 	await page.getByLabel(`Name for ${current}`, { exact: true }).fill(name);
 	await page.getByLabel(`Name for ${current}`, { exact: true }).press("Tab");
 }
-async function save(page: Page) { await page.getByRole("button", { name: "Save connections", exact: true }).click(); }
+async function save(page: Page) { await expect(page.getByText(/Saved (on this browser|here · local-only blocks)/).first()).toBeVisible(); }
 function node(id: string, kind: BehaviorKind, config: Partial<BehaviorConfig> = {}) { return { id, kind, x: 0, y: 0, config: behavior_config_schema.parse({ label: id, ...config }) }; }
 
 test("users build their own allowance with a variable and an add action", async ({ page }) => {
@@ -50,7 +50,9 @@ test("a general timer has no automatic blocker and supports countdown and count-
 	await expect(page.getByLabel("Timer time")).toHaveText("0:00");
 	await expect(page.getByText("Finished · counting down", { exact: true })).toBeVisible();
 	await page.getByRole("button", { name: "Back to editing", exact: true }).click();
-	await page.locator(".connected-page-block").getByRole("button", { name: "Configure" }).click();
+	if (!await page.getByLabel("Timer mode").isVisible()) {
+		await page.getByRole("button", { name: "Edit Timer", exact: true }).click();
+	}
 	await page.getByLabel("Timer mode").selectOption("stopwatch"); await save(page);
 	await page.getByRole("button", { name: "Preview", exact: true }).click();
 	await page.getByRole("button", { name: "Start Timer", exact: true }).click();
@@ -88,8 +90,7 @@ test("timer, saved record, chart, and allowance share values without a manual fo
 		await page.screenshot({ path: `test-results/primitive-preview-${width}.png`, fullPage: true });
 	}
 	await page.getByRole("button", { name: "Back to editing", exact: true }).click();
-	await page.getByRole("tab", { name: "Routines", exact: true }).click();
-	await page.getByRole("button", { name: "Configure Reward", exact: true }).click();
+	await page.getByRole("button", { name: "Edit Reward", exact: true }).click();
 	await expect(page.getByLabel("Amount from (optional): Reward", { exact: true })).not.toHaveValue("");
 	await page.screenshot({ path: "test-results/primitive-action-375.png", fullPage: true });
 });
@@ -97,7 +98,7 @@ test("timer, saved record, chart, and allowance share values without a manual fo
 test("a change action cannot be saved without a variable and trigger", async ({ page }) => {
 	await page.goto("/"); await page.getByRole("button", { name: "New page", exact: true }).click();
 	await add_block(page, "Change variable");
-	await expect(page.getByRole("button", { name: "Save connections", exact: true })).toBeDisabled();
+	await expect(page.getByText("Block needs a setting", { exact: true })).toBeVisible();
 	await expect(page.getByLabel("Variable to change")).toHaveValue("");
 	await page.screenshot({ path: "test-results/primitive-missing-source.png", fullPage: true });
 });

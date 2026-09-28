@@ -51,7 +51,7 @@ describe("user-defined variables", () => {
 		result = run_behaviors(graph, result.state, { now: 7000, tap: "button" }); expect(result.state.values.allowance).toBe(105);
 	});
 	it("rejects mixed continuous and event-based writers and overflows atomically", () => {
-		const graph = allowance(); graph.nodes.push(node("source", "number_input")); graph.connections.push(wire("source", "value", "allowance", "set")); expect(() => behavior_order(graph, {}, true)).toThrow("continuous");
+		const graph = allowance(); graph.nodes.push(node("source", "number_input")); graph.connections.push(wire("source", "value", "allowance", "set")); expect(() => behavior_order(graph, {}, true)).toThrow("ongoing");
 		const state = initial_behaviors(); state.values.allowance = 1000000; expect(() => run_behaviors(allowance(), state, { now: 0, tap: "button" })).toThrow("1,000,000"); expect(state.fired).toEqual({}); expect(state.values.allowance).toBe(1000000);
 	});
 	it("supports connected comparison and progress targets", () => {

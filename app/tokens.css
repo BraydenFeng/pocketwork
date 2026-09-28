@@ -5,11 +5,8 @@
 	--editor-heading: 40px;
 	--editor-gutter: 48px;
 	--editor-picker: 480px;
+	--editor-menu: 192px;
 	--editor-overlay: oklch(0.24 0.016 239 / 0.24);
-	--logic-library: 192px;
-	--logic-inspector: 264px;
-	--logic-stage: 580px;
-	--logic-port: 28px;
 	--s-1: 4px;
 	--s-2: 8px;
 	--s-3: 12px;
@@ -91,7 +88,6 @@
 	--outline-offset: 3px;
 	--measure: 56ch;
 	--shell-max: 1600px;
-	--canvas-min: 400px;
 	--breakpoint-tablet: 1100px;
 	--breakpoint-mobile: 760px;
 	--breakpoint-phone: 400px;
