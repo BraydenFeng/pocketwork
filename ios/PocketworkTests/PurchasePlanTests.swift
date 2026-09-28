@@ -16,6 +16,17 @@ final class PurchasePlanTests: XCTestCase {
 		XCTAssertEqual(PurchaseEnvironment.sandbox.verification_path, "api/subscription/sandbox")
 		XCTAssertEqual(PurchaseEnvironment.production.verification_path, "api/subscription")
 	}
+	func test_guest_does_not_load_storekit_or_request_apple_authentication() async {
+		let subscriptions = SubscriptionController()
+		let cloud = CloudController()
+		XCTAssertNil(cloud.account_id)
+		await subscriptions.attach(cloud)
+		await subscriptions.load_product()
+		await subscriptions.refresh()
+		XCTAssertNil(subscriptions.product)
+		XCTAssertNil(subscriptions.environment)
+		XCTAssertNil(subscriptions.message)
+	}
 	func test_test_response_cannot_unlock_production() {
 		XCTAssertThrowsError(try plan("Sandbox").active_until(in: .production, now: now))
 		XCTAssertThrowsError(try plan().active_until(in: .sandbox, now: now))

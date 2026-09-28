@@ -28,7 +28,8 @@ final class SubscriptionController: ObservableObject {
 		await load_product()
 	}
 	func load_product() async {
-		guard configured, !loading, !CommandLine.arguments.contains("--ui-testing") else { return }
+		// AppTransaction may request Apple authentication; guests have not asked to buy anything.
+		guard configured, cloud?.account_id != nil, !loading, !CommandLine.arguments.contains("--ui-testing") else { return }
 		loading = true; defer { loading = false }
 		do {
 			guard case .verified(let app) = try await AppTransaction.shared else { throw DocumentError.invalid("Apple could not verify this app installation.") }

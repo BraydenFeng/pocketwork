@@ -35,6 +35,17 @@ final class ScreenshotTests: XCTestCase {
 		app.buttons["Cancel"].tap()
 		XCTAssertTrue(app.buttons["home.create-account"].exists)
 	}
+	func test_guest_launch_without_storekit_sign_in_prompt() throws {
+		app.terminate()
+		app.launchArguments = ["--reset-library"]
+		app.launch()
+		XCTAssertTrue(app.buttons["home.create-account"].waitForExistence(timeout: 10))
+		let apple_sign_in = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts["Sign in to Apple Account"]
+		XCTAssertFalse(apple_sign_in.waitForExistence(timeout: 3), "Opening a guest workspace must not request an Apple purchase sign-in")
+		try snap("16-guest-without-purchase-prompt")
+		app.buttons["New page"].tap()
+		XCTAssertTrue(app.navigationBars["New page"].waitForExistence(timeout: 10))
+	}
 
 	func test_walkthrough_screens() throws {
 		XCTAssertTrue(app.navigationBars["My pages"].waitForExistence(timeout: 10))
