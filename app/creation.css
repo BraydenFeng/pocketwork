@@ -28,7 +28,7 @@
 .document-input:hover { background: var(--c-bg); }
 .document-input:focus { background: var(--c-bg); outline: var(--outline-focus); outline-offset: var(--s-1); }
 .document-input[aria-invalid="true"] { outline: var(--outline-focus); outline-color: var(--c-danger); }
-textarea.document-input { field-sizing: content; min-height: var(--toolbar-h); line-height: var(--lh-body); }
+textarea.document-input { field-sizing: content; min-height: var(--toolbar-h); line-height: var(--lh-body); resize: none; }
 .document-description { color: var(--c-text-faint); }
 .document-properties { margin: var(--s-5) 0 var(--s-6); padding-block: var(--s-3); border-block: var(--hairline); display: flex; gap: var(--s-4); justify-content: space-between; align-items: center; color: var(--c-text-faint); font-size: var(--t-small); flex-wrap: wrap; }
 .document-properties > span, .document-properties button { display: flex; gap: var(--s-2); align-items: center; }
@@ -100,6 +100,7 @@ textarea.document-input { field-sizing: content; min-height: var(--toolbar-h); l
 .allowance-fact { display: flex; gap: var(--s-3); align-items: flex-start; padding: var(--s-4); border-block: var(--hairline); }
 .allowance-fact strong { font-size: var(--t-body); }
 .allowance-fact p { margin-top: var(--s-1); color: var(--c-text-faint); font-size: var(--t-small); }
+.allowance-settings { min-width: 0; margin: 0; padding: 0; border: 0; }
 .allowance-rules { margin-block: var(--s-5); border-top: var(--hairline); }
 .allowance-rule { padding-block: var(--s-5); border-bottom: var(--hairline); }
 .allowance-rule-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-3); margin-bottom: var(--s-4); }

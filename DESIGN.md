@@ -6,6 +6,8 @@ Brayden rejected the remaining node canvas, Connections workflow, and separate R
 
 The tone stays editorial minimalism. The creator should feel like writing and arranging a small personal tool, not programming a workflow diagram. Blocks are added from the page or with `/`, edited in place, and saved automatically as soon as their required properties are complete. References between blocks appear as ordinary sentence-like properties such as “When,” “Use value from,” or “Show entries from.”
 
+Home allowance is a native routine inside this same page structure, not a separate editor. Its location and allowance controls appear as the first routine block, while the page still exposes PAGE, ROUTINES, and DATA sections for adding content, automations, variables, logs, and displays. Its required schedule and Screen Time storage blocks stay internal so the page does not show duplicate controls.
+
 Three signature moves: the document glyph and editable title; small PAGE / ROUTINES / DATA section labels within one continuous page; and expandable block rows whose properties sit directly beneath the block. There is no editor-mode tab bar and no graph deep link. Native presets and foreground-only blocks keep their capability notes, but those notes are secondary to the thing being built.
 
 ## September 20: primitives before recipes

@@ -64,6 +64,7 @@ export function Workbench({ tool, groups, on_save, on_back, storage_blocked, sto
 	const [save_failed, set_save_failed] = useState(false);
 	const [graph, set_graph] = useState<LogicGraph>(() => graph_from_document(tool));
 	const [graph_dirty, set_graph_dirty] = useState(false);
+	const [page_draft_error, set_page_draft_error] = useState<string | null>(null);
 	const [selected_block, set_selected_block] = useState<string | null>(null);
 	const [runtime, set_runtime] = useState(initial_runtime);
 	const [preview_enabled, set_preview_enabled] = useState(false);
@@ -112,10 +113,10 @@ export function Workbench({ tool, groups, on_save, on_back, storage_blocked, sto
 		return () => window.removeEventListener("keydown", key);
 	}, [view, picker]);
 	useEffect(() => {
-		const warn = (event: BeforeUnloadEvent) => { if (graph_dirty || save_failed) { event.preventDefault(); } };
+		const warn = (event: BeforeUnloadEvent) => { if (graph_dirty || page_draft_error || save_failed) { event.preventDefault(); } };
 		window.addEventListener("beforeunload", warn);
 		return () => window.removeEventListener("beforeunload", warn);
-	}, [graph_dirty, save_failed]);
+	}, [graph_dirty, page_draft_error, save_failed]);
 
 	function commit(next: AppDocument) {
 		try { set_history(current => change(current, checked_document(next))); set_error(null); }
@@ -142,8 +143,9 @@ export function Workbench({ tool, groups, on_save, on_back, storage_blocked, sto
 		set_error(null);
 	}
 	function can_leave() {
-		if (graph_dirty && !window.confirm("Discard the unfinished block changes? Your saved page will stay unchanged.")) { return false; }
+		if ((graph_dirty || page_draft_error) && !window.confirm("Discard the unfinished changes? Your saved page will stay unchanged.")) { return false; }
 		if (graph_dirty) { discard_graph(); }
+		if (page_draft_error) { set_page_draft_error(null); }
 		return true;
 	}
 	function show(next: EditorView) {
@@ -184,16 +186,16 @@ export function Workbench({ tool, groups, on_save, on_back, storage_blocked, sto
 	function dispatch(action: RuntimeAction) { set_runtime(state => transition(document, state, action)); }
 
 	const has_native_preview = document.blocks.some(block => block.type !== "note" || Boolean(block.text));
-	const save_label = storage_blocked ? "Storage needs attention" : save_failed ? "Not saved" : graph_dirty ? "Block needs a setting" : saving ? "Saving…" : document.schema_version === 4 && !native_format_four ? "Saved here · local-only blocks" : sync === "syncing" ? "Syncing…" : sync === "error" ? "Saved here · sync paused" : sync === "synced" ? "Saved & synced" : "Saved on this browser";
+	const save_label = storage_blocked ? "Storage needs attention" : save_failed ? "Not saved" : page_draft_error ? "Schedule needs attention" : graph_dirty ? "Block needs a setting" : saving ? "Saving…" : document.schema_version === 4 && !native_format_four ? "Saved here · local-only blocks" : sync === "syncing" ? "Syncing…" : sync === "error" ? "Saved here · sync paused" : sync === "synced" ? "Saved & synced" : "Saved on this browser";
 	return <div className="creation-workspace"><a className="skip-link" href="#page-editor">Skip to page</a>
-		<header className="creation-topbar"><nav className="creation-breadcrumb" aria-label="Breadcrumb"><Button variant="quiet" onClick={back}><ArrowLeft /><span>My pages</span></Button><ChevronRight /><span>{document.name}</span></nav><div className="creation-topbar-actions"><span className={`creation-save ${save_failed || storage_blocked || graph_dirty ? "is-error" : ""}`} role="status"><Check />{save_label}</span><Button variant={view === "preview" ? "primary" : "quiet"} aria-pressed={view === "preview"} onClick={() => show(view === "preview" ? "page" : "preview")}><Play />{view === "preview" ? "Back to editing" : "Preview"}</Button><div className="creation-more"><Button variant="quiet" aria-label="More page options" aria-expanded={more} onClick={() => set_more(!more)}><MoreHorizontal /></Button>{more && <div className="creation-more-menu"><Button variant="quiet" onClick={export_page}><Download />Export page</Button><Button variant="quiet" onClick={() => { set_help(true); set_more(false); }}><Smartphone />Use on iPhone</Button></div>}</div></div></header>
-		<div className="creation-toolbar creation-toolbar-quiet"><span>Page editor</span><div className="history-controls"><Button variant="quiet" aria-label="Undo edit" disabled={!history.past.length || graph_dirty || storage_blocked} onClick={() => set_history(undo)}><Undo2 /></Button><Button variant="quiet" aria-label="Redo edit" disabled={!history.future.length || graph_dirty || storage_blocked} onClick={() => set_history(redo)}><Redo2 /></Button></div></div>
+		<header className="creation-topbar"><nav className="creation-breadcrumb" aria-label="Breadcrumb"><Button variant="quiet" onClick={back}><ArrowLeft /><span>My pages</span></Button><ChevronRight /><span>{document.name}</span></nav><div className="creation-topbar-actions"><span className={`creation-save ${save_failed || storage_blocked || graph_dirty || page_draft_error ? "is-error" : ""}`} role="status"><Check />{save_label}</span><Button variant={view === "preview" ? "primary" : "quiet"} aria-pressed={view === "preview"} onClick={() => show(view === "preview" ? "page" : "preview")}><Play />{view === "preview" ? "Back to editing" : "Preview"}</Button><div className="creation-more"><Button variant="quiet" aria-label="More page options" aria-expanded={more} onClick={() => set_more(!more)}><MoreHorizontal /></Button>{more && <div className="creation-more-menu"><Button variant="quiet" onClick={export_page}><Download />Export page</Button><Button variant="quiet" onClick={() => { set_help(true); set_more(false); }}><Smartphone />Use on iPhone</Button></div>}</div></div></header>
+		<div className="creation-toolbar creation-toolbar-quiet"><span>Page editor</span><div className="history-controls"><Button variant="quiet" aria-label="Undo edit" disabled={!history.past.length || graph_dirty || Boolean(page_draft_error) || storage_blocked} onClick={() => set_history(undo)}><Undo2 /></Button><Button variant="quiet" aria-label="Redo edit" disabled={!history.future.length || graph_dirty || Boolean(page_draft_error) || storage_blocked} onClick={() => set_history(redo)}><Redo2 /></Button></div></div>
 		{(error ?? storage_error) && <div className="alert-banner" role="alert"><Info /><span>{error ?? storage_error}</span>{storage_blocked && <Button onClick={on_replace_unreadable}>Replace unreadable data</Button>}<Button variant="quiet" aria-label="Dismiss error" onClick={() => { set_error(null); on_dismiss_error(); }}><X /></Button></div>}
 		{notice && <div className="notice-banner" role="status"><Check /><span>{notice}</span><Button variant="quiet" aria-label="Dismiss message" onClick={() => set_notice(null)}><X /></Button></div>}
 		{help && <div className="creation-help"><div>{document.schema_version === 4 && !native_format_four ? <><strong>This draft needs a compatible phone update.</strong><p>These new blocks currently run only in the browser. Sign-in and export do not make them compatible with the installed iPhone app. Any earlier phone version of this page stays unchanged.</p></> : <><strong>Your page follows your account.</strong><p>Open Pocketwork on your iPhone with the same sign-in to sync. Choose apps, grant permissions, and enable schedules there. Browser previews never change phone restrictions. Without sign-in, export the page and import it on the phone.</p></>}</div><Button variant="quiet" aria-label="Close iPhone help" onClick={() => set_help(false)}><X /></Button></div>}
 		<main id="page-editor">
 			{document.schema_version === 4 && !native_format_four && <div className="creation-help"><Info /><p>Saved only here until the compatible iPhone update is available. Existing phone pages stay unchanged.</p></div>}
-			{view === "page" && <RoutinePage document={document} groups={groups} graph={graph} selected={selected_block} graph_dirty={graph_dirty} graph_error={graph_error} on_change={commit} on_graph_change={edit_graph} on_select={set_selected_block} on_discard_graph={discard_graph} on_add={(scope, before) => set_picker({ scope, before })} on_error={set_error} />}
+			{view === "page" && <RoutinePage document={document} groups={groups} graph={graph} selected={selected_block} graph_dirty={graph_dirty} graph_error={graph_error} disabled={storage_blocked} on_change={commit} on_graph_change={edit_graph} on_select={set_selected_block} on_discard_graph={discard_graph} on_add={(scope, before) => set_picker({ scope, before })} on_error={set_error} on_draft_error={set_page_draft_error} />}
 			{view === "preview" && <div className={`creation-preview ${has_native_preview ? "has-native-preview" : ""}`}><div className="preview-explanation"><span className="document-eyebrow">TRY YOUR PAGE</span><h1>A test run. Nothing on your phone changes.</h1><p>Buttons, entries, and switches here are simulated. Test data resets when you leave this preview.</p>{has_native_preview && <><Button variant="quiet" onClick={() => { set_runtime(initial_runtime()); set_preview_enabled(document.enabled ?? false); }}><RotateCcw />Reset timer</Button>{runtime.status === "running" && <Button variant="quiet" onClick={() => dispatch({ type: "tick", now: runtime.ends_at! })}>Simulate timer finishing</Button>}<p role="status">{runtime.status === "running" ? "Session running · simulated" : runtime.status === "completed" ? "Session completed" : "Ready when you are"}</p>{runtime.events.length > 0 && <ol className="event-log">{runtime.events.slice(-3).map((event, index) => <li key={index}>{event.message}</li>)}</ol>}</>}</div>{has_native_preview && <PhonePreview document={{ ...document, ...(document.enabled !== undefined ? { enabled: preview_enabled } : {}) }} runtime={runtime} now={now} selected_id={null} interactive on_select={() => undefined} dispatch={dispatch} on_toggle_enabled={set_preview_enabled} />}{document.behaviors && <div className="creation-behavior-preview"><BehaviorRunner graph={graph_from_document(document)} simple /></div>}</div>}
 		</main>
 		{picker && <BlockPicker scope={picker.scope} on_close={() => set_picker(null)} on_pick={pick} />}

@@ -6,7 +6,6 @@ import { connect_cloud, current_account, fetch_library, push_library, sign_out, 
 import { add_group, delete_tool, duplicate_tool, empty_library, find_tool, import_tool, load_library, remove_group, rename_group, save_library, upsert_tool, LIBRARY_KEY, library_schema, type Library } from "@/lib/library";
 import { cloud_compatible_library, merge_libraries, same_library } from "@/lib/sync";
 import { fetch_status, type StatusReport } from "@/lib/status";
-import { HomeAllowance } from "./home-allowance";
 import { Home } from "./home";
 import { fetch_plan } from "@/lib/account-client";
 import { assert_page_limit, free_plan, plan_active, type PagePlan } from "@/lib/page-plan";
@@ -261,7 +260,6 @@ export function PocketworkApp() {
 
 	if (!ready) { return <div className="app-loading" role="status">Opening your routines…</div>; }
 
-	if (open_tool?.home_allowance) { return <HomeAllowance key={open_tool.id} document={open_tool} on_back={() => navigate(null)} on_save={save_tool} disabled={storage_blocked} />; }
 	if (open_tool) {
 		return <Workbench key={open_tool.id} tool={open_tool} groups={library.groups ?? []} on_save={save_tool} on_back={() => navigate(null)} storage_blocked={storage_blocked} storage_error={error} on_replace_unreadable={replace_unreadable} on_dismiss_error={() => set_error(null)} sync={account ? sync : "off"} />;
 	}

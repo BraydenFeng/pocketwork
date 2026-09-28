@@ -7,8 +7,8 @@ import { Button } from "./ui";
 
 export type PickerScope = "all" | "page" | "routines" | "data";
 
-export function InlineText({ label, value, on_commit, placeholder, multiline = false, max_length = 80, required = false, className = "", on_slash }: {
-	label: string; value: string; on_commit: (value: string) => void; placeholder?: string; multiline?: boolean; max_length?: number; required?: boolean; className?: string; on_slash?: () => void;
+export function InlineText({ label, value, on_commit, placeholder, multiline = false, wrap = false, max_length = 80, required = false, className = "", on_slash }: {
+	label: string; value: string; on_commit: (value: string) => void; placeholder?: string; multiline?: boolean; wrap?: boolean; max_length?: number; required?: boolean; className?: string; on_slash?: () => void;
 }) {
 	const [draft, set_draft] = useState(value);
 	const [invalid, set_invalid] = useState(false);
@@ -17,10 +17,10 @@ export function InlineText({ label, value, on_commit, placeholder, multiline = f
 	function key(event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) {
 		if (event.key === "/" && !draft && on_slash) { event.preventDefault(); on_slash(); }
 		if (event.key === "Escape") { set_draft(value); set_invalid(false); }
-		if (event.key === "Enter" && !multiline) { event.preventDefault(); event.currentTarget.blur(); }
+		if (event.key === "Enter" && (!multiline || wrap)) { event.preventDefault(); event.currentTarget.blur(); }
 	}
-	const props = { className: `document-input ${className}`, "aria-label": label, "aria-invalid": invalid, value: draft, placeholder, maxLength: max_length, onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => { set_draft(event.target.value); set_invalid(false); }, onBlur: commit, onKeyDown: key };
-	return <>{multiline ? <textarea rows={2} {...props} /> : <input {...props} />}{invalid && <span className="field-error" role="alert">Give this a name before leaving the field.</span>}</>;
+	const props = { className: `document-input ${className}`, "aria-label": label, "aria-invalid": invalid, value: draft, placeholder, maxLength: max_length, onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => { set_draft(wrap ? event.target.value.replace(/[\r\n]+/g, " ") : event.target.value); set_invalid(false); }, onBlur: commit, onKeyDown: key };
+	return <>{multiline || wrap ? <textarea rows={wrap ? 1 : 2} {...props} /> : <input {...props} />}{invalid && <span className="field-error" role="alert">Give this a name before leaving the field.</span>}</>;
 }
 
 export function NumberField({ label, value, min, max, on_commit, unit, integer = true }: { label: string; value: number; min: number; max: number; on_commit: (value: number) => void; unit?: string; integer?: boolean }) {

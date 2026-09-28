@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { is_behavior, type BehaviorConfig } from "@/lib/behaviors";
 import { connected_summary, generated_storage, input_name, node_name, numeric_fields, page_section, set_source, source_options, type PageSection } from "@/lib/creation";
@@ -11,10 +12,11 @@ import { BlockIcon, InlineText, NumberField } from "./creation-controls";
 import { PrimitiveSettings } from "./primitive-settings";
 import { Button } from "./ui";
 
-export function RoutineBlocks({ graph, selected, section, on_select, on_change, on_add, on_error }: {
+export function RoutineBlocks({ graph, selected, section, leading_block, on_select, on_change, on_add, on_error }: {
 	graph: LogicGraph;
 	selected: string | null;
 	section: PageSection;
+	leading_block?: ReactNode;
 	on_select: (id: string | null) => void;
 	on_change: (graph: LogicGraph) => void;
 	on_add: () => void;
@@ -54,9 +56,9 @@ export function RoutineBlocks({ graph, selected, section, on_select, on_change, 
 	const description = section === "data" ? "Values, logs, and things you can display." : "Events, conditions, and actions.";
 	return <section className="document-system-section" aria-labelledby={`${section}-section-title`}>
 		<div className="document-section-heading"><span className="document-eyebrow">{title.toUpperCase()}</span><h2 id={`${section}-section-title`}>{title}</h2><p>{description}</p></div>
-		{section === "routines" && visible_blocks.length > 0 && <p className="document-runtime-note">Custom routines run while this page is open. Native schedules keep running on iPhone.</p>}
-		{visible_blocks.length === 0 && <p className="document-section-empty">No {section} yet.</p>}
-		<div className="document-logic-blocks">{visible_blocks.map(node => {
+		{section === "routines" && (leading_block || visible_blocks.length > 0) && <p className="document-runtime-note">Custom routines run while this page is open. Native schedules keep running on iPhone.</p>}
+		{!leading_block && visible_blocks.length === 0 && <p className="document-section-empty">No {section} yet.</p>}
+		<div className="document-logic-blocks">{leading_block}{visible_blocks.map(node => {
 			const open = selected === node.id;
 			return <section key={node.id} className={`document-logic-block ${open ? "is-open" : ""}`}>
 				<button type="button" className="document-logic-heading" aria-expanded={open} aria-label={`Edit ${node_name(node)}`} onClick={() => on_select(open ? null : node.id)}><BlockIcon kind={node.kind} /><span><strong>{node_name(node)}</strong><small>{connected_summary(graph, node)}</small></span><span className="document-logic-kind">{node_catalog[node.kind].title}</span><ChevronDown /></button>

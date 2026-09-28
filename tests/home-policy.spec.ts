@@ -6,6 +6,7 @@ test("home allowance shows all windows and honest phone setup", async ({ page })
 	await seed_library(page, [personal_routine]);
 	await page.goto("/?routine=home-distraction-allowance");
 	await expect(page.getByRole("heading", { name: "Home distraction allowance", exact: true })).toBeVisible();
+	await page.getByRole("button", { name: "Edit Home screen-time allowance", exact: true }).click();
 	const groups = page.locator(".allowance-rule");
 	await expect(groups).toHaveCount(3);
 	await expect(groups.nth(0).getByRole("heading", { name: "Mon, Tue, Wed, Thu", exact: true })).toBeVisible();
