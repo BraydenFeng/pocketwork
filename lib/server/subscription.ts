@@ -19,15 +19,25 @@ export function verified_plan_response(value: unknown, user_id: string, bundle: 
 	throw new ApiError("This subscription does not belong to this Pocketwork account.", 403);
 }
 export async function refresh_subscription(user_id: string, transaction_id: string): Promise<PagePlan> {
-	if (!/^\d{1,32}$/.test(transaction_id)) { throw new ApiError("Invalid transaction ID."); }
-	const sandbox = process.env.APP_STORE_ENVIRONMENT === "Sandbox";
-	const host = sandbox ? "api.storekit-sandbox.itunes.apple.com" : "api.storekit.apple.com";
-	const bundle = required_env("APP_STORE_BUNDLE_ID");
-	const response = await apple_fetch(`https://${host}/inApps/v1/subscriptions/${transaction_id}`, { headers: { Authorization: `Bearer ${apple_jwt("APP_STORE", "appstoreconnect-v1", { bid: bundle })}` } });
-	const row = verified_plan_response(response, user_id, bundle, required_env("APP_STORE_PRODUCT_ID"), sandbox);
+	if (process.env.APP_STORE_ENVIRONMENT !== "Production") { throw new ApiError("Live subscriptions require the Production environment.", 503); }
+	const row = await fetch_subscription(user_id, transaction_id, false);
 	const { error } = await admin_client().from("page_subscriptions").upsert({ user_id, ...row }, { onConflict: "user_id" });
 	if (error) { throw new ApiError("Could not save your verified subscription. Restore purchases to retry.", 502); }
 	return { pro: row.pro, expires_at: row.expires_at, configured: true };
+}
+
+async function fetch_subscription(user_id: string, transaction_id: string, sandbox: boolean) {
+	if (!/^\d{1,32}$/.test(transaction_id)) { throw new ApiError("Invalid transaction ID."); }
+	const host = sandbox ? "api.storekit-sandbox.apple.com" : "api.storekit.apple.com";
+	const bundle = required_env("APP_STORE_BUNDLE_ID");
+	const response = await apple_fetch(`https://${host}/inApps/v1/subscriptions/${transaction_id}`, { headers: { Authorization: `Bearer ${apple_jwt("APP_STORE", "appstoreconnect-v1", { bid: bundle })}` } });
+	return verified_plan_response(response, user_id, bundle, required_env("APP_STORE_PRODUCT_ID"), sandbox);
+}
+
+// TestFlight can verify delivery on the phone without ever changing live cloud entitlements.
+export async function verify_test_subscription(user_id: string, transaction_id: string): Promise<PagePlan & { environment: "Sandbox" }> {
+	const row = await fetch_subscription(user_id, transaction_id, true);
+	return { pro: row.pro, expires_at: row.expires_at, configured: true, environment: "Sandbox" };
 }
 export async function account_plan(user_id: string): Promise<PagePlan> {
 	if (!process.env.APP_STORE_PRODUCT_ID) { return free_plan; }

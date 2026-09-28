@@ -135,14 +135,18 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 		}
 		return data
 	}
-	struct PagePlan: Decodable { let pro: Bool; let expires_at: String?; let configured: Bool }
-	func refresh_plan(transaction_id: String? = nil) async throws {
-		guard website != nil, signed_in, Bundle.main.object(forInfoDictionaryKey: "PocketworkSubscriptionsEnabled") as? Bool == true else { return }
-		let data = try await api_request("api/subscription", body: transaction_id.map { ["transaction_id": $0] })
-		let plan = try JSONDecoder().decode(PagePlan.self, from: data)
-		let formatter = ISO8601DateFormatter(); formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-		library?.pro_until = plan.pro ? plan.expires_at.flatMap { formatter.date(from: $0) } : nil
+	@discardableResult
+	func refresh_plan(transaction_id: String? = nil, environment: PurchaseEnvironment = .production) async throws -> Bool {
+		guard website != nil, signed_in, Bundle.main.object(forInfoDictionaryKey: "PocketworkSubscriptionsEnabled") as? Bool == true else { return false }
+		guard environment == .production || transaction_id != nil else { throw DocumentError.invalid("A test purchase needs its Apple transaction.") }
+		let data = try await api_request(environment.verification_path, body: transaction_id.map { ["transaction_id": $0] })
+		let plan = try JSONDecoder().decode(PurchasePlan.self, from: data)
+		let expiration = try plan.active_until(in: environment)
+		if environment == .sandbox { library?.test_pro_until = expiration }
+		else { library?.pro_until = expiration }
+		return expiration != nil
 	}
+	func clear_test_plan() { library?.test_pro_until = nil }
 	func delete_account() async {
 		guard !busy, !syncing, signed_in else { return }
 		busy = true; deleting = true; pending_save?.cancel(); error_message = nil
@@ -259,7 +263,10 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 					}
 				}
 				if remote?.library != merged {
-					if merged.tools.count > 3 && merged.tools.contains(where: { remote?.library.find($0.id) == nil }) { try await refresh_plan() }
+					if merged.tools.count > 3 && merged.tools.contains(where: { remote?.library.find($0.id) == nil }) {
+						try await refresh_plan()
+						guard library.has_live_pro else { throw DocumentError.invalid("More than 3 cloud pages needs a live Pro subscription. TestFlight purchases unlock this phone only; your pages remain saved here.") }
+					}
 					let stamp = remote?.updated_at.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""
 					let write_path = remote == nil ? "rest/v1/libraries" : path + "&updated_at=eq." + stamp
 					do {

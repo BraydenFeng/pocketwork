@@ -29,9 +29,14 @@ struct AccountView: View {
 				Text("MCP and sync are included. Pages hold routines and data. Existing pages stay available if you cancel Pro.").supporting()
 				if subscriptions.configured {
 					if let product = subscriptions.product, !library.has_pro { Button("Subscribe · " + product.displayPrice + " / month") { Task { await subscriptions.purchase() } }.buttonStyle(PrimaryButtonStyle()).disabled(subscriptions.busy) }
-					else if !library.has_pro { Text("Subscription product is not available yet.").supporting() }
+					else if !library.has_pro {
+						Text("Subscription product is not available yet.").supporting()
+						Button("Retry loading subscription") { Task { await subscriptions.load_product() } }.buttonStyle(TextButtonStyle()).disabled(subscriptions.busy)
+					}
 					Button("Restore purchases") { Task { await subscriptions.restore() } }.buttonStyle(TextButtonStyle()).disabled(subscriptions.busy)
-					Text("Renews monthly until cancelled in your Apple account. Payment is charged to your Apple account.").supporting()
+					if subscriptions.is_sandbox {
+						Text("TestFlight purchase testing. No charge. Test Pro applies to this phone only; extra test pages are not synced to the live website.").supporting()
+					} else { Text("Renews monthly until cancelled in your Apple account. Payment is charged to your Apple account.").supporting() }
 				} else { Text("Pro purchases are not enabled in this build.").supporting() }
 				Link("Manage subscriptions", destination: URL(string: "https://apps.apple.com/account/subscriptions")!)
 				if let message = subscriptions.message { Text(message).supporting() }

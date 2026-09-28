@@ -12,6 +12,7 @@ try {
 	if (process.env.NEXT_PUBLIC_SUBSCRIPTIONS_ENABLED !== "true") { issues.push("Subscriptions are not enabled for the launch website"); }
 	if (process.env.NEXT_PUBLIC_NATIVE_FORMAT4_ENABLED !== "true") { issues.push("Format-4 sync is still held back pending the phone release"); }
 	if (!readFileSync("ios/project.yml", "utf8").includes("PrivacyInfo.xcprivacy")) { issues.push("Native privacy manifest resource is missing"); }
+	if (!readFileSync("ios/project.yml", "utf8").includes("PocketworkSubscriptionsEnabled: true")) { issues.push("Native purchases are disabled"); }
 	if (issues.length) { console.error("Release configuration is NOT ready:\n" + issues.map(issue => `- ${issue}`).join("\n")); process.exitCode = 1; }
 	else { console.log("Configuration is present. This does not verify Apple approval, credentials, live SQL policies, device behavior, or purchase/deletion flows. Complete RELEASE.md before submission."); }
 } catch (error) { console.error("Release preflight failed:", error instanceof Error ? error.message : "Unknown error"); process.exitCode = 1; }
