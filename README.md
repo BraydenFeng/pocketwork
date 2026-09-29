@@ -59,11 +59,11 @@ UI tokens and structural rules are in `DESIGN.md` and `app/tokens.css`. `tools/u
 
 ## Intentionally not built yet
 
-App Store release, subscriptions, a full drag-and-drop layout grid, calendar/location integrations, widgets, and MCP. The first MCP implementation should manipulate this same strict document schema with authenticated, user-approved edits, not expose arbitrary native execution.
+App Store release, a full drag-and-drop layout grid, calendar integrations, and widgets.
 
 ## Web and iPhone cloud workflow
 
-Use Sign in with Apple on the website and in the updated TestFlight app with the same Apple account. Start with New routine; the ready-made catalog is no longer shown. Existing personal routines are preserved. The website saves locally immediately and syncs after edits, on focus, and every 15 seconds while visible. The iPhone syncs after edits, on opening/foreground, or pull-to-refresh. iOS does not receive cloud changes while the app is closed; open it to apply updated schedules. Choose apps and grant Screen Time access on the phone. Ongoing timer progress and private app selections remain on device.
+Use Sign in with Apple on the website and in the updated TestFlight app with the same Apple account. Start with New page; the ready-made catalog is no longer shown. Existing personal pages are preserved. The website saves locally immediately and syncs after edits, on focus, and every 15 seconds while visible. The iPhone syncs after edits, on opening/foreground, or pull-to-refresh. iOS does not receive cloud changes while the app is closed; open it to apply updated schedules. Choose apps and grant Screen Time access on the phone. Ongoing timer progress and private app selections remain on device.
 
 The existing Supabase libraries table and RLS policies work without another migration. Writes compare the server updated_at timestamp and retry after conflicts. Account libraries are stored separately on each device. iPhone refresh tokens live in Keychain. Google support is implemented but hidden until enabled (web: NEXT_PUBLIC_GOOGLE_ENABLED=true, iOS Info.plist: SupabaseGoogleEnabled=true).
 
@@ -75,12 +75,12 @@ Off by default. In the iPhone app, Account & sync → **Share status with your a
 
 ## Home allowance and MCP
 
-The personal seed is available at `http://127.0.0.1:3210/?seed=home` after signing in. It calls the authenticated `seed_home_allowance` MCP tool, preserves an existing routine with the same ID, and starts disabled. The user must install the new TestFlight build, set home while physically there, allow Always location access, choose the Distractions apps, and enable the allowance. Routine format 2 prevents older builds from silently ignoring the home requirement.
+For a home allowance page, the user must install the compatible TestFlight build, set home while physically there, allow Always location access, choose the Distractions apps, and enable the allowance. Routine format 2 prevents older builds from silently ignoring the home requirement.
 
 Weekdays Mon–Thu share 30 minutes across 18:00–18:30 and 19:00–20:50; Friday gets 120 minutes in 14:30–20:20; each weekend day gets 180 minutes in 06:30–20:30. Outside windows, distractions are blocked only at home. Away use is unrestricted and uncounted. The allowance resets at midnight America/Los_Angeles. Home coordinates remain in the iPhone App Group, not Supabase. One home allowance per device is supported because iOS caps monitored activities.
 
 The native meter uses whole-minute checkpoints and a fresh activity after returning home. The final partial minute can be lost on departure, and OS geofence/threshold callbacks may be delayed. This is not second-accurate metering, and simulator tests cannot prove background enforcement on a real iPhone. A physical-device leave/return test remains required. The geofence radius is 150 m; disabling location access leaves the home restriction inactive.
 
-The signed-in website has Copy agent connection. This copies a short-lived Supabase bearer token into an MCP HTTP config for the current account. Keep that config private; it expires with the session, and there is no refresh/admin token in it. Copy again after expiration. The endpoint is `/api/mcp`, validates the token with Supabase, and supports list_routines, get_capabilities, save_routine, delete_routine, and the personal seed. Writes use the existing RLS-protected library row and optimistic revision checks. No AI service is invoked.
+The signed-in website has Copy agent connection. This copies a short-lived Supabase bearer token into an MCP HTTP config for the current account. Keep that config private; it expires with the session, and there is no refresh/admin token in it. Copy again after expiration. The endpoint is `/api/mcp`, validates the token with Supabase, and exposes the exact Page, Routine, and Data blocks from the visual builder through `get_block_catalog`, `list_pages`, `get_page`, `create_page`, `update_page`, `add_block`, `update_block`, `remove_block`, and `delete_page`. Agents cannot upload raw documents, graphs, code, or private presets. Writes use the existing RLS-protected library row and optimistic revision checks. No AI service is invoked.
 
 For stdio clients run `node tools/mcp-server.mjs` with POCKETWORK_MCP_URL and POCKETWORK_ACCESS_TOKEN supplied by your agent client. The local website server must remain running. This is a local developer connection, not a hosted OAuth discovery service; no Codex plugin or background service was installed.

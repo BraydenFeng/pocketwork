@@ -35,7 +35,7 @@ export const behavior_catalog: Record<BehaviorKind, { title: string; detail: str
 	and: { title: "AND", detail: "Both conditions are true", category: "Logic", inputs: { a: "boolean", b: "boolean" }, outputs: { result: "boolean" } },
 	or: { title: "OR", detail: "Either condition is true", category: "Logic", inputs: { a: "boolean", b: "boolean" }, outputs: { result: "boolean" } },
 	not: { title: "NOT", detail: "Reverse a condition", category: "Logic", inputs: { condition: "boolean" }, outputs: { result: "boolean" } },
-	branch: { title: "If / else", detail: "Take the matching branch", category: "Logic", inputs: { condition: "boolean" }, outputs: { yes: "boolean", no: "boolean" } },
+	branch: { title: "If / else", detail: "Split into true and false", category: "Logic", inputs: { condition: "boolean" }, outputs: { yes: "boolean", no: "boolean" } },
 	delay: { title: "Delay", detail: "Wait before the next action", category: "Logic", inputs: { start: "boolean" }, outputs: { done: "boolean" } },
 	variable: { title: "Variable", detail: "Store a number", category: "Logic", inputs: { set: "number" }, outputs: { value: "number" } },
 	count: { title: "Counter", detail: "Count events; optionally reset", category: "Accountability", inputs: { increment: "boolean", reset: "boolean" }, outputs: { value: "number" } },

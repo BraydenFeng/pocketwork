@@ -42,6 +42,7 @@ export const creation_catalog: { kind: CreationKind; title: string; detail: stri
 	{ kind: "and", title: "Both conditions", detail: "True when both conditions are true", section: "Actions & logic" },
 	{ kind: "or", title: "Either condition", detail: "True when at least one condition is true", section: "Actions & logic" },
 	{ kind: "not", title: "Reverse condition", detail: "Flip true and false", section: "Actions & logic" },
+	{ kind: "branch", title: "If / else", detail: "Split into true and false", section: "Actions & logic" },
 	{ kind: "aggregate", title: "Summarize entries", detail: "Sum, average, or count entries", section: "Actions & logic" },
 	{ kind: "calculate", title: "Calculate", detail: "Add, subtract, multiply, or divide", section: "Actions & logic" },
 	{ kind: "timer", title: "Focus timer", detail: "Timed focus session", section: "Native presets" },
@@ -88,9 +89,10 @@ export function remove_page_block(document: AppDocument, id: string): AppDocumen
 }
 
 export function node_name(node: LogicNode): string { return node.config?.label || node.block?.title || node_catalog[node.kind].title; }
-const readable_ports: Record<string, string> = { pressed: "when tapped", submitted: "when submitted", record: "entry fields", rows: "saved entries", saved: "when saved", active: "while active", finished: "when finished", present: "at the saved place", away: "away from the saved place", arrived: "on arrival", left: "on departure", due: "at the chosen time", checked: "switched on", changed: "when changed", done: "when checked in", value: "value", count: "entry count", result: "result", days: "streak days", reached: "goal reached", minutes: "minutes used", granted: "reward granted", outside: "outside the window" };
+const readable_ports: Record<string, string> = { pressed: "when tapped", submitted: "when submitted", record: "entry fields", rows: "saved entries", saved: "when saved", active: "while active", finished: "when finished", present: "at the saved place", away: "away from the saved place", arrived: "on arrival", left: "on departure", due: "at the chosen time", checked: "switched on", changed: "when changed", done: "when checked in", value: "value", count: "entry count", result: "result", yes: "condition is true", no: "condition is false", days: "streak days", reached: "goal reached", minutes: "minutes used", granted: "reward granted", outside: "outside the window" };
 export function port_name(port: string): string { return readable_ports[port] ?? port.replaceAll("_", " "); }
 export function input_name(kind: NodeKind, input: string): string {
+	if (kind === "branch" && input === "condition") { return "If"; }
 	if (input === "when") { return "When"; }
 	if (input === "amount") { return "Amount from (optional)"; }
 	if (input === "threshold" || input === "target") { return "Target from (optional)"; }
@@ -175,6 +177,15 @@ export function generated_storage(graph: LogicGraph, node: LogicNode): boolean {
 	const record = graph.connections.find(edge => edge.to === node.id && edge.input === "record");
 	const save = graph.connections.find(edge => edge.to === node.id && edge.input === "save");
 	return Boolean(record && save && record.from === save.from && graph.nodes.some(item => item.id === record.from && item.kind === "form"));
+}
+
+export function remove_connected_block(graph: LogicGraph, id: string): LogicGraph {
+	const node = graph.nodes.find(item => item.id === id);
+	if (!node || !is_behavior(node.kind)) { throw new Error("That block is no longer on this page."); }
+	if (graph.nodes.some(item => item.kind === "change_value" && item.config?.variable_id === id)) { throw new Error("A change block still uses this variable. Choose another variable there first."); }
+	const generated_ids = new Set(graph.nodes.filter(item => generated_storage(graph, item)).filter(item => graph.connections.some(edge => edge.from === id && edge.to === item.id)).map(item => item.id));
+	generated_ids.add(id);
+	return { ...graph, nodes: graph.nodes.filter(item => !generated_ids.has(item.id)), connections: graph.connections.filter(edge => !generated_ids.has(edge.from) && !generated_ids.has(edge.to)) };
 }
 
 export function numeric_fields(graph: LogicGraph, node: LogicNode): { id: string; label: string }[] {

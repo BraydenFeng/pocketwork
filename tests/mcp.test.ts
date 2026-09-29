@@ -1,73 +1,103 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { compile_graph, graph_from_document, make_node } from "../lib/logic-graph";
-import { call_mcp_tool } from "../lib/mcp";
-import { personal_routine } from "../lib/personal-routine";
-import { empty_library } from "../lib/library";
+import { fetch_library, push_library, type Cloud, type CloudSnapshot } from "../lib/cloud";
+import { empty_library, type Library } from "../lib/library";
+import { call_mcp_tool, mcp_tools } from "../lib/mcp";
 import * as release_flags from "../lib/release-flags";
-import { fetch_library, push_library, type Cloud } from "../lib/cloud";
+
 vi.mock("../lib/cloud", () => ({ fetch_library: vi.fn(), push_library: vi.fn() }));
 vi.mock("../lib/release-flags", () => ({ native_format_four: false }));
+
 const cloud = {} as Cloud;
 const account = { id: "owner", email: "test@example.com" };
-beforeEach(() => { vi.resetAllMocks(); vi.spyOn(release_flags, "native_format_four", "get").mockReturnValue(false); });
-it.each([false, true])("reports the actual format-4 rollout flag (%s)", async (enabled) => {
-	vi.spyOn(release_flags, "native_format_four", "get").mockReturnValue(enabled);
-	const result = await call_mcp_tool(cloud, account, "get_capabilities", {});
-	const capabilities = JSON.parse(result.content[0].text!);
-	expect(capabilities.native_format_four).toBe(enabled);
-	expect(capabilities.execution).toContain(enabled ? "completion actions run on reopening" : "cloud save tools reject them");
-	expect(fetch_library).not.toHaveBeenCalled();
-});
-it("never publishes primitive drafts to an older phone through MCP", async () => {
-	const graph = graph_from_document(personal_routine); graph.nodes.push(make_node("elapsed_timer"));
-	const document = compile_graph(personal_routine, graph);
-	await expect(call_mcp_tool(cloud, account, "save_routine", { document })).rejects.toThrow("local web drafts");
-	await expect(call_mcp_tool(cloud, account, "save_routine_graph", { base_document: personal_routine, graph })).rejects.toThrow("local web drafts");
-	expect(push_library).not.toHaveBeenCalled(); expect(fetch_library).not.toHaveBeenCalled();
-});
-it("seeds the exact disabled routine into the authenticated account", async () => {
-	vi.mocked(fetch_library).mockResolvedValue(null); vi.mocked(push_library).mockResolvedValue(true);
-	await call_mcp_tool(cloud, account, "seed_home_allowance", {});
-	const [, who, library] = vi.mocked(push_library).mock.calls[0];
-	expect(who.id).toBe("owner");
-	expect(library.tools[0].document).toEqual(personal_routine);
-	expect(library.groups?.map((group) => group.name)).toEqual(["Distractions"]);
-});
-it("never overwrites a seeded routine after the user edits it", async () => {
-	vi.mocked(fetch_library).mockResolvedValue({ library: { ...empty_library, tools: [{ document: { ...personal_routine, name: "My edits" }, updated_at: new Date().toISOString() }] }, updated_at: "revision" });
-	await call_mcp_tool(cloud, account, "seed_home_allowance", {});
-	expect(push_library).not.toHaveBeenCalled();
-});
-it("retries writes after concurrent cloud saves", async () => {
-	vi.mocked(fetch_library).mockResolvedValue(null); vi.mocked(push_library).mockResolvedValueOnce(false).mockResolvedValueOnce(true);
-	await call_mcp_tool(cloud, account, "seed_home_allowance", {});
-	expect(fetch_library).toHaveBeenCalledTimes(2);
-});
-it("rejects invalid documents before writing", async () => {
-	await expect(call_mcp_tool(cloud, account, "save_routine", { document: { ...personal_routine, home_allowance: { ...personal_routine.home_allowance, away_usage_counts: true } } })).rejects.toThrow();
-	expect(push_library).not.toHaveBeenCalled();
-});
-it("describes partial-minute and geofence limits", async () => {
-	const result = await call_mcp_tool(cloud, account, "get_capabilities", {});
-	expect(result.content[0].text).toContain("partial minute");
-	expect(result.content[0].text).toContain("150 m");
+
+function parsed(result: Awaited<ReturnType<typeof call_mcp_tool>>) {
+	return JSON.parse(result.content[0].text!);
+}
+
+function use_memory_cloud() {
+	let snapshot: CloudSnapshot | null = null;
+	vi.mocked(fetch_library).mockImplementation(async () => snapshot);
+	vi.mocked(push_library).mockImplementation(async (_cloud, who, library) => {
+		expect(who).toEqual(account);
+		snapshot = { library, updated_at: `revision-${Date.now()}` };
+		return true;
+	});
+	return () => snapshot?.library ?? empty_library;
+}
+
+beforeEach(() => {
+	vi.resetAllMocks();
+	vi.spyOn(release_flags, "native_format_four", "get").mockReturnValue(false);
 });
 
-it("graph tools only read routines in the authenticated account", async () => {
-	vi.mocked(fetch_library).mockResolvedValue(null);
-	await expect(call_mcp_tool(cloud, account, "get_routine_graph", { id: personal_routine.id })).rejects.toThrow("not found");
-	expect(fetch_library).toHaveBeenCalledWith(cloud, account);
+it("advertises block operations instead of raw graphs, documents, or presets", () => {
+	const names = mcp_tools.map(tool => tool.name);
+	expect(names).toEqual(expect.arrayContaining(["get_block_catalog", "list_pages", "get_page", "create_page", "add_block", "update_block", "remove_block", "delete_page"]));
+	expect(names).not.toEqual(expect.arrayContaining(["get_routine_graph", "save_routine_graph", "save_routine", "seed_home_allowance"]));
 });
-it("graph saves reject a stale base before writing", async () => {
-	vi.mocked(fetch_library).mockResolvedValue({ library: { ...empty_library, tools: [{ document: { ...personal_routine, name: "Newer edit" }, updated_at: "now" }] }, updated_at: "revision" });
-	const graph = graph_from_document(personal_routine); graph.nodes.find((node) => node.kind === "allowance")!.policy!.rules[0].allowance_minutes = 45;
-	await expect(call_mcp_tool(cloud, account, "save_routine_graph", { base_document: personal_routine, graph })).rejects.toThrow("changed");
+
+it.each([false, true])("reports the actual block rollout flag (%s)", async enabled => {
+	vi.spyOn(release_flags, "native_format_four", "get").mockReturnValue(enabled);
+	const catalog = parsed(await call_mcp_tool(cloud, account, "get_block_catalog", {}));
+	expect(catalog.native_format_four).toBe(enabled);
+	expect(catalog.execution).toContain(enabled ? "completion actions run on reopening" : "cloud writes reject them");
+	expect(catalog.blocks).toEqual(expect.arrayContaining([
+		expect.objectContaining({ kind: "branch", name: "If / else", description: "Split into true and false" }),
+	]));
+	expect(fetch_library).not.toHaveBeenCalled();
+});
+
+it("creates pages and builds real connected blocks from the shared catalog", async () => {
+	vi.spyOn(release_flags, "native_format_four", "get").mockReturnValue(true);
+	const library = use_memory_cloud();
+	await call_mcp_tool(cloud, account, "create_page", { id: "gym-page", name: "Gym rewards", description: "Earn free time at the gym." });
+	const toggle = parsed(await call_mcp_tool(cloud, account, "add_block", { page_id: "gym-page", kind: "checkbox", name: "Gym mode" }));
+	const branch = parsed(await call_mcp_tool(cloud, account, "add_block", { page_id: "gym-page", kind: "branch", name: "If gym mode is on", inputs: { condition: { block_id: toggle.block_id, output: "checked" } } }));
+	await call_mcp_tool(cloud, account, "add_block", { page_id: "gym-page", kind: "reminder", name: "Celebrate", settings: { message: "Gym time counted." }, inputs: { send: { block_id: branch.block_id, output: "yes" } } });
+	const page = parsed(await call_mcp_tool(cloud, account, "get_page", { page_id: "gym-page" }));
+	expect(page.sections.routines).toEqual(expect.arrayContaining([
+		expect.objectContaining({ id: branch.block_id, kind: "branch", inputs: { condition: expect.objectContaining({ source: { block_id: toggle.block_id, output: "checked" } }) } }),
+	]));
+	expect(library().tools[0].document.behaviors?.connections).toEqual(expect.arrayContaining([
+		expect.objectContaining({ from: toggle.block_id, output: "checked", to: branch.block_id, input: "condition" }),
+	]));
+});
+
+it("updates and removes the same stored blocks", async () => {
+	const library = use_memory_cloud();
+	await call_mcp_tool(cloud, account, "create_page", { id: "simple-page", name: "Simple" });
+	const added = parsed(await call_mcp_tool(cloud, account, "add_block", { page_id: "simple-page", kind: "button", name: "Start" }));
+	await call_mcp_tool(cloud, account, "update_block", { page_id: "simple-page", block_id: added.block_id, name: "Begin" });
+	expect(library().tools[0].document.behaviors?.nodes[0].config.label).toBe("Begin");
+	await call_mcp_tool(cloud, account, "remove_block", { page_id: "simple-page", block_id: added.block_id });
+	expect(library().tools[0].document.behaviors).toBeUndefined();
+});
+
+it("never publishes newer blocks to an older phone", async () => {
+	use_memory_cloud();
+	await call_mcp_tool(cloud, account, "create_page", { id: "timer-page", name: "Timer" });
+	vi.mocked(push_library).mockClear();
+	await expect(call_mcp_tool(cloud, account, "add_block", { page_id: "timer-page", kind: "elapsed_timer" })).rejects.toThrow("local web drafts");
 	expect(push_library).not.toHaveBeenCalled();
 });
-it("graph saves compile the edited budget into the owner library", async () => {
-	vi.mocked(fetch_library).mockResolvedValue({ library: { ...empty_library, tools: [{ document: personal_routine, updated_at: "now" }] }, updated_at: "revision" });
-	vi.mocked(push_library).mockResolvedValue(true);
-	const graph = graph_from_document(personal_routine); graph.nodes.find((node) => node.kind === "allowance")!.policy!.rules[0].allowance_minutes = 45;
-	await call_mcp_tool(cloud, account, "save_routine_graph", { base_document: personal_routine, graph });
-	expect(vi.mocked(push_library).mock.calls[0][2].tools[0].document.home_allowance!.rules[0].allowance_minutes).toBe(45);
+
+it("retries writes after concurrent cloud saves", async () => {
+	vi.mocked(fetch_library).mockResolvedValue(null);
+	vi.mocked(push_library).mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+	await call_mcp_tool(cloud, account, "create_page", { id: "retry-page", name: "Retry" });
+	expect(fetch_library).toHaveBeenCalledTimes(2);
+});
+
+it("reads only pages from the authenticated account", async () => {
+	vi.mocked(fetch_library).mockResolvedValue(null);
+	await expect(call_mcp_tool(cloud, account, "get_page", { page_id: "missing" })).rejects.toThrow("not found");
+	expect(fetch_library).toHaveBeenCalledWith(cloud, account);
+});
+
+it("rejects retired write formats instead of spawning a private routine", async () => {
+	for (const tool of ["save_routine", "save_routine_graph", "seed_home_allowance"]) {
+		await expect(call_mcp_tool(cloud, account, tool, {})).rejects.toThrow("retired");
+	}
+	expect(fetch_library).not.toHaveBeenCalled();
+	expect(push_library).not.toHaveBeenCalled();
 });

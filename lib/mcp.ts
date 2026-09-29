@@ -1,73 +1,168 @@
 import { native_format_four } from "./release-flags";
 import { z } from "zod";
-import { behavior_catalog } from "./behaviors";
-import { document_schema } from "./document";
-import { empty_library, upsert_tool, delete_tool } from "./library";
+import { creation_catalog, type CreationKind } from "./creation";
+import { empty_library, upsert_tool, delete_tool, find_tool, type Library } from "./library";
 import { fetch_library, push_library, type Account, type Cloud } from "./cloud";
-import { compile_graph, graph_from_document, graph_schema, node_catalog } from "./logic-graph";
-import { personal_routine } from "./personal-routine";
+import { add_actual_block, block_catalog, page_snapshot, remove_actual_block, update_actual_block, type BlockInputs } from "./page-blocks";
 import { fetch_status, render_history_png, summarize_status } from "./status";
+import { blank_tool } from "./templates";
 
 const object = { type: "object", properties: {}, additionalProperties: false };
+const identifier_schema = z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/);
+const creation_kind_schema = z.enum(creation_catalog.map(entry => entry.kind) as [CreationKind, ...CreationKind[]]);
+const settings_schema = z.record(z.string(), z.unknown());
+const source_schema = z.object({ block_id: identifier_schema, output: identifier_schema }).strict();
+const inputs_schema = z.record(z.string(), z.union([source_schema, z.null()]));
+const page_id_schema = z.object({ page_id: identifier_schema }).strict();
+const create_page_schema = z.object({ id: identifier_schema.optional(), name: z.string().trim().min(1).max(80), description: z.string().max(500).optional() }).strict();
+const update_page_schema = z.object({ page_id: identifier_schema, name: z.string().trim().min(1).max(80).optional(), description: z.string().max(500).optional() }).strict().refine(value => value.name !== undefined || value.description !== undefined, "Give at least one page field to update.");
+const add_block_schema = z.object({ page_id: identifier_schema, kind: creation_kind_schema, name: z.string().trim().min(1).max(80).optional(), settings: settings_schema.optional(), inputs: inputs_schema.optional(), before_block_id: identifier_schema.optional() }).strict();
+const update_block_schema = z.object({ page_id: identifier_schema, block_id: identifier_schema, name: z.string().trim().min(1).max(80).optional(), settings: settings_schema.optional(), inputs: inputs_schema.optional() }).strict().refine(value => value.name !== undefined || value.settings !== undefined || value.inputs !== undefined, "Give at least one block field to update.");
+const remove_block_schema = z.object({ page_id: identifier_schema, block_id: identifier_schema }).strict();
+
 export const mcp_tools = [
-	{ name: "get_routine_graph", description: "Read a routine as connected native-capability nodes, with its current document for safe editing.", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"], additionalProperties: false }, annotations: { readOnlyHint: true } },
-	{ name: "save_routine_graph", description: "Validate and apply connected logic to a routine. Supply the unmodified base_document from get_routine_graph to prevent overwriting newer edits. Node positions are temporary; executable connections sync to iPhone. Supports the native capabilities from get_capabilities, not arbitrary code.", inputSchema: { type: "object", properties: { base_document: { type: "object" }, graph: z.toJSONSchema(graph_schema) }, required: ["base_document", "graph"], additionalProperties: false }, annotations: { destructiveHint: false, idempotentHint: true } },
+	{ name: "get_block_catalog", description: "List the exact Page, Routine, and Data blocks available in Pocketwork, including each block's settings, inputs, and outputs.", inputSchema: object, annotations: { readOnlyHint: true } },
+	{ name: "list_pages", description: "List this account's Pocketwork pages.", inputSchema: object, annotations: { readOnlyHint: true } },
+	{ name: "get_page", description: "Read one page as the same Page, Routine, and Data blocks shown in the visual builder.", inputSchema: z.toJSONSchema(page_id_schema), annotations: { readOnlyHint: true } },
+	{ name: "create_page", description: "Create a blank Pocketwork page. Add functionality with add_block using kinds from get_block_catalog.", inputSchema: z.toJSONSchema(create_page_schema), annotations: { destructiveHint: false, idempotentHint: false } },
+	{ name: "update_page", description: "Rename a page or change its description.", inputSchema: z.toJSONSchema(update_page_schema), annotations: { destructiveHint: false, idempotentHint: true } },
+	{ name: "add_block", description: "Add one of Pocketwork's actual visual-builder blocks to a page and connect its named inputs to earlier block outputs.", inputSchema: z.toJSONSchema(add_block_schema), annotations: { destructiveHint: false, idempotentHint: false } },
+	{ name: "update_block", description: "Change an actual block's name, settings, or named input connections.", inputSchema: z.toJSONSchema(update_block_schema), annotations: { destructiveHint: false, idempotentHint: true } },
+	{ name: "remove_block", description: "Remove an actual block and its connections from a page.", inputSchema: z.toJSONSchema(remove_block_schema), annotations: { destructiveHint: true, idempotentHint: true } },
+	{ name: "delete_page", description: "Delete a page from this account and remember the deletion for other devices.", inputSchema: z.toJSONSchema(page_id_schema), annotations: { destructiveHint: true, idempotentHint: true } },
 	{ name: "get_status", description: "What the phone last reported: running session, home allowance minutes left today, which routines are switched on, and a 30-day history. Requires Share status to be on in the iPhone app. Minute counts only; never app identities.", inputSchema: object, annotations: { readOnlyHint: true } },
 	{ name: "render_status_chart", description: "A PNG bar chart of the last 14 days (allowance minutes used against budget, or focus minutes), with the same status summary as text.", inputSchema: object, annotations: { readOnlyHint: true } },
-	{ name: "list_routines", description: "Read your saved routine library. App selections and home coordinates stay on the phone.", inputSchema: object, annotations: { readOnlyHint: true } },
-	{ name: "get_capabilities", description: "Read routine format and enforcement limits before designing a routine.", inputSchema: object, annotations: { readOnlyHint: true } },
-	{ name: "save_routine", description: "Create or update a validated routine in this account. Requires a supplied routine document. Never executes code.", inputSchema: { type: "object", properties: { document: { type: "object" } }, required: ["document"], additionalProperties: false }, annotations: { destructiveHint: false, idempotentHint: true } },
-	{ name: "delete_routine", description: "Delete a routine from this account and remember the deletion for other devices.", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"], additionalProperties: false }, annotations: { destructiveHint: true, idempotentHint: true } },
-	{ name: "seed_home_allowance", description: "Add the requested home-only distraction routine if absent. Never overwrites later edits. Phone setup is required before activation.", inputSchema: object, annotations: { destructiveHint: false, idempotentHint: true } },
 ];
 function content(value: unknown) { return { content: [{ type: "text", text: JSON.stringify(value) }] }; }
+
+function capabilities() {
+	const primitives = native_format_four
+		? "These blocks can sync to a compatible updated iPhone. Connected logic runs while its page is open. Timers track elapsed time while away, but completion actions run on reopening."
+		: "Routine and Data blocks are local web drafts only; cloud writes reject them until the compatible phone update is rolled out.";
+	return {
+		model: "Pages contain Page, Routine, and Data blocks. Agents use the same block catalog and editing operations as the visual builder.",
+		native_format_four,
+		blocks: block_catalog(),
+		execution: `${primitives} Native focus, schedule, and home-allowance pages have separate background support. Browser Preview simulates events. Progress is device-local; no AI API is used.`,
+		limits: "Three free pages at a time. MCP and sync are free. Existing pages stay usable after cancellation.",
+		phone: "App selections and saved locations stay on the phone. Cloud changes apply when the phone app opens.",
+	};
+}
+
+function list_pages(library: Library) {
+	return library.tools.map(entry => ({
+		id: entry.document.id,
+		name: entry.document.name,
+		description: entry.document.description,
+		updated_at: entry.updated_at,
+		block_counts: Object.fromEntries(Object.entries(page_snapshot(entry.document).sections).map(([section, blocks]) => [section, blocks.length])),
+	}));
+}
+
+function require_page(library: Library, page_id: string) {
+	const page = find_tool(library, page_id);
+	if (!page) { throw new Error("Page not found in this account."); }
+	return page;
+}
+
+function assert_syncable(document: ReturnType<typeof blank_tool>) {
+	if (document.schema_version === 4 && !native_format_four) {
+		throw new Error("Routine and Data blocks are currently local web drafts. Do not sync them until the compatible native update is released.");
+	}
+}
+
+async function read_library(cloud: Cloud, account: Account): Promise<Library> {
+	try { return (await fetch_library(cloud, account))?.library ?? empty_library; }
+	catch (failure) { throw new Error(`Could not read this account's pages. ${failure instanceof Error ? failure.message : "Cloud read failed."}`); }
+}
+
+async function mutate_library<Result>(cloud: Cloud, account: Account, change: (library: Library) => { library: Library; result: Result }): Promise<Result> {
+	for (let attempt = 0; attempt < 5; attempt++) {
+		let remote;
+		try { remote = await fetch_library(cloud, account); }
+		catch (failure) { throw new Error(`Could not read this account before saving. ${failure instanceof Error ? failure.message : "Cloud read failed."}`); }
+		const changed = change(remote?.library ?? empty_library);
+		try {
+			if (await push_library(cloud, account, changed.library, remote)) { return changed.result; }
+		}
+		catch (failure) { throw new Error(`Could not save this account's pages. ${failure instanceof Error ? failure.message : "Cloud save failed."}`); }
+	}
+	throw new Error("Another device is saving. Retry this tool call.");
+}
+
 export async function call_mcp_tool(cloud: Cloud, account: Account, name: string, args: unknown) {
 	if (name === "get_status" || name === "render_status_chart") {
-		const found = await fetch_status(cloud, account);
+		let found;
+		try { found = await fetch_status(cloud, account); }
+		catch (failure) { throw new Error(`Could not read phone status. ${failure instanceof Error ? failure.message : "Status read failed."}`); }
 		if (!found) { return { content: [{ type: "text", text: "The phone has not shared any status. In Pocketwork on iPhone, open Account & sync and switch on Share status with your agents, then open the app once." }] }; }
 		const summary = summarize_status(found.status, Date.now());
 		if (name === "get_status") { return { content: [{ type: "text", text: summary }, { type: "text", text: JSON.stringify(found.status) }] }; }
 		const chart = render_history_png(found.status);
 		return { content: [{ type: "text", text: `${summary} ${chart.caption}` }, { type: "image", data: chart.png.toString("base64"), mimeType: "image/png" }] };
 	}
-	if (name === "get_capabilities") {
-		const primitives = native_format_four
-			? "Format-4 primitives can sync to a compatible updated iPhone. Connected logic runs while its page is open. Timers track elapsed time while away, but completion actions run on reopening."
-			: "Format-4 primitives are local web drafts only; cloud save tools reject them until the compatible phone update is rolled out.";
-		return content({ model: "Pages hold routines (actions) and data (values, entries, displays). API routine names are kept for compatibility. Three free pages at a time; MCP and sync are free. Existing pages stay usable after cancellation.", native_format_four, graph_schema: z.toJSONSchema(graph_schema), graph_nodes: node_catalog, behaviors: behavior_catalog, execution: `Format-3 behaviors require their phone update and run while the page is open. ${primitives} Native focus, schedule, and home-allowance presets have separate background support. Browser Preview simulates events. Progress is device-local; no AI API is used.`, document_schema: z.toJSONSchema(document_schema, { unrepresentable: "any" }), home_allowance: "One home allowance per phone, daily shared windows, home-only whole-minute usage checkpoints; a final partial minute may be lost at departure. Home geofence is 150 m and OS callbacks may be delayed. Phone setup/permissions required. Cloud changes apply when the phone app opens." });
+	if (name === "get_block_catalog" || name === "get_capabilities") { return content(capabilities()); }
+	if (name === "list_pages" || name === "list_routines") { return content({ pages: list_pages(await read_library(cloud, account)) }); }
+	if (name === "get_page" || name === "get_routine_graph") {
+		const page_id = name === "get_page" ? page_id_schema.parse(args).page_id : z.object({ id: identifier_schema }).strict().parse(args).id;
+		return content(page_snapshot(require_page(await read_library(cloud, account), page_id)));
 	}
-	if (name === "get_routine_graph") {
-		const { id } = z.object({ id: z.string() }).strict().parse(args);
-		const document = (await fetch_library(cloud, account))?.library.tools.find((entry) => entry.document.id === id)?.document;
-		if (!document) { throw new Error("Routine not found in this account."); }
-		return content({ base_document: document, graph: graph_from_document(document) });
+	if (name === "create_page") {
+		const input = create_page_schema.parse(args);
+		const blank = blank_tool();
+		const page = { ...blank, id: input.id ?? blank.id, name: input.name, description: input.description ?? "" };
+		const snapshot = await mutate_library(cloud, account, library => {
+			if (find_tool(library, page.id)) { throw new Error("A page with that ID already exists."); }
+			return { library: upsert_tool(library, page, Date.now()), result: page_snapshot(page) };
+		});
+		return content({ saved: true, page: snapshot, phone_sync: "Open Pocketwork on your iPhone to apply changes." });
 	}
-	if (name === "save_routine_graph") {
-		const { base_document, graph } = z.object({ base_document: document_schema, graph: graph_schema }).strict().parse(args);
-		const updated = compile_graph(base_document, graph);
-		if (updated.schema_version === 4 && !native_format_four) { throw new Error("Format-4 building blocks are currently local web drafts. Do not sync them until the compatible native update is released."); }
-		for (let attempt = 0; attempt < 5; attempt++) {
-			const remote = await fetch_library(cloud, account);
-			const current = remote?.library.tools.find((entry) => entry.document.id === base_document.id)?.document;
-			if (!current) { throw new Error("Routine not found in this account."); }
-			const current_json = JSON.stringify(document_schema.parse(current));
-			if (current_json === JSON.stringify(updated)) { return content({ saved: true, id: updated.id }); }
-			if (current_json !== JSON.stringify(base_document)) { throw new Error("Routine changed. Read its current graph before applying changes."); }
-			if (await push_library(cloud, account, upsert_tool(remote!.library, updated, Date.now()), remote)) { return content({ saved: true, id: updated.id, phone_sync: "Open Pocketwork on your iPhone to apply changes." }); }
-		}
-		throw new Error("Another device is saving. Retry this tool call.");
+	if (name === "update_page") {
+		const input = update_page_schema.parse(args);
+		const snapshot = await mutate_library(cloud, account, library => {
+			const current = require_page(library, input.page_id);
+			const page = { ...current, name: input.name ?? current.name, description: input.description ?? current.description };
+			return { library: upsert_tool(library, page, Date.now()), result: page_snapshot(page) };
+		});
+		return content({ saved: true, page: snapshot, phone_sync: "Open Pocketwork on your iPhone to apply changes." });
 	}
-	if (name === "list_routines") { return content((await fetch_library(cloud, account))?.library ?? empty_library); }
-	if (!["save_routine", "delete_routine", "seed_home_allowance"].includes(name)) { throw new Error("Unknown routine tool."); }
-	const id = name === "delete_routine" ? z.object({ id: z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/) }).strict().parse(args).id : null;
-	const document = name === "save_routine" ? z.object({ document: document_schema }).strict().parse(args).document : personal_routine;
-	if (!id && document.schema_version === 4 && !native_format_four) { throw new Error("Format-4 building blocks are currently local web drafts. Do not sync them until the compatible native update is released."); }
-	for (let attempt = 0; attempt < 5; attempt++) {
-		const remote = await fetch_library(cloud, account);
-		const library = remote?.library ?? empty_library;
-		if (name === "seed_home_allowance" && library.tools.some((entry) => entry.document.id === document.id)) { return content({ saved: true, already_exists: true, id: document.id }); }
-		const next = id ? delete_tool(library, id, Date.now()) : upsert_tool(library, document, Date.now());
-		if (await push_library(cloud, account, next, remote)) { return content({ saved: true, id: id ?? document.id, device_setup_required: Boolean(document.home_allowance), phone_sync: "Open Pocketwork on your iPhone to apply changes." }); }
+	if (name === "add_block") {
+		const input = add_block_schema.parse(args);
+		const result = await mutate_library(cloud, account, library => {
+			const current = require_page(library, input.page_id);
+			const added = add_actual_block(current, input.kind, { name: input.name, settings: input.settings, inputs: input.inputs as BlockInputs | undefined, before_block_id: input.before_block_id });
+			assert_syncable(added.document);
+			return { library: upsert_tool(library, added.document, Date.now()), result: { block_id: added.block_id, page: page_snapshot(added.document) } };
+		});
+		return content({ saved: true, ...result, phone_sync: "Open Pocketwork on your iPhone to apply changes." });
 	}
-	throw new Error("Another device is saving. Retry this tool call.");
+	if (name === "update_block") {
+		const input = update_block_schema.parse(args);
+		const snapshot = await mutate_library(cloud, account, library => {
+			const current = require_page(library, input.page_id);
+			const page = update_actual_block(current, input.block_id, { name: input.name, settings: input.settings, inputs: input.inputs as BlockInputs | undefined });
+			assert_syncable(page);
+			return { library: upsert_tool(library, page, Date.now()), result: page_snapshot(page) };
+		});
+		return content({ saved: true, page: snapshot, phone_sync: "Open Pocketwork on your iPhone to apply changes." });
+	}
+	if (name === "remove_block") {
+		const input = remove_block_schema.parse(args);
+		const snapshot = await mutate_library(cloud, account, library => {
+			const current = require_page(library, input.page_id);
+			const page = remove_actual_block(current, input.block_id);
+			assert_syncable(page);
+			return { library: upsert_tool(library, page, Date.now()), result: page_snapshot(page) };
+		});
+		return content({ saved: true, page: snapshot, phone_sync: "Open Pocketwork on your iPhone to apply changes." });
+	}
+	if (name === "delete_page" || name === "delete_routine") {
+		const page_id = name === "delete_page" ? page_id_schema.parse(args).page_id : z.object({ id: identifier_schema }).strict().parse(args).id;
+		await mutate_library(cloud, account, library => ({ library: delete_tool(library, page_id, Date.now()), result: null }));
+		return content({ saved: true, page_id });
+	}
+	if (["save_routine", "save_routine_graph", "seed_home_allowance"].includes(name)) {
+		throw new Error("That MCP tool was retired. Use create_page, add_block, and update_block so the agent edits the same blocks as the visual builder.");
+	}
+	throw new Error("Unknown Pocketwork tool.");
 }

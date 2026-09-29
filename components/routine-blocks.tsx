@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { is_behavior, type BehaviorConfig } from "@/lib/behaviors";
-import { connected_summary, generated_storage, input_name, node_name, numeric_fields, page_section, set_source, source_options, type PageSection } from "@/lib/creation";
+import { connected_summary, generated_storage, input_name, node_name, numeric_fields, page_section, remove_connected_block, set_source, source_options, type PageSection } from "@/lib/creation";
 import { node_catalog, node_ports, type LogicGraph, type LogicNode } from "@/lib/logic-graph";
 import { optional_input } from "@/lib/primitives";
 import { ALL_DAYS, DAY_LABELS } from "@/lib/schedule";
@@ -33,13 +33,10 @@ export function RoutineBlocks({ graph, selected, section, leading_block, on_sele
 		});
 	}
 	function remove(node: LogicNode) {
-		if (graph.nodes.some(item => item.kind === "change_value" && item.config?.variable_id === node.id)) {
-			on_error("A change block still uses this variable. Choose another variable there first.");
-			return;
-		}
 		const used_by = new Set(graph.connections.filter(edge => edge.from === node.id).map(edge => edge.to)).size;
 		if (used_by && !window.confirm(`Remove ${node_name(node)}? ${used_by} other block${used_by === 1 ? " uses" : "s use"} it and will need a new setting.`)) { return; }
-		on_change({ ...graph, nodes: graph.nodes.filter(item => item.id !== node.id), connections: graph.connections.filter(edge => edge.from !== node.id && edge.to !== node.id) });
+		try { on_change(remove_connected_block(graph, node.id)); }
+		catch (failure) { on_error(failure instanceof Error ? failure.message : "Could not remove this block."); return; }
 		on_select(null);
 	}
 	function input_field(node: LogicNode, input: string) {

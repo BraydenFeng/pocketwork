@@ -19,7 +19,7 @@ export async function POST(request: Request) {
 		const { data, error } = await client.auth.getUser(authorization.slice(7));
 		if (error || !data.user) { return new Response("Sign-in expired. Copy a fresh agent connection from Pocketwork.", { status: 401 }); }
 		const reply = (result: unknown) => Response.json({ jsonrpc: "2.0", id, result }, { headers: { "Cache-Control": "no-store" } });
-		if (message.method === "initialize") { return reply({ protocolVersion: "2025-11-25", capabilities: { tools: {} }, serverInfo: { name: "pocketwork", version: "0.2.0" } }); }
+		if (message.method === "initialize") { return reply({ protocolVersion: "2025-11-25", capabilities: { tools: {} }, serverInfo: { name: "pocketwork", version: "0.3.0" } }); }
 		if (message.method?.startsWith("notifications/")) { return new Response(null, { status: 202 }); }
 		if (message.method === "ping") { return reply({}); }
 		if (message.method === "tools/list") { return reply({ tools: mcp_tools }); }

@@ -139,28 +139,6 @@ export function PocketworkApp() {
 		return () => window.clearTimeout(timeout);
 	}, [library, account, ready, sync_now]);
 
-	useEffect(() => {
-		if (!ready || !account || storage_blocked || !account_ready.current || new URLSearchParams(window.location.search).get("seed") !== "home") { return; }
-		let cancelled = false;
-		void (async () => {
-			if (!cloud) { return; }
-			const { data, error } = await cloud.client.auth.getSession();
-			if (error || !data.session) { throw new Error("Sign in to seed your routine."); }
-			const response = await fetch("/api/mcp", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session.access_token}` }, body: JSON.stringify({ jsonrpc: "2.0", id: "seed-home", method: "tools/call", params: { name: "seed_home_allowance", arguments: {} } }) });
-			if (!response.ok) { throw new Error("Could not seed the routine. Please retry."); }
-			const reply = await response.json();
-			if (reply.error || reply.result?.isError) { throw new Error(reply.error?.message ?? reply.result.content[0].text); }
-			if (cancelled) { return; }
-			const remote = await fetch_library(cloud, account);
-			if (cancelled || !remote) { return; }
-			const next = merge_libraries(library_ref.current, remote.library, Date.now());
-			save_library(storage(), next); library_ref.current = next; set_library(next);
-			const url = new URL(window.location.href); url.searchParams.delete("seed"); url.searchParams.set("routine", "home-distraction-allowance"); window.history.replaceState(null, "", url);
-			set_open_id("home-distraction-allowance");
-		})().catch((failure) => set_error(error_message(failure)));
-		return () => { cancelled = true; };
-	}, [ready, account, storage_blocked, storage, cloud]);
-
 	// The URL carries which routine is open so the browser back button returns to My routines.
 	function navigate(id: string | null) {
 		const url = new URL(window.location.href);

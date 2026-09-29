@@ -4,11 +4,11 @@ import { useEffect, useState } from "react";
 import { ChevronDown, MapPin, Plus, Smartphone, Trash2 } from "lucide-react";
 import type { AppDocument } from "@/lib/document";
 import { home_policy_schema, type HomePolicy } from "@/lib/home-policy";
+import { home_allowance_block_id } from "@/lib/page-blocks";
 import { BlockIcon, NumberField } from "./creation-controls";
 import { Button } from "./ui";
 
 const day_names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-export const home_allowance_block_id = "home-allowance-settings";
 
 export function HomeAllowanceBlock({ document, open, disabled = false, on_toggle, on_change, on_draft_error }: {
 	document: AppDocument;

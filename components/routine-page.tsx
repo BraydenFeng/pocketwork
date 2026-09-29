@@ -6,10 +6,11 @@ import { is_behavior } from "@/lib/behaviors";
 import { describe_shield, new_id, shield_mode, type AppDocument, type Block } from "@/lib/document";
 import { generated_storage, remove_page_block } from "@/lib/creation";
 import type { LogicGraph } from "@/lib/logic-graph";
+import { home_allowance_block_id } from "@/lib/page-blocks";
 import { ALL_DAYS, DAY_LABELS, WEEKDAYS } from "@/lib/schedule";
 import type { AppGroup } from "@/lib/library";
 import { BlockIcon, InlineText, NumberField } from "./creation-controls";
-import { HomeAllowanceBlock, home_allowance_block_id } from "./home-allowance";
+import { HomeAllowanceBlock } from "./home-allowance";
 import { RoutineBlocks } from "./routine-blocks";
 import { Button, Toggle } from "./ui";
 

@@ -8,6 +8,8 @@ The tone stays editorial minimalism. The creator should feel like writing and ar
 
 Home allowance is a native routine inside this same page structure, not a separate editor. Its location and allowance controls appear as the first routine block, while the page still exposes PAGE, ROUTINES, and DATA sections for adding content, automations, variables, logs, and displays. Its required schedule and Screen Time storage blocks stay internal so the page does not show duplicate controls.
 
+Conditional flow is an ordinary Routine block. “If / else” takes one named condition and exposes literal “condition is true” and “condition is false” choices to later action blocks; the interface never asks users or agents to edit graph nodes. The MCP creates and edits pages through the same picker catalog and block operations as the visual builder, not through raw documents, graphs, or private presets.
+
 Three signature moves: the document glyph and editable title; small PAGE / ROUTINES / DATA section labels within one continuous page; and expandable block rows whose properties sit directly beneath the block. There is no editor-mode tab bar and no graph deep link. Native presets and foreground-only blocks keep their capability notes, but those notes are secondary to the thing being built.
 
 ## September 20: primitives before recipes
