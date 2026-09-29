@@ -21,6 +21,7 @@ const setting_names: Partial<Record<CreationKind, string[]>> = {
 	elapsed_timer: ["timer_mode", "value"], variable: ["value", "unit"], change_value: ["variable_id", "change", "value"], time_window: ["time", "end_time", "days"],
 	log: ["fields"], form: ["fields"], record: ["fields"], chart: ["field"], aggregate: ["field", "operation"], calculate: ["operation"], text_compare: ["text", "operation"],
 	progress: ["value"], health: ["metric"], app_gate: ["groups"], add_allowance: ["minutes"], reminder: ["message"], delay: ["minutes"], clock: ["time", "days"],
+	interval: ["value", "interval_unit"],
 	number_input: ["value"], text_input: ["text"], count: ["value"], compare: ["operator", "value"], goal: ["value"], app_usage: ["value"],
 	branch: ["else_enabled"],
 };
@@ -33,7 +34,7 @@ function is_log(graph: LogicGraph, node: LogicNode): boolean {
 
 function block_outputs(graph: LogicGraph, node: LogicNode | undefined) {
 	if (!node) { return []; }
-	return visible_outputs(graph, node).map(output => ({ block_id: node.id, output, label: port_name(output) }));
+	return visible_outputs(graph, node).map(output => ({ block_id: node.id, output, label: port_name(output, node.kind) }));
 }
 
 function block_inputs(graph: LogicGraph, node: LogicNode) {
@@ -66,7 +67,7 @@ export function block_catalog() {
 			section: is_page_kind(entry.kind) ? "page" : page_section(entry.kind),
 			settings: setting_names[entry.kind] ?? [],
 			inputs: behavior ? Object.keys(behavior.inputs).map(input => ({ input, label: input_name(kind as LogicNode["kind"], input), type: behavior.inputs[input] })) : [],
-			outputs: behavior ? Object.keys(behavior.outputs).map(output => ({ output, label: port_name(output), type: behavior.outputs[output], optional: entry.kind === "branch" && output === "no" })) : native ? native.outputs.map(output => ({ output, label: port_name(output), type: output === "active" || output === "finished" || output === "outside" ? "boolean" : "unknown", optional: false })) : [],
+			outputs: behavior ? Object.keys(behavior.outputs).map(output => ({ output, label: port_name(output, entry.kind), type: behavior.outputs[output], optional: entry.kind === "branch" && output === "no" })) : native ? native.outputs.map(output => ({ output, label: port_name(output, entry.kind), type: output === "active" || output === "finished" || output === "outside" ? "boolean" : "unknown", optional: false })) : [],
 		};
 	});
 }

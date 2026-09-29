@@ -25,6 +25,7 @@ Status: release preparation, not permission to submit. Vercel deployment alone d
 - Cancellation preserves all existing pages and their controls. Only new pages over the free allowance are prevented. This is enforced on the phone, web, and database, including MCP writes.
 - Apple 4.10 prohibits monetizing built-in capabilities including Screen Time APIs. A general page allowance is not a guarantee of approval. Explain the full productivity workspace and pricing honestly; review this unresolved issue before submission. Do not hide or rename Screen Time charges to evade review.
 - New format-4 primitives have native source support, but cloud release is gated by `NEXT_PUBLIC_NATIVE_FORMAT4_ENABLED=false`. Keep it false until a compatible phone build is installed/available to every syncing user. The flag is build-time for the website: redeploy when enabling it. Do not enable just because simulator compilation passes.
+- The Every block uses format 5 and is gated separately by `NEXT_PUBLIC_NATIVE_FORMAT5_ENABLED=false`. Keep it false until a format-5 phone build is available to every syncing user; until then, pages using Every remain local web drafts and the MCP does not advertise the block.
 - Generic connected logic runs while its page is open. Timers track elapsed wall time while away, but completion actions evaluate on reopening. Native focus/schedule/home-allowance presets have separate background support. Never advertise arbitrary always-on background workflows.
 
 ## Vercel and database

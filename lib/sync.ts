@@ -1,13 +1,13 @@
 import type { Library, LibraryEntry } from "./library";
-import { native_format_four } from "./release-flags";
+import { native_format_five, native_format_four } from "./release-flags";
 
 export const TOMBSTONE_DAYS = 30;
 
-// Format 4 has no released phone reader yet. Keep its drafts local without removing the last phone-compatible copy.
+// New formats stay local until their phone reader is released, without removing the last compatible cloud copy.
 export function cloud_compatible_library(local: Library, remote: Library | null): Library {
-	if (native_format_four) { return local; }
+	const supported = native_format_five ? 5 : native_format_four ? 4 : 3;
 	return { ...local, tools: local.tools.flatMap(entry => {
-		if (entry.document.schema_version < 4) { return [entry]; }
+		if (entry.document.schema_version <= supported) { return [entry]; }
 		const previous = remote?.tools.find(item => item.document.id === entry.document.id);
 		return previous ? [previous] : [];
 	}) };
@@ -24,7 +24,7 @@ export function merge_libraries(local: Library, remote: Library, now: number): L
 	const by_id = new Map<string, LibraryEntry>();
 	for (const entry of [...local.tools, ...remote.tools]) {
 		const current = by_id.get(entry.document.id);
-		if (current?.document.schema_version === 4 && entry.document.schema_version < 4) { continue; }
+		if (current && current.document.schema_version > entry.document.schema_version) { continue; }
 		if (!current || entry.updated_at > current.updated_at) { by_id.set(entry.document.id, entry); }
 	}
 	const tools: LibraryEntry[] = [];

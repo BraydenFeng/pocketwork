@@ -805,5 +805,58 @@
         "messages": 1
       }
     ]
+  },
+  {
+    "name": "an hourly interval runs once at each due time",
+    "graph": {
+      "nodes": [
+        {
+          "id": "every",
+          "kind": "interval",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "Every hour",
+            "value": 1,
+            "minutes": 5,
+            "time": "18:00",
+            "days": [1, 2, 3, 4, 5, 6, 7],
+            "message": "Time for your routine.",
+            "operator": "gte",
+            "interval_unit": "hours"
+          }
+        },
+        {
+          "id": "message",
+          "kind": "reminder",
+          "x": 0,
+          "y": 0,
+          "config": {
+            "label": "Hourly reminder",
+            "value": 1,
+            "minutes": 5,
+            "time": "18:00",
+            "days": [1, 2, 3, 4, 5, 6, 7],
+            "message": "One hour passed.",
+            "operator": "gte"
+          }
+        }
+      ],
+      "connections": [
+        {
+          "from": "every",
+          "output": "due",
+          "to": "message",
+          "input": "send"
+        }
+      ]
+    },
+    "steps": [
+      { "now": 1800000000, "messages": 0 },
+      { "now": 1800003599, "messages": 0 },
+      { "now": 1800003600, "messages": 1 },
+      { "now": 1800003601, "messages": 0 },
+      { "now": 1800007200, "messages": 1 }
+    ]
   }
 ]

@@ -20,6 +20,7 @@ struct BehaviorConfig: Codable, Equatable {
 	var end_time: String? = nil
 	var unit: String? = nil
 	var else_enabled: Bool? = nil
+	var interval_unit: String? = nil
 }
 struct BehaviorNode: Codable, Equatable, Identifiable {
 	var id: String
@@ -160,6 +161,15 @@ enum BehaviorRuntime {
 			case "arrive": boolean("arrived", context.at_location == true && previous.at_location == false, pulse)
 			case "leave": boolean("left", context.at_location == false && previous.at_location == true, pulse)
 			case "clock": boolean("due", c.days.contains(calendar.component(.weekday, from: context.now)) && c.time == time, day + c.time)
+			case "interval":
+				let duration = try PrimitiveRuntime.interval_seconds(c)
+				if let scheduled = state.pending.first(where: { $0.id == node.id }) {
+					let due = scheduled.at <= context.now.timeIntervalSince1970
+					if due { state.pending.removeAll { $0.id == node.id }; state.pending.append(BehaviorPending(id: node.id, at: context.now.timeIntervalSince1970 + duration, token: pulse)) }
+					boolean("due", due, due ? String(scheduled.at) : "")
+				} else {
+					state.pending.append(BehaviorPending(id: node.id, at: context.now.timeIntervalSince1970 + duration, token: pulse)); boolean("due", false, "")
+				}
 			case "app_usage": emit("minutes", context.usage_minutes ?? 0); boolean("reached", context.usage_minutes.map { $0 >= c.value } ?? false, day); output["minutes"]?.available = context.usage_minutes != nil; output["reached"]?.available = context.usage_minutes != nil
 			case "and", "or": let a = input("a"), b = input("b"); boolean("result", node.kind == "and" ? a.value != 0 && b.value != 0 : a.value != 0 || b.value != 0, (a.value != 0 ? a.token : "") + ":" + (b.value != 0 ? b.token : ""))
 			case "not": boolean("result", input("condition").value == 0)

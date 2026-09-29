@@ -92,6 +92,9 @@ textarea.document-input { field-sizing: content; min-height: var(--toolbar-h); l
 .block-properties .builder-fields { border: var(--hairline); border-radius: var(--r-1); padding: var(--s-3); min-width: 0; }
 .block-properties .builder-fields > div { display: flex; flex-direction: column; gap: var(--s-3); padding-block: var(--s-3); border-bottom: var(--hairline); margin-bottom: var(--s-3); }
 .block-properties p, .block-help { color: var(--c-text-faint); font-size: var(--t-small); }
+.interval-setting { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s-3); align-items: end; }
+.interval-setting .document-number { align-items: flex-start; flex-direction: column; margin: 0; }
+.interval-setting .number-with-unit, .interval-setting .number-with-unit input { width: 100%; }
 .branch-paths { border-block: var(--hairline); }
 .branch-path { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); min-height: var(--control-h); padding-block: var(--s-2); }
 .branch-path + .branch-path { border-top: var(--hairline); }
@@ -172,6 +175,7 @@ textarea.document-input { field-sizing: content; min-height: var(--toolbar-h); l
 	.document-properties { margin-bottom: var(--s-5); }
 	.document-logic-kind { display: none; }
 	.document-logic-body { margin-left: 0; }
+	.interval-setting { grid-template-columns: 1fr; }
 	.creation-preview, .creation-preview.has-native-preview { display: flex; flex-direction: column; padding: var(--s-5) var(--s-3); }
 	.creation-preview .phone { width: min(100%, var(--w-phone)); }
 	.creation-behavior-preview { width: 100%; }

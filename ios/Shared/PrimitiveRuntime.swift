@@ -10,15 +10,25 @@ struct PrimitiveTimerValue: Codable {
 }
 
 enum PrimitiveRuntime {
-	static let kinds = ["elapsed_timer", "change_value", "time_window", "record"]
+	static let kinds = ["elapsed_timer", "change_value", "time_window", "record", "interval"]
 	static let ports: [String: (inputs: [String: String], outputs: [String: String])] = [
 		"elapsed_timer": (["start":"boolean", "pause":"boolean", "stop":"boolean", "reset":"boolean", "duration":"number"], ["elapsed":"number", "remaining":"number", "running":"boolean", "finished":"boolean"]),
 		"change_value": (["when":"boolean", "amount":"number"], ["changed":"boolean", "value":"number"]),
 		"time_window": ([:], ["active":"boolean", "outside":"boolean"]),
-		"record": (["value":"number"], ["record":"record"])
+		"record": (["value":"number"], ["record":"record"]),
+		"interval": ([:], ["due":"boolean"])
 	]
 	static func requires_four(_ graph: BehaviorGraph) -> Bool {
 		graph.nodes.contains { kinds.contains($0.kind) || $0.config.unit != nil } || graph.connections.contains { ["threshold", "target"].contains($0.input) }
+	}
+	static func requires_five(_ graph: BehaviorGraph) -> Bool { graph.nodes.contains { $0.kind == "interval" } }
+	static func interval_seconds(_ config: BehaviorConfig) throws -> Double {
+		let unit = config.interval_unit ?? "hours"
+		guard ["minutes", "hours", "days"].contains(unit), config.value.rounded() == config.value, config.value >= 1 else { throw DocumentError.invalid("Set Every to a whole interval from 1 minute to 7 days.") }
+		let scale = unit == "minutes" ? 60.0 : unit == "hours" ? 3600.0 : 86400.0
+		let duration = config.value * scale
+		guard duration <= 604800 else { throw DocumentError.invalid("Set Every to a whole interval from 1 minute to 7 days.") }
+		return duration
 	}
 	static func optional(_ node: BehaviorNode, _ port: String) -> Bool {
 		node.kind == "elapsed_timer" || node.kind == "change_value" && port == "amount" || node.kind == "compare" && port == "threshold" || node.kind == "progress" && port == "target" || node.kind == "variable" && port == "set" || node.kind == "count" && port == "reset" || node.kind == "save_entry" && port == "clear" || node.kind == "record" && node.config.fields?.first(where: { $0.id == port })?.required == false
@@ -34,6 +44,7 @@ enum PrimitiveRuntime {
 			if let end = c.end_time { guard ScheduleWindow.minutes(end) != nil else { throw DocumentError.invalid("Enter a valid end time.") } }
 			if node.kind == "elapsed_timer", c.timer_mode != "stopwatch" { guard ((1.0 / 60.0)...10080.0).contains(c.value) else { throw DocumentError.invalid("Countdown duration must be between one second and seven days.") } }
 			if node.kind == "time_window" { guard c.time != (c.end_time ?? "20:00") else { throw DocumentError.invalid("A time window needs different start and end times.") } }
+			if node.kind == "interval" { _ = try interval_seconds(c) }
 			if node.kind != "change_value" { continue }
 			guard let target = graph.nodes.first(where: { $0.id == c.variable_id }), target.kind == "variable" else {
 				if strict || c.variable_id != nil { throw DocumentError.invalid("Choose an existing variable for " + c.label + ".") }
@@ -54,7 +65,7 @@ enum PrimitiveRuntime {
 		return rising || fresh
 	}
 	static func mark_events(_ node: BehaviorNode, outputs: inout [String: BehaviorSignal], input: (String) -> BehaviorSignal) {
-		let events = ["button":"pressed", "check_in":"done", "arrive":"arrived", "leave":"left", "clock":"due", "elapsed_timer":"finished", "change_value":"changed", "delay":"done", "reminder":"sent", "number_input":"changed", "text_input":"changed", "checkbox":"changed", "form":"submitted", "save_entry":"saved", "add_allowance":"granted"]
+		let events = ["button":"pressed", "check_in":"done", "arrive":"arrived", "leave":"left", "clock":"due", "interval":"due", "elapsed_timer":"finished", "change_value":"changed", "delay":"done", "reminder":"sent", "number_input":"changed", "text_input":"changed", "checkbox":"changed", "form":"submitted", "save_entry":"saved", "add_allowance":"granted"]
 		if let port = events[node.kind], let signal = outputs[port], signal.value != 0, signal.available { outputs[port]?.event_token = node.id + ":" + signal.token }
 		if ["and", "or", "branch"].contains(node.kind) {
 			let port = node.kind == "branch" ? "yes" : "result"

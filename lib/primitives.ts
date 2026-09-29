@@ -1,13 +1,14 @@
 import { z } from "zod";
 import type { BehaviorContext, BehaviorNode, BehaviorState, Behaviors, Signal } from "./behaviors";
 
-export const primitive_kinds = ["elapsed_timer", "change_value", "time_window", "record"] as const;
+export const primitive_kinds = ["elapsed_timer", "change_value", "time_window", "record", "interval"] as const;
 export const primitive_config_fields = {
 	variable_id: z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/).optional(),
 	change: z.enum(["set", "add", "subtract", "reset"]).optional(),
 	timer_mode: z.enum(["countdown", "stopwatch"]).optional(),
 	end_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
 	unit: z.string().trim().max(24).optional(),
+	interval_unit: z.enum(["minutes", "hours", "days"]).optional(),
 };
 export type TimerCommand = { node: string; action: "start" | "pause" | "stop" | "reset" };
 export type TimerValue = { elapsed: number; started_at?: number; duration: number; cycle: number; finished: boolean };
@@ -25,7 +26,7 @@ export function once_signal(signal: Signal, state: BehaviorState, key: string): 
 export function mark_events(node: BehaviorNode, outputs: Record<string, Signal>, input: (port: string) => Signal): void {
 	const event_ports: Partial<Record<BehaviorNode["kind"], string>> = {
 		button: "pressed", check_in: "done", arrive: "arrived", leave: "left", clock: "due", elapsed_timer: "finished", change_value: "changed",
-		delay: "done", reminder: "sent", number_input: "changed", text_input: "changed", checkbox: "changed", form: "submitted", save_entry: "saved", add_allowance: "granted",
+		delay: "done", interval: "due", reminder: "sent", number_input: "changed", text_input: "changed", checkbox: "changed", form: "submitted", save_entry: "saved", add_allowance: "granted",
 	};
 	const event_port = event_ports[node.kind];
 	if (event_port && outputs[event_port]?.value && outputs[event_port].available !== false) { outputs[event_port].event_token = `${node.id}:${outputs[event_port].token}`; }
@@ -40,6 +41,18 @@ export function mark_events(node: BehaviorNode, outputs: Record<string, Signal>,
 export function requires_format_four(graph: Behaviors): boolean {
 	return graph.nodes.some(node => (primitive_kinds as readonly string[]).includes(node.kind) || node.config.unit !== undefined)
 		|| graph.connections.some(edge => edge.input === "threshold" || edge.input === "target");
+}
+
+export function requires_format_five(graph: Behaviors): boolean {
+	return graph.nodes.some(node => node.kind === "interval");
+}
+
+export function interval_duration_ms(config: Pick<BehaviorNode["config"], "value" | "interval_unit">): number {
+	const unit = config.interval_unit ?? "hours";
+	const scale = unit === "minutes" ? 60_000 : unit === "hours" ? 3_600_000 : 86_400_000;
+	const duration = config.value * scale;
+	if (!Number.isInteger(config.value) || config.value < 1 || duration > 604_800_000) { throw new Error("Set Every to a whole interval from 1 minute to 7 days."); }
+	return duration;
 }
 
 export function optional_input(node: Pick<BehaviorNode, "kind" | "config">, port: string): boolean {

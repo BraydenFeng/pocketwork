@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { Activity, ArrowUpRight, Calculator, CalendarClock, ChartNoAxesCombined, CheckCircle2, CheckSquare, CirclePlus, Clock3, Database, FileInput, FileText, Flame, Hash, ListChecks, ListPlus, LogOut, MapPin, MessageSquare, MousePointerClick, RefreshCw, RotateCcw, Save, Search, Shield, Sigma, SlidersHorizontal, Smartphone, Split, Square, Table2, Target, Timer, ToggleLeft, Type, Variable, X } from "lucide-react";
+import { Activity, ArrowUpRight, Calculator, CalendarClock, ChartNoAxesCombined, CheckCircle2, CheckSquare, CirclePlus, Clock3, Database, FileInput, FileText, Flame, Hash, ListChecks, ListPlus, LogOut, MapPin, MessageSquare, MousePointerClick, RefreshCw, Repeat2, RotateCcw, Save, Search, Shield, Sigma, SlidersHorizontal, Smartphone, Split, Square, Table2, Target, Timer, ToggleLeft, Type, Variable, X } from "lucide-react";
 import { creation_catalog, is_page_kind, page_section, type CreationKind } from "@/lib/creation";
 import { Button } from "./ui";
 
@@ -66,6 +66,7 @@ export function BlockIcon({ kind }: { kind: string }) {
 		arrive: MapPin,
 		leave: LogOut,
 		clock: CalendarClock,
+		interval: Repeat2,
 		app_gate: Shield,
 		reminder: MessageSquare,
 		count: Hash,

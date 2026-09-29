@@ -61,6 +61,22 @@ describe("user-defined variables", () => {
 });
 
 describe("general timers and records", () => {
+	it("emits one event per interval without firing immediately or replaying every missed event", () => {
+		const graph: Behaviors = { nodes: [node("every", "interval", { value: 1, interval_unit: "hours" }), node("count", "count")], connections: [wire("every", "due", "count", "increment")] };
+		let result = run_behaviors(graph, initial_behaviors(), { now: 0 });
+		expect(result.signals.every.due.value).toBe(false); expect(result.signals.count.value.value).toBe(0);
+		result = run_behaviors(graph, result.state, { now: 3_599_999 }); expect(result.signals.count.value.value).toBe(0);
+		result = run_behaviors(graph, result.state, { now: 3_600_000 }); expect(result.signals.every.due.value).toBe(true); expect(result.state.values.count).toBe(1);
+		result = run_behaviors(graph, result.state, { now: 3_600_001 }); expect(result.state.values.count).toBe(1);
+		result = run_behaviors(graph, JSON.parse(JSON.stringify(result.state)), { now: 18_000_000 }); expect(result.state.values.count).toBe(2);
+		result = run_behaviors(graph, result.state, { now: 21_600_000 }); expect(result.state.values.count).toBe(3);
+	});
+	it("uses format 5 and rejects invalid intervals", () => {
+		const base = blank_tool(); const added = add_connected_block(graph_from_document(base), "interval"); const document = compile_graph(base, added.graph);
+		expect(document.schema_version).toBe(5); expect(document_schema.safeParse({ ...document, schema_version: 4 }).success).toBe(false);
+		const invalid: Behaviors = { nodes: [node("every", "interval", { value: 8, interval_unit: "days" })], connections: [] };
+		expect(() => behavior_order(invalid, {}, true)).toThrow("1 minute to 7 days");
+	});
 	it("adds no blocking or native focus session automatically", () => {
 		const base = blank_tool(); const result = add_connected_block(graph_from_document(base), "elapsed_timer"); const document = compile_graph(base, result.graph);
 		expect(document.schema_version).toBe(4); expect(document.blocks).toEqual(base.blocks); expect(document.rules.block_during_focus).toBe(false);
@@ -117,5 +133,9 @@ describe("phone compatibility", () => {
 		expect(merge_libraries(local, remote, Date.now()).tools[0].document.schema_version).toBe(4);
 		expect(cloud_compatible_library(local, remote).tools[0].document).toEqual(starter_document);
 		expect(cloud_compatible_library(local, null).tools).toHaveLength(0);
+		const every_document = compile_graph(document, { ...graph_from_document(document), nodes: [...graph_from_document(document).nodes, node("every", "interval", { value: 1, interval_unit: "hours" })] });
+		const every_local: Library = { schema_version: 1, tools: [{ document: every_document, updated_at: "2026-09-20T08:00:00Z" }] };
+		expect(merge_libraries(every_local, local, Date.now()).tools[0].document.schema_version).toBe(5);
+		expect(cloud_compatible_library(every_local, local).tools[0].document).toEqual(document);
 	});
 });

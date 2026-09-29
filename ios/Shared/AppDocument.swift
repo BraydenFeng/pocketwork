@@ -175,9 +175,13 @@ struct AppDocument: Codable, Equatable {
 			try policy.validate()
 			guard schedule != nil, rules.block_during_focus, shield?.shield_mode == .block, shield?.group_names.count == 1 else { throw DocumentError.invalid("Home allowances require one distraction group and a schedule.") }
 		}
-		guard (1...4).contains(schema_version) else { throw DocumentError.invalid("Update Pocketwork to open this routine format.") }
-		guard (schema_version >= 3) == (behaviors != nil) else { throw DocumentError.invalid("Connected behaviors require routine format 3 or 4.") }
-		if let behaviors { guard schema_version == 4 || !PrimitiveRuntime.requires_four(behaviors) else { throw DocumentError.invalid("These blocks require routine format 4.") }; _ = try behaviors.ordered(external: behavior_external_ports) }
+		guard (1...5).contains(schema_version) else { throw DocumentError.invalid("Update Pocketwork to open this routine format.") }
+		guard (schema_version >= 3) == (behaviors != nil) else { throw DocumentError.invalid("Connected behaviors require routine format 3, 4, or 5.") }
+		if let behaviors {
+			guard schema_version >= 4 || !PrimitiveRuntime.requires_four(behaviors) else { throw DocumentError.invalid("These blocks require routine format 4 or newer.") }
+			guard schema_version >= 5 || !PrimitiveRuntime.requires_five(behaviors) else { throw DocumentError.invalid("The Every block requires routine format 5.") }
+			_ = try behaviors.ordered(external: behavior_external_ports)
+		}
 		try Self.validate_id(id)
 		try Self.validate_text(name, maximum: 80, required: true)
 		try Self.validate_text(description, maximum: 200)

@@ -5,7 +5,7 @@ import { call_mcp_tool, mcp_tools } from "../lib/mcp";
 import * as release_flags from "../lib/release-flags";
 
 vi.mock("../lib/cloud", () => ({ fetch_library: vi.fn(), push_library: vi.fn() }));
-vi.mock("../lib/release-flags", () => ({ native_format_four: false }));
+vi.mock("../lib/release-flags", () => ({ native_format_four: false, native_format_five: false }));
 
 const cloud = {} as Cloud;
 const account = { id: "owner", email: "test@example.com" };
@@ -28,6 +28,29 @@ function use_memory_cloud() {
 beforeEach(() => {
 	vi.resetAllMocks();
 	vi.spyOn(release_flags, "native_format_four", "get").mockReturnValue(false);
+	vi.spyOn(release_flags, "native_format_five", "get").mockReturnValue(false);
+});
+
+it("advertises Every only after the format-5 phone rollout", async () => {
+	vi.spyOn(release_flags, "native_format_four", "get").mockReturnValue(true);
+	let catalog = parsed(await call_mcp_tool(cloud, account, "get_block_catalog", {}));
+	expect(catalog.native_format_five).toBe(false);
+	expect(catalog.blocks.some((block: { kind: string }) => block.kind === "interval")).toBe(false);
+	vi.spyOn(release_flags, "native_format_five", "get").mockReturnValue(true);
+	catalog = parsed(await call_mcp_tool(cloud, account, "get_block_catalog", {}));
+	expect(catalog.blocks).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "interval", name: "Every", settings: ["value", "interval_unit"], outputs: [expect.objectContaining({ output: "due", label: "every interval" })] })]));
+});
+
+it("creates an Every block through the shared MCP model once format 5 is available", async () => {
+	vi.spyOn(release_flags, "native_format_four", "get").mockReturnValue(true);
+	const library = use_memory_cloud();
+	await call_mcp_tool(cloud, account, "create_page", { id: "hourly", name: "Hourly" });
+	await expect(call_mcp_tool(cloud, account, "add_block", { page_id: "hourly", kind: "interval" })).rejects.toThrow("phone update");
+	vi.spyOn(release_flags, "native_format_five", "get").mockReturnValue(true);
+	const every = parsed(await call_mcp_tool(cloud, account, "add_block", { page_id: "hourly", kind: "interval", settings: { value: 1, interval_unit: "hours" } }));
+	await call_mcp_tool(cloud, account, "add_block", { page_id: "hourly", kind: "reminder", settings: { message: "One hour passed." }, inputs: { send: { block_id: every.block_id, output: "due" } } });
+	expect(library().tools[0].document.schema_version).toBe(5);
+	expect(library().tools[0].document.behaviors?.connections).toContainEqual(expect.objectContaining({ from: every.block_id, output: "due", input: "send" }));
 });
 
 it("advertises block operations instead of raw graphs, documents, or presets", () => {

@@ -33,6 +33,16 @@ final class PrimitiveTests: XCTestCase {
 		result = try run(graph, result.state, at: 700); XCTAssertEqual(result.state.values["count"], 1)
 		result = try run(graph, result.state, at: 700, command: "reset"); XCTAssertEqual(result.signals["timer"]?["elapsed"]?.value, 0)
 	}
+	func testIntervalRunsOnceWhenDueAndRequiresFormatFive() throws {
+		var every = node("every", "interval"); every.config.interval_unit = "hours"
+		let graph = BehaviorGraph(nodes: [every, node("count", "count")], connections: [edge("every", "due", "count", "increment")])
+		var result = try run(graph, at: 0); XCTAssertEqual(result.signals["count"]?["value"]?.value, 0)
+		result = try run(graph, result.state, at: 3599); XCTAssertEqual(result.signals["count"]?["value"]?.value, 0)
+		result = try run(graph, result.state, at: 3600); XCTAssertEqual(result.state.values["count"], 1)
+		result = try run(graph, result.state, at: 18000); XCTAssertEqual(result.state.values["count"], 2)
+		var document = AppDocument.blank(); document.schema_version = 5; document.behaviors = graph
+		XCTAssertNoThrow(try document.validate()); document.schema_version = 4; XCTAssertThrowsError(try document.validate())
+	}
 	func testStopwatchCreatesSavedRecord() throws {
 		var timer = node("timer", "elapsed_timer"); timer.config.timer_mode = "stopwatch"
 		let graph = BehaviorGraph(nodes: [timer, node("record", "record"), node("save", "save_entry")], connections: [edge("timer", "elapsed", "record", "value"), edge("record", "record", "save", "record"), edge("timer", "finished", "save", "save")])

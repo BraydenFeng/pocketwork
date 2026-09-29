@@ -33,6 +33,7 @@ export const creation_catalog: { kind: CreationKind; title: string; detail: stri
 	{ kind: "arrive", title: "Arrive at location", detail: "When you reach a saved place", section: "Controls & events" },
 	{ kind: "leave", title: "Leave location", detail: "When you leave a saved place", section: "Controls & events" },
 	{ kind: "clock", title: "At a time", detail: "At a set time", section: "Controls & events" },
+	{ kind: "interval", title: "Every", detail: "Do something every few minutes, hours, or days", section: "Controls & events" },
 	{ kind: "app_gate", title: "Control app access", detail: "Block selected apps", section: "Actions & logic" },
 	{ kind: "reminder", title: "Show a message", detail: "Display a message", section: "Actions & logic" },
 	{ kind: "count", title: "Count events", detail: "Count how many times something happens", section: "Actions & logic" },
@@ -93,7 +94,10 @@ export function node_name(node: LogicNode): string {
 	return node.config?.label || node.block?.title || node_catalog[node.kind].title;
 }
 const readable_ports: Record<string, string> = { pressed: "when tapped", submitted: "when submitted", record: "entry fields", rows: "saved entries", saved: "when saved", active: "while active", finished: "when finished", present: "at the saved place", away: "away from the saved place", arrived: "on arrival", left: "on departure", due: "at the chosen time", checked: "switched on", changed: "when changed", done: "when checked in", value: "value", count: "entry count", result: "result", yes: "then", no: "else", days: "streak days", reached: "goal reached", minutes: "minutes used", granted: "reward granted", outside: "outside the window" };
-export function port_name(port: string): string { return readable_ports[port] ?? port.replaceAll("_", " "); }
+export function port_name(port: string, kind?: string): string {
+	if (kind === "interval" && port === "due") { return "every interval"; }
+	return readable_ports[port] ?? port.replaceAll("_", " ");
+}
 export function input_name(kind: NodeKind, input: string): string {
 	if (kind === "branch" && input === "condition") { return "If"; }
 	if (input === "when") { return "When"; }
@@ -118,7 +122,7 @@ export function input_name(kind: NodeKind, input: string): string {
 export function source_options(graph: LogicGraph, target: string, input: string) {
 	const base = { ...graph, connections: graph.connections.filter(edge => !(edge.to === target && edge.input === input)) };
 	return graph.nodes.filter(node => node.id !== target).flatMap(node => visible_outputs(graph, node).flatMap(output => {
-		try { connect(base, { from: node.id, output, to: target, input }); return [{ id: `${node.id}:${output}`, node: node.id, output, label: `${node_name(node)} · ${node.config?.fields?.find(field => field.id === output)?.label ?? port_name(output)}` }]; }
+		try { connect(base, { from: node.id, output, to: target, input }); return [{ id: `${node.id}:${output}`, node: node.id, output, label: `${node_name(node)} · ${node.config?.fields?.find(field => field.id === output)?.label ?? port_name(output, node.kind)}` }]; }
 		catch { return []; }
 	}));
 }

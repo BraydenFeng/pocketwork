@@ -117,6 +117,29 @@ test("an if block adds else only when requested", async ({ page }) => {
 	await expect(page.getByText("Condition did not match", { exact: true })).toBeVisible();
 });
 
+test("an Every block triggers connected actions on its interval", async ({ page }) => {
+	await page.goto("/"); await page.getByRole("button", { name: "New page", exact: true }).click();
+	await page.getByRole("button", { name: "Add routine block", exact: true }).click();
+	await page.getByRole("dialog").getByRole("button", { name: "Add Every", exact: true }).click();
+	await expect(page.getByLabel("Every", { exact: true })).toHaveValue("1");
+	await expect(page.getByLabel("Interval unit", { exact: true })).toHaveValue("hours");
+	await page.getByLabel("Every", { exact: true }).fill("2");
+	await page.getByLabel("Every", { exact: true }).press("Tab");
+	await page.getByLabel("Interval unit", { exact: true }).selectOption("minutes");
+	await page.getByRole("button", { name: "Add routine block", exact: true }).click();
+	await page.getByRole("dialog").getByRole("button", { name: "Add Show a message", exact: true }).click();
+	await page.getByLabel("Message", { exact: true }).fill("Two minutes passed");
+	await page.getByLabel("Message", { exact: true }).press("Tab");
+	await page.getByLabel("Show message when: Show a message", { exact: true }).selectOption({ label: "Every · every interval" });
+	await expect(page.getByText("Saved here · local-only blocks", { exact: true })).toBeVisible();
+	expect(await page.evaluate(() => JSON.parse(localStorage.getItem("pocketwork.library.v1")!).tools[0].document.schema_version)).toBe(5);
+	await page.getByRole("button", { name: "Preview", exact: true }).click();
+	await page.waitForTimeout(1100);
+	await page.getByText("Simulate time, location, and app usage", { exact: true }).click();
+	await page.getByRole("button", { name: "Advance one interval", exact: true }).click();
+	await expect(page.getByText("Two minutes passed", { exact: true })).toBeVisible();
+});
+
 test("an incomplete block cannot replace a saved page and can be discarded", async ({ page }) => {
 	await seed_library(page, [starter_document]); await page.goto(STARTER_URL);
 	await add_block(page, "Chart");

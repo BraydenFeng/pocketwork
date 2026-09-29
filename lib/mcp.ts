@@ -1,4 +1,4 @@
-import { native_format_four } from "./release-flags";
+import { native_format_five, native_format_four } from "./release-flags";
 import { z } from "zod";
 import { creation_catalog, type CreationKind } from "./creation";
 import { empty_library, upsert_tool, delete_tool, find_tool, type Library } from "./library";
@@ -42,7 +42,8 @@ function capabilities() {
 	return {
 		model: "Pages contain Page, Routine, and Data blocks. Agents use the same block catalog and editing operations as the visual builder.",
 		native_format_four,
-		blocks: block_catalog(),
+		native_format_five,
+		blocks: block_catalog().filter(block => block.kind !== "interval" || native_format_five),
 		execution: `${primitives} Native focus, schedule, and home-allowance pages have separate background support. Browser Preview simulates events. Progress is device-local; no AI API is used.`,
 		limits: "Three free pages at a time. MCP and sync are free. Existing pages stay usable after cancellation.",
 		phone: "App selections and saved locations stay on the phone. Cloud changes apply when the phone app opens.",
@@ -66,6 +67,9 @@ function require_page(library: Library, page_id: string) {
 }
 
 function assert_syncable(document: ReturnType<typeof blank_tool>) {
+	if (document.schema_version === 5 && !native_format_five) {
+		throw new Error("The Every block is currently a local web draft. Do not sync it until the compatible native update is released.");
+	}
 	if (document.schema_version === 4 && !native_format_four) {
 		throw new Error("Routine and Data blocks are currently local web drafts. Do not sync them until the compatible native update is released.");
 	}
@@ -128,6 +132,7 @@ export async function call_mcp_tool(cloud: Cloud, account: Account, name: string
 	}
 	if (name === "add_block") {
 		const input = add_block_schema.parse(args);
+		if (input.kind === "interval" && !native_format_five) { throw new Error("The Every block is not available to agents until its compatible phone update is released."); }
 		const result = await mutate_library(cloud, account, library => {
 			const current = require_page(library, input.page_id);
 			const added = add_actual_block(current, input.kind, { name: input.name, settings: input.settings, inputs: input.inputs as BlockInputs | undefined, before_block_id: input.before_block_id });

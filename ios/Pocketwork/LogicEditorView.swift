@@ -211,6 +211,11 @@ private struct BehaviorSettings: View {
 			}
 			if kind == "compare" { Picker("Comparison", selection: $config.operator) { Text("At least").tag("gte"); Text("More than").tag("gt"); Text("Equals").tag("eq"); Text("Less than").tag("lt"); Text("At most").tag("lte") } }
 			if kind == "delay" { Field(label: "Minutes") { TextField("Minutes", value: $config.minutes, format: .number).keyboardType(.decimalPad) } }
+			if kind == "interval" {
+				Field(label: "Every") { TextField("Interval", value: $config.value, format: .number).keyboardType(.numberPad) }
+				Picker("Unit", selection: Binding(get: { config.interval_unit ?? "hours" }, set: { unit in config.interval_unit = unit; config.value = min(config.value, unit == "minutes" ? 10080 : unit == "hours" ? 168 : 7) })) { Text("Minutes").tag("minutes"); Text("Hours").tag("hours"); Text("Days").tag("days") }
+				Text("Runs while this page is open. If an interval passes while it is closed, it runs once when you return.").supporting()
+			}
 			if kind == "clock" {
 				Field(label: "Time · 24-hour") { TextField("18:00", text: $config.time).keyboardType(.numbersAndPunctuation) }
 				ForEach(1...7, id: \.self) { day in Toggle(Calendar.current.weekdaySymbols[day - 1], isOn: Binding(get: { config.days.contains(day) }, set: { on in if on { config.days.append(day); config.days.sort() } else if config.days.count > 1 { config.days.removeAll { $0 == day } } })).tint(Theme.accent) }

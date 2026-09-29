@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { mark_events, once_signal, optional_input, primitive_config_fields, primitive_kinds, requires_format_four, run_timer, variable_dependencies, window_active, type TimerCommand, type TimerValue } from "./primitives";
+import { interval_duration_ms, mark_events, once_signal, optional_input, primitive_config_fields, primitive_kinds, requires_format_four, run_timer, variable_dependencies, window_active, type TimerCommand, type TimerValue } from "./primitives";
 import { builder_kinds, builder_catalog, builder_config_fields, builder_node, form_fields, type PortType, type Scalar, type Entry, type BuilderState, type BuilderAction } from "./builder-blocks";
 export type { PortType } from "./builder-blocks";
 
@@ -32,6 +32,7 @@ export const behavior_catalog: Record<BehaviorKind, { title: string; detail: str
 	arrive: { title: "Arrive at location", detail: "When you enter the saved place", category: "Triggers", inputs: {}, outputs: { arrived: "boolean" } },
 	leave: { title: "Leave location", detail: "When you exit the saved place", category: "Triggers", inputs: {}, outputs: { left: "boolean" } },
 	clock: { title: "At a time", detail: "A chosen time and days", category: "Triggers", inputs: {}, outputs: { due: "boolean" } },
+	interval: { title: "Every", detail: "Do something every few minutes, hours, or days", category: "Triggers", inputs: {}, outputs: { due: "boolean" } },
 	app_usage: { title: "App usage", detail: "Apple Screen Time integration", category: "Triggers", inputs: {}, outputs: { minutes: "number", reached: "boolean" } },
 	and: { title: "AND", detail: "Both conditions are true", category: "Logic", inputs: { a: "boolean", b: "boolean" }, outputs: { result: "boolean" } },
 	or: { title: "OR", detail: "Either condition is true", category: "Logic", inputs: { a: "boolean", b: "boolean" }, outputs: { result: "boolean" } },
@@ -73,6 +74,7 @@ export function behavior_order(graph: Behaviors, external: Record<string, Record
 		if (require_inputs && node.kind === "app_gate" && !node.config.groups?.length) { throw new Error("Choose at least one app group to control."); }
 		if (node.kind === "elapsed_timer" && node.config.timer_mode !== "stopwatch" && (node.config.value < 1 / 60 || node.config.value > 10080)) { throw new Error("Set the countdown duration between one second and seven days, in minutes."); }
 		if (node.kind === "time_window" && node.config.time === (node.config.end_time ?? "20:00")) { throw new Error("A time window needs different start and end times."); }
+		if (node.kind === "interval") { interval_duration_ms(node.config); }
 	}
 	const ordered: BehaviorNode[] = []; const remaining = [...graph.nodes];
 	while (remaining.length) {
@@ -130,6 +132,14 @@ export function run_behaviors(graph: Behaviors, previous: BehaviorState, context
 			case "arrive": emit("arrived", context.at_location === true && previous.at_location === false, pulse); break;
 			case "leave": emit("left", context.at_location === false && previous.at_location === true, pulse); break;
 			case "clock": emit("due", c.days.includes(date.getDay()+1) && time === c.time, day + c.time); break;
+			case "interval": {
+				const duration = interval_duration_ms(c);
+				const scheduled = state.pending.find(item => item.id === node.id);
+				if (!scheduled) { state.pending.push({ id: node.id, at: context.now + duration, token: pulse }); emit("due", false, ""); break; }
+				const due = scheduled.at <= context.now;
+				if (due) { state.pending = state.pending.filter(item => item.id !== node.id); state.pending.push({ id: node.id, at: context.now + duration, token: pulse }); }
+				emit("due", due, due ? String(scheduled.at) : ""); break;
+			}
 			case "app_usage": emit("minutes", context.usage_minutes ?? 0); emit("reached", context.usage_minutes !== undefined && context.usage_minutes >= c.value, day); out.minutes.available = out.reached.available = context.usage_minutes !== undefined; break;
 			case "and": case "or": { const a = input("a"), b = input("b"); emit("result", node.kind === "and" ? Boolean(a.value && b.value) : Boolean(a.value || b.value), `${a.value ? a.token : ""}:${b.value ? b.token : ""}`); break; }
 			case "not": emit("result", !input("condition").value); break;
