@@ -1,5 +1,5 @@
 import { behavior_catalog, behavior_config_schema, is_behavior } from "./behaviors";
-import { add_connected_block, checked_document, creation_catalog, generated_storage, input_name, insert_page_block, is_page_kind, node_name, page_section, port_name, remove_connected_block, remove_page_block, set_source, type CreationKind } from "./creation";
+import { add_connected_block, checked_document, creation_catalog, generated_storage, input_name, insert_page_block, is_page_kind, node_name, page_section, port_name, remove_connected_block, remove_page_block, set_source, visible_outputs, type CreationKind } from "./creation";
 import { block_schema, type AppDocument, type Block } from "./document";
 import { home_policy_schema } from "./home-policy";
 import { compile_graph, graph_from_document, node_catalog, node_ports, type LogicGraph, type LogicNode } from "./logic-graph";
@@ -22,6 +22,7 @@ const setting_names: Partial<Record<CreationKind, string[]>> = {
 	log: ["fields"], form: ["fields"], record: ["fields"], chart: ["field"], aggregate: ["field", "operation"], calculate: ["operation"], text_compare: ["text", "operation"],
 	progress: ["value"], health: ["metric"], app_gate: ["groups"], add_allowance: ["minutes"], reminder: ["message"], delay: ["minutes"], clock: ["time", "days"],
 	number_input: ["value"], text_input: ["text"], count: ["value"], compare: ["operator", "value"], goal: ["value"], app_usage: ["value"],
+	branch: ["else_enabled"],
 };
 
 function behavior_kind(kind: CreationKind): string { return kind === "log" ? "form" : kind; }
@@ -30,9 +31,9 @@ function is_log(graph: LogicGraph, node: LogicNode): boolean {
 	return node.kind === "form" && graph.nodes.some(item => generated_storage(graph, item) && graph.connections.some(edge => edge.from === node.id && edge.to === item.id));
 }
 
-function block_outputs(node: LogicNode | undefined) {
+function block_outputs(graph: LogicGraph, node: LogicNode | undefined) {
 	if (!node) { return []; }
-	return node_ports(node).outputs.map(output => ({ block_id: node.id, output, label: port_name(output) }));
+	return visible_outputs(graph, node).map(output => ({ block_id: node.id, output, label: port_name(output) }));
 }
 
 function block_inputs(graph: LogicGraph, node: LogicNode) {
@@ -65,7 +66,7 @@ export function block_catalog() {
 			section: is_page_kind(entry.kind) ? "page" : page_section(entry.kind),
 			settings: setting_names[entry.kind] ?? [],
 			inputs: behavior ? Object.keys(behavior.inputs).map(input => ({ input, label: input_name(kind as LogicNode["kind"], input), type: behavior.inputs[input] })) : [],
-			outputs: behavior ? Object.keys(behavior.outputs).map(output => ({ output, label: port_name(output), type: behavior.outputs[output] })) : native ? native.outputs.map(output => ({ output, label: port_name(output), type: output === "active" || output === "finished" || output === "outside" ? "boolean" : "unknown" })) : [],
+			outputs: behavior ? Object.keys(behavior.outputs).map(output => ({ output, label: port_name(output), type: behavior.outputs[output], optional: entry.kind === "branch" && output === "no" })) : native ? native.outputs.map(output => ({ output, label: port_name(output), type: output === "active" || output === "finished" || output === "outside" ? "boolean" : "unknown", optional: false })) : [],
 		};
 	});
 }
@@ -75,7 +76,7 @@ export function page_snapshot(document: AppDocument) {
 	const hidden_native = document.home_allowance ? new Set(document.blocks.filter(block => block.type === "schedule" || block.type === "screen_time").map(block => block.id)) : new Set<string>();
 	const page: SnapshotBlock[] = document.blocks.filter(block => !hidden_native.has(block.id)).map(block => {
 		const node = graph.nodes.find(item => item.id === block.id);
-		return { id: block.id, kind: block.type, name: block.title, settings: native_settings(block), inputs: {}, outputs: block_outputs(node) };
+		return { id: block.id, kind: block.type, name: block.title, settings: native_settings(block), inputs: {}, outputs: block_outputs(graph, node) };
 	});
 	const custom: SnapshotBlock[] = graph.nodes.filter(node => is_behavior(node.kind) && !generated_storage(graph, node)).map(node => ({
 		id: node.id,
@@ -83,7 +84,7 @@ export function page_snapshot(document: AppDocument) {
 		name: node_name(node),
 		settings: behavior_settings(node),
 		inputs: block_inputs(graph, node),
-		outputs: block_outputs(node),
+		outputs: block_outputs(graph, node),
 	}));
 	const routines = custom.filter(block => page_section(block.kind) === "routines");
 	if (document.home_allowance) {
@@ -152,6 +153,10 @@ export function update_actual_block(document: AppDocument, id: string, options: 
 	const node = graph.nodes.find(item => item.id === id && is_behavior(item.kind));
 	if (!node) { throw new Error("That block is no longer on this page."); }
 	node.config = behavior_config_schema.parse({ ...node.config!, ...settings, label: options.name ?? node.config!.label });
+	if (node.kind === "branch" && settings.else_enabled === false) {
+		if (graph.connections.some(edge => edge.from === node.id && edge.output === "no")) { throw new Error("Else is still used by another block. Remove that block before removing Else."); }
+		graph = { ...graph, connections: graph.connections.filter(edge => edge.from !== node.id || edge.output !== "no") };
+	}
 	graph = apply_inputs(graph, id, inputs);
 	return compile_graph(document, graph);
 }

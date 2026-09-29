@@ -92,6 +92,13 @@ textarea.document-input { field-sizing: content; min-height: var(--toolbar-h); l
 .block-properties .builder-fields { border: var(--hairline); border-radius: var(--r-1); padding: var(--s-3); min-width: 0; }
 .block-properties .builder-fields > div { display: flex; flex-direction: column; gap: var(--s-3); padding-block: var(--s-3); border-bottom: var(--hairline); margin-bottom: var(--s-3); }
 .block-properties p, .block-help { color: var(--c-text-faint); font-size: var(--t-small); }
+.branch-paths { border-block: var(--hairline); }
+.branch-path { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); min-height: var(--control-h); padding-block: var(--s-2); }
+.branch-path + .branch-path { border-top: var(--hairline); }
+.branch-path strong, .branch-path small { display: block; }
+.branch-path strong { font-size: var(--t-small); }
+.branch-path small { margin-top: var(--s-1); color: var(--c-text-faint); font-size: var(--t-micro); }
+.branch-add { justify-content: flex-start; width: 100%; border-top: var(--hairline); border-radius: 0; }
 .document-logic-footer { display: flex; justify-content: space-between; align-items: center; gap: var(--s-3); }
 .document-section-add { margin-top: var(--s-2); }
 .document-draft-warning { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); margin-block: var(--s-5); padding: var(--s-3) var(--s-4); border: var(--hairline); border-left: var(--border-selected); background: var(--c-bg); }

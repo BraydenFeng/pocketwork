@@ -42,7 +42,7 @@ export const creation_catalog: { kind: CreationKind; title: string; detail: stri
 	{ kind: "and", title: "Both conditions", detail: "True when both conditions are true", section: "Actions & logic" },
 	{ kind: "or", title: "Either condition", detail: "True when at least one condition is true", section: "Actions & logic" },
 	{ kind: "not", title: "Reverse condition", detail: "Flip true and false", section: "Actions & logic" },
-	{ kind: "branch", title: "If / else", detail: "Split into true and false", section: "Actions & logic" },
+	{ kind: "branch", title: "If", detail: "Run when a condition is true", section: "Actions & logic" },
 	{ kind: "aggregate", title: "Summarize entries", detail: "Sum, average, or count entries", section: "Actions & logic" },
 	{ kind: "calculate", title: "Calculate", detail: "Add, subtract, multiply, or divide", section: "Actions & logic" },
 	{ kind: "timer", title: "Focus timer", detail: "Timed focus session", section: "Native presets" },
@@ -88,8 +88,11 @@ export function remove_page_block(document: AppDocument, id: string): AppDocumen
 	return checked_document(next);
 }
 
-export function node_name(node: LogicNode): string { return node.config?.label || node.block?.title || node_catalog[node.kind].title; }
-const readable_ports: Record<string, string> = { pressed: "when tapped", submitted: "when submitted", record: "entry fields", rows: "saved entries", saved: "when saved", active: "while active", finished: "when finished", present: "at the saved place", away: "away from the saved place", arrived: "on arrival", left: "on departure", due: "at the chosen time", checked: "switched on", changed: "when changed", done: "when checked in", value: "value", count: "entry count", result: "result", yes: "condition is true", no: "condition is false", days: "streak days", reached: "goal reached", minutes: "minutes used", granted: "reward granted", outside: "outside the window" };
+export function node_name(node: LogicNode): string {
+	if (node.kind === "branch" && node.config?.label === "If / else") { return "If"; }
+	return node.config?.label || node.block?.title || node_catalog[node.kind].title;
+}
+const readable_ports: Record<string, string> = { pressed: "when tapped", submitted: "when submitted", record: "entry fields", rows: "saved entries", saved: "when saved", active: "while active", finished: "when finished", present: "at the saved place", away: "away from the saved place", arrived: "on arrival", left: "on departure", due: "at the chosen time", checked: "switched on", changed: "when changed", done: "when checked in", value: "value", count: "entry count", result: "result", yes: "then", no: "else", days: "streak days", reached: "goal reached", minutes: "minutes used", granted: "reward granted", outside: "outside the window" };
 export function port_name(port: string): string { return readable_ports[port] ?? port.replaceAll("_", " "); }
 export function input_name(kind: NodeKind, input: string): string {
 	if (kind === "branch" && input === "condition") { return "If"; }
@@ -114,10 +117,18 @@ export function input_name(kind: NodeKind, input: string): string {
 
 export function source_options(graph: LogicGraph, target: string, input: string) {
 	const base = { ...graph, connections: graph.connections.filter(edge => !(edge.to === target && edge.input === input)) };
-	return graph.nodes.filter(node => node.id !== target).flatMap(node => node_ports(node).outputs.flatMap(output => {
+	return graph.nodes.filter(node => node.id !== target).flatMap(node => visible_outputs(graph, node).flatMap(output => {
 		try { connect(base, { from: node.id, output, to: target, input }); return [{ id: `${node.id}:${output}`, node: node.id, output, label: `${node_name(node)} · ${node.config?.fields?.find(field => field.id === output)?.label ?? port_name(output)}` }]; }
 		catch { return []; }
 	}));
+}
+
+export function branch_has_else(graph: LogicGraph, node: LogicNode): boolean {
+	return node.kind === "branch" && (node.config?.else_enabled === true || graph.connections.some(edge => edge.from === node.id && edge.output === "no"));
+}
+
+export function visible_outputs(graph: LogicGraph, node: LogicNode): string[] {
+	return node.kind === "branch" && !branch_has_else(graph, node) ? node_ports(node).outputs.filter(output => output !== "no") : node_ports(node).outputs;
 }
 
 export function set_source(graph: LogicGraph, target: string, input: string, value: string): LogicGraph {

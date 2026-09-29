@@ -19,6 +19,7 @@ struct BehaviorConfig: Codable, Equatable {
 	var timer_mode: String? = nil
 	var end_time: String? = nil
 	var unit: String? = nil
+	var else_enabled: Bool? = nil
 }
 struct BehaviorNode: Codable, Equatable, Identifiable {
 	var id: String

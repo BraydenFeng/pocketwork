@@ -11,7 +11,7 @@ describe("block descriptions", () => {
 		["variable", "Store a number"],
 		["time_window", "Active between two times"],
 		["app_usage", "Apple Screen Time integration"],
-		["branch", "Split into true and false"],
+		["branch", "Run when a condition is true"],
 	] as const)("uses the same plain description for %s in the picker and page", (kind, detail) => {
 		expect(creation_catalog.find(item => item.kind === kind)?.detail).toBe(detail);
 		expect(behavior_catalog[kind].detail).toBe(detail);
@@ -88,6 +88,19 @@ describe("named block references", () => {
 		const extra = make_node("table"); const graph = { ...chart.graph, nodes: [...chart.graph.nodes, extra] };
 		const linked = set_source(graph, extra.id, "rows", `${chart.selected}:rows`);
 		expect(source_options(linked, chart.selected, "rows").some(option => option.node === extra.id)).toBe(false);
+	});
+	it("offers an else source only after it is added", () => {
+		const base = blank_tool();
+		const toggle = add_connected_block(graph_from_document(base), "checkbox");
+		const branch = add_connected_block(toggle.graph, "branch");
+		const linked = set_source(branch.graph, branch.selected, "condition", `${toggle.selected}:checked`);
+		const reminder = add_connected_block(linked, "reminder");
+		const before = source_options(reminder.graph, reminder.selected, "send").filter(option => option.node === branch.selected);
+		expect(before.map(option => option.output)).toEqual(["yes"]);
+		const enabled = structuredClone(reminder.graph);
+		enabled.nodes.find(node => node.id === branch.selected)!.config!.else_enabled = true;
+		const after = source_options(enabled, reminder.selected, "send").filter(option => option.node === branch.selected);
+		expect(after.map(option => option.output)).toEqual(["yes", "no"]);
 	});
 	it("validates the numeric chart field, rather than silently displaying nothing", () => {
 		const base = blank_tool(); const log = add_connected_block(graph_from_document(base), "log"); const chart = add_connected_block(log.graph, "chart");

@@ -83,26 +83,32 @@ test("a switch controls named app groups without advanced wiring", async ({ page
 	await expect(page.getByText("Simulated: app gate open", { exact: true }).last()).toBeVisible();
 });
 
-test("an if block exposes true and false paths without a graph", async ({ page }) => {
+test("an if block adds else only when requested", async ({ page }) => {
 	await page.goto("/"); await page.getByRole("button", { name: "New page", exact: true }).click();
 	await add_block(page, "Switch");
 	await page.getByRole("button", { name: "Add routine block", exact: true }).click();
-	await page.getByRole("dialog").getByRole("button", { name: "Add If / else", exact: true }).click();
-	await page.getByLabel("If: If / else", { exact: true }).selectOption({ label: "Switch · switched on" });
+	await page.getByRole("dialog").getByRole("button", { name: "Add If", exact: true }).click();
+	await page.getByLabel("If: If", { exact: true }).selectOption({ label: "Switch · switched on" });
+	const paths = page.getByRole("group", { name: "Paths for If", exact: true });
+	await expect(paths.getByText("Then", { exact: true })).toBeVisible();
+	await expect(paths.getByText("Else", { exact: true })).toHaveCount(0);
+	await paths.getByRole("button", { name: "Add else", exact: true }).click();
+	await expect(paths.getByText("Else", { exact: true })).toBeVisible();
+	await expect(paths.getByRole("button", { name: "Remove else", exact: true })).toBeVisible();
 	await page.getByRole("button", { name: "Add routine block", exact: true }).click();
 	await page.getByRole("dialog").getByRole("button", { name: "Add Show a message", exact: true }).click();
 	await page.getByLabel("Name for Show a message", { exact: true }).fill("True path");
 	await page.getByLabel("Name for Show a message", { exact: true }).press("Tab");
 	await page.getByLabel("Message", { exact: true }).fill("Condition matched");
 	await page.getByLabel("Message", { exact: true }).press("Tab");
-	await page.getByLabel("Show message when: True path", { exact: true }).selectOption({ label: "If / else · condition is true" });
+	await page.getByLabel("Show message when: True path", { exact: true }).selectOption({ label: "If · then" });
 	await page.getByRole("button", { name: "Add routine block", exact: true }).click();
 	await page.getByRole("dialog").getByRole("button", { name: "Add Show a message", exact: true }).click();
 	await page.getByLabel("Name for Show a message", { exact: true }).fill("False path");
 	await page.getByLabel("Name for Show a message", { exact: true }).press("Tab");
 	await page.getByLabel("Message", { exact: true }).fill("Condition did not match");
 	await page.getByLabel("Message", { exact: true }).press("Tab");
-	await page.getByLabel("Show message when: False path", { exact: true }).selectOption({ label: "If / else · condition is false" });
+	await page.getByLabel("Show message when: False path", { exact: true }).selectOption({ label: "If · else" });
 	await expect(page.getByText("Saved on this browser", { exact: true })).toBeVisible();
 	await page.getByRole("button", { name: "Preview", exact: true }).click();
 	await page.getByRole("checkbox", { name: "Switch", exact: true }).check();

@@ -12,6 +12,7 @@ export const behavior_config_schema = z.object({
 	minutes: z.number().min(1).max(1440).default(5), time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default("18:00"),
 	days: z.array(z.number().int().min(1).max(7)).min(1).max(7).default([1,2,3,4,5,6,7]),
 	message: z.string().max(240).default("Time for your routine."), operator: z.enum(["gte", "gt", "eq", "lt", "lte"]).default("gte"),
+	else_enabled: z.boolean().optional(),
 }).strict();
 export type BehaviorConfig = z.infer<typeof behavior_config_schema>;
 export const behavior_node_schema = z.object({ id: z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/), kind: z.enum(behavior_kinds), x: z.number().finite(), y: z.number().finite(), config: behavior_config_schema }).strict();
@@ -35,7 +36,7 @@ export const behavior_catalog: Record<BehaviorKind, { title: string; detail: str
 	and: { title: "AND", detail: "Both conditions are true", category: "Logic", inputs: { a: "boolean", b: "boolean" }, outputs: { result: "boolean" } },
 	or: { title: "OR", detail: "Either condition is true", category: "Logic", inputs: { a: "boolean", b: "boolean" }, outputs: { result: "boolean" } },
 	not: { title: "NOT", detail: "Reverse a condition", category: "Logic", inputs: { condition: "boolean" }, outputs: { result: "boolean" } },
-	branch: { title: "If / else", detail: "Split into true and false", category: "Logic", inputs: { condition: "boolean" }, outputs: { yes: "boolean", no: "boolean" } },
+	branch: { title: "If", detail: "Run when a condition is true", category: "Logic", inputs: { condition: "boolean" }, outputs: { yes: "boolean", no: "boolean" } },
 	delay: { title: "Delay", detail: "Wait before the next action", category: "Logic", inputs: { start: "boolean" }, outputs: { done: "boolean" } },
 	variable: { title: "Variable", detail: "Store a number", category: "Logic", inputs: { set: "number" }, outputs: { value: "number" } },
 	count: { title: "Counter", detail: "Count events; optionally reset", category: "Accountability", inputs: { increment: "boolean", reset: "boolean" }, outputs: { value: "number" } },

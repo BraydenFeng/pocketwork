@@ -47,6 +47,12 @@ final class BehaviorTests: XCTestCase {
 		XCTAssertEqual(try ToolLibrary.decode(library.encoded()), library)
 	}
 
+	func testIfElsePreferenceRoundTrips() throws {
+		let config = BehaviorConfig(label: "If", value: 1, minutes: 1, time: "18:00", days: [1,2,3,4,5,6,7], message: "", operator: "gte", else_enabled: true)
+		let decoded = try JSONDecoder().decode(BehaviorConfig.self, from: JSONEncoder().encode(config))
+		XCTAssertEqual(decoded.else_enabled, true)
+	}
+
 	func testGraphEditsPreserveProgressAndRemoveDetachedState() throws {
 		let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "behavior-fixtures", withExtension: "json"))
 		let old = try JSONDecoder().decode([Fixture].self, from: Data(contentsOf: url))[0].graph

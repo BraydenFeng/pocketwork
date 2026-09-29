@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { is_behavior, type BehaviorConfig } from "@/lib/behaviors";
-import { connected_summary, generated_storage, input_name, node_name, numeric_fields, page_section, remove_connected_block, set_source, source_options, type PageSection } from "@/lib/creation";
+import { branch_has_else, connected_summary, generated_storage, input_name, node_name, numeric_fields, page_section, remove_connected_block, set_source, source_options, type PageSection } from "@/lib/creation";
 import { node_catalog, node_ports, type LogicGraph, type LogicNode } from "@/lib/logic-graph";
 import { optional_input } from "@/lib/primitives";
 import { ALL_DAYS, DAY_LABELS } from "@/lib/schedule";
@@ -39,6 +39,15 @@ export function RoutineBlocks({ graph, selected, section, leading_block, on_sele
 		catch (failure) { on_error(failure instanceof Error ? failure.message : "Could not remove this block."); return; }
 		on_select(null);
 	}
+	function set_else(node: LogicNode, enabled: boolean) {
+		const users = new Set(graph.connections.filter(edge => edge.from === node.id && edge.output === "no").map(edge => edge.to)).size;
+		if (!enabled && users && !window.confirm(`Remove Else? ${users} other block${users === 1 ? " uses" : "s use"} it and will need a new When setting.`)) { return; }
+		on_change({
+			...graph,
+			nodes: graph.nodes.map(item => item.id === node.id ? { ...item, config: { ...item.config!, else_enabled: enabled ? true : undefined } } : item),
+			connections: enabled ? graph.connections : graph.connections.filter(edge => edge.from !== node.id || edge.output !== "no"),
+		});
+	}
 	function input_field(node: LogicNode, input: string) {
 		const options = source_options(graph, node.id, input);
 		const edge = graph.connections.find(entry => entry.to === node.id && entry.input === input);
@@ -59,17 +68,28 @@ export function RoutineBlocks({ graph, selected, section, leading_block, on_sele
 			const open = selected === node.id;
 			return <section key={node.id} className={`document-logic-block ${open ? "is-open" : ""}`}>
 				<button type="button" className="document-logic-heading" aria-expanded={open} aria-label={`Edit ${node_name(node)}`} onClick={() => on_select(open ? null : node.id)}><BlockIcon kind={node.kind} /><span><strong>{node_name(node)}</strong><small>{connected_summary(graph, node)}</small></span><span className="document-logic-kind">{node_catalog[node.kind].title}</span><ChevronDown /></button>
-				{open && <div className="document-logic-body"><label className="block-property"><span>Name</span><InlineText label={`Name for ${node_name(node)}`} value={node.config?.label ?? ""} placeholder={node_catalog[node.kind].title} on_commit={label => update({ ...node, config: { ...node.config!, label } })} /></label>
+				{open && <div className="document-logic-body"><label className="block-property"><span>Name</span><InlineText label={`Name for ${node_name(node)}`} value={node.kind === "branch" && node.config?.label === "If / else" ? "If" : node.config?.label ?? ""} placeholder={node_catalog[node.kind].title} on_commit={label => update({ ...node, config: { ...node.config!, label } })} /></label>
 					<NodeSettings node={node} graph={graph} patch={patch => update({ ...node, config: { ...node.config!, ...patch } })} />
 					{["elapsed_timer", "variable"].includes(node.kind)
 						? <details className="document-details"><summary>Controls (optional)</summary><div className="block-properties">{node_ports(node).inputs.map(input => input_field(node, input))}</div></details>
 						: node_ports(node).inputs.filter(input => !(node.kind === "change_value" && input === "amount" && node.config?.change === "reset")).map(input => input_field(node, input))}
+					{node.kind === "branch" && <BranchPaths graph={graph} node={node} on_change={enabled => set_else(node, enabled)} />}
 					<div className="document-logic-footer"><span className="supporting">{node_catalog[node.kind].detail}</span><Button variant="danger" onClick={() => remove(node)}><Trash2 />Remove block</Button></div>
 				</div>}
 			</section>;
 		})}</div>
 		<button type="button" className="document-add document-section-add" onClick={on_add}><Plus /><span>Add {section === "data" ? "data" : "routine"} block</span></button>
 	</section>;
+}
+
+function BranchPaths({ graph, node, on_change }: { graph: LogicGraph; node: LogicNode; on_change: (enabled: boolean) => void }) {
+	const has_else = branch_has_else(graph, node);
+	return <div className="branch-paths" role="group" aria-label={`Paths for ${node_name(node)}`}>
+		<div className="branch-path"><span><strong>Then</strong><small>Condition is true</small></span></div>
+		{has_else
+			? <div className="branch-path"><span><strong>Else</strong><small>Condition is false</small></span><Button variant="quiet" onClick={() => on_change(false)}><Trash2 />Remove else</Button></div>
+			: <Button variant="quiet" className="branch-add" onClick={() => on_change(true)}><Plus />Add else</Button>}
+	</div>;
 }
 
 function NodeSettings({ node, graph, patch }: { node: LogicNode; graph: LogicGraph; patch: (config: Partial<BehaviorConfig>) => void }) {

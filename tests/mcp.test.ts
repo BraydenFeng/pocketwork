@@ -42,7 +42,7 @@ it.each([false, true])("reports the actual block rollout flag (%s)", async enabl
 	expect(catalog.native_format_four).toBe(enabled);
 	expect(catalog.execution).toContain(enabled ? "completion actions run on reopening" : "cloud writes reject them");
 	expect(catalog.blocks).toEqual(expect.arrayContaining([
-		expect.objectContaining({ kind: "branch", name: "If / else", description: "Split into true and false" }),
+		expect.objectContaining({ kind: "branch", name: "If", description: "Run when a condition is true", settings: ["else_enabled"], outputs: expect.arrayContaining([expect.objectContaining({ output: "no", label: "else", optional: true })]) }),
 	]));
 	expect(fetch_library).not.toHaveBeenCalled();
 });
@@ -53,14 +53,26 @@ it("creates pages and builds real connected blocks from the shared catalog", asy
 	await call_mcp_tool(cloud, account, "create_page", { id: "gym-page", name: "Gym rewards", description: "Earn free time at the gym." });
 	const toggle = parsed(await call_mcp_tool(cloud, account, "add_block", { page_id: "gym-page", kind: "checkbox", name: "Gym mode" }));
 	const branch = parsed(await call_mcp_tool(cloud, account, "add_block", { page_id: "gym-page", kind: "branch", name: "If gym mode is on", inputs: { condition: { block_id: toggle.block_id, output: "checked" } } }));
+	const initial_branch = branch.page.sections.routines.find((block: { id: string }) => block.id === branch.block_id);
+	expect(initial_branch.outputs.map((output: { output: string }) => output.output)).toEqual(["yes"]);
+	const enabled = parsed(await call_mcp_tool(cloud, account, "update_block", { page_id: "gym-page", block_id: branch.block_id, settings: { else_enabled: true } }));
+	const enabled_branch = enabled.page.sections.routines.find((block: { id: string }) => block.id === branch.block_id);
+	expect(enabled_branch.outputs.map((output: { output: string }) => output.output)).toEqual(["yes", "no"]);
+	const disabled = parsed(await call_mcp_tool(cloud, account, "update_block", { page_id: "gym-page", block_id: branch.block_id, settings: { else_enabled: false } }));
+	const disabled_branch = disabled.page.sections.routines.find((block: { id: string }) => block.id === branch.block_id);
+	expect(disabled_branch.outputs.map((output: { output: string }) => output.output)).toEqual(["yes"]);
+	await call_mcp_tool(cloud, account, "update_block", { page_id: "gym-page", block_id: branch.block_id, settings: { else_enabled: true } });
 	await call_mcp_tool(cloud, account, "add_block", { page_id: "gym-page", kind: "reminder", name: "Celebrate", settings: { message: "Gym time counted." }, inputs: { send: { block_id: branch.block_id, output: "yes" } } });
+	await call_mcp_tool(cloud, account, "add_block", { page_id: "gym-page", kind: "reminder", name: "Try again", settings: { message: "Gym mode is off." }, inputs: { send: { block_id: branch.block_id, output: "no" } } });
 	const page = parsed(await call_mcp_tool(cloud, account, "get_page", { page_id: "gym-page" }));
 	expect(page.sections.routines).toEqual(expect.arrayContaining([
 		expect.objectContaining({ id: branch.block_id, kind: "branch", inputs: { condition: expect.objectContaining({ source: { block_id: toggle.block_id, output: "checked" } }) } }),
 	]));
 	expect(library().tools[0].document.behaviors?.connections).toEqual(expect.arrayContaining([
 		expect.objectContaining({ from: toggle.block_id, output: "checked", to: branch.block_id, input: "condition" }),
+		expect.objectContaining({ from: branch.block_id, output: "no", input: "send" }),
 	]));
+	await expect(call_mcp_tool(cloud, account, "update_block", { page_id: "gym-page", block_id: branch.block_id, settings: { else_enabled: false } })).rejects.toThrow("Else is still used");
 });
 
 it("updates and removes the same stored blocks", async () => {
