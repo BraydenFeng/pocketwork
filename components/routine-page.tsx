@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ArrowDown, ArrowUp, GripVertical, Plus, Smartphone, Trash2 } from "lucide-react";
 import { is_behavior } from "@/lib/behaviors";
+import { is_block_authored_home_allowance } from "@/lib/background-allowance";
 import { describe_shield, new_id, shield_mode, type AppDocument, type Block } from "@/lib/document";
 import { generated_storage, remove_page_block } from "@/lib/creation";
 import type { LogicGraph } from "@/lib/logic-graph";
@@ -34,6 +35,7 @@ export function RoutinePage({ document, groups, graph, selected, graph_dirty, gr
 }) {
 	const [menu, set_menu] = useState<string | null>(null);
 	const [dragged, set_dragged] = useState<string | null>(null);
+	const block_authored_allowance = is_block_authored_home_allowance(document);
 	const custom_blocks = graph.nodes.filter(node => is_behavior(node.kind) && !generated_storage(graph, node));
 	const page_blocks = document.home_allowance ? document.blocks.filter(block => !["schedule", "screen_time"].includes(block.type)) : document.blocks;
 	function update(block: Block) { on_change({ ...document, blocks: document.blocks.map(item => item.id === block.id ? block : item) }); }
@@ -69,7 +71,7 @@ export function RoutinePage({ document, groups, graph, selected, graph_dirty, gr
 			<button type="button" className="document-add" onClick={() => on_add("all")}><Plus /><span>Add a block</span><kbd aria-hidden="true">/</kbd></button>
 		</section>
 		{graph_dirty && graph_error && <div className="document-draft-warning" role="alert"><div><strong>This block needs one more setting.</strong><p>{graph_error}</p></div><Button variant="quiet" onClick={on_discard_graph}>Discard unfinished block</Button></div>}
-		<RoutineBlocks graph={graph} selected={selected} section="routines" leading_block={document.home_allowance ? <HomeAllowanceBlock document={document} open={selected === home_allowance_block_id} disabled={disabled} on_toggle={() => on_select(selected === home_allowance_block_id ? null : home_allowance_block_id)} on_change={on_change} on_draft_error={on_draft_error} /> : undefined} on_select={on_select} on_change={on_graph_change} on_add={() => on_add("routines")} on_error={on_error} />
+		<RoutineBlocks graph={graph} selected={selected} section="routines" native_background={block_authored_allowance} leading_block={document.home_allowance && !block_authored_allowance ? <HomeAllowanceBlock document={document} open={selected === home_allowance_block_id} disabled={disabled} on_toggle={() => on_select(selected === home_allowance_block_id ? null : home_allowance_block_id)} on_change={on_change} on_draft_error={on_draft_error} /> : undefined} on_select={on_select} on_change={on_graph_change} on_add={() => on_add("routines")} on_error={on_error} />
 		<RoutineBlocks graph={graph} selected={selected} section="data" on_select={on_select} on_change={on_graph_change} on_add={() => on_add("data")} on_error={on_error} />
 		<div className="document-bottom-note">Type / in an empty text block to add anything.</div>
 	</div>;

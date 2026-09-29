@@ -13,6 +13,7 @@ export const creation_catalog: { kind: CreationKind; title: string; detail: stri
 	{ kind: "variable", title: "Variable", detail: "Store a number", section: "Building blocks" },
 	{ kind: "change_value", title: "Change variable", detail: "Set, add, subtract, or reset a number", section: "Building blocks" },
 	{ kind: "time_window", title: "Time window", detail: "Active between two times", section: "Building blocks" },
+	{ kind: "location", title: "At location", detail: "Inside the saved place on your phone", section: "Building blocks" },
 	{ kind: "note", title: "Text", detail: "Plain text", section: "On the page" },
 	{ kind: "heading", title: "Heading", detail: "Section title", section: "On the page" },
 	{ kind: "checklist", title: "Checklist", detail: "Check off tasks", section: "On the page" },

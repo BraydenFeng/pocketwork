@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { derive_home_allowance, is_block_authored_home_allowance } from "./background-allowance";
 import { behavior_ports, behavior_catalog, behavior_config_schema, behavior_kinds, behavior_order, behaviors_schema, is_behavior, type BehaviorConfig, type BehaviorKind, type Behaviors } from "./behaviors";
 import { home_policy_schema } from "./home-policy";
 import { block_schema, create_block, document_schema, type AppDocument, type Block } from "./document";
@@ -64,9 +65,11 @@ export function graph_from_document(document: AppDocument): LogicGraph {
 		if (a && b) { graph = connect(graph, { from: a.id, output, to: b.id, input }); }
 	};
 	if (document.home_allowance) {
-		nodes.push({ id: "home-condition", kind: "home", x: 40, y: 40 }, { id: "usage-meter", kind: "usage", x: 340, y: 180 }, { id: "daily-allowance", kind: "allowance", x: 640, y: 180, policy: structuredClone(document.home_allowance) });
-		add_edge("home", "present", "usage", "home"); add_edge("schedule", "active", "usage", "window"); add_edge("usage", "used", "allowance", "used"); add_edge("allowance", "reached", "apps", "gate"); add_edge("home", "present", "apps", "home");
-		if (document.home_allowance.outside_windows === "block_at_home") { add_edge("schedule", "outside", "apps", "outside"); }
+		if (!is_block_authored_home_allowance(document)) {
+			nodes.push({ id: "home-condition", kind: "home", x: 40, y: 40 }, { id: "usage-meter", kind: "usage", x: 340, y: 180 }, { id: "daily-allowance", kind: "allowance", x: 640, y: 180, policy: structuredClone(document.home_allowance) });
+			add_edge("home", "present", "usage", "home"); add_edge("schedule", "active", "usage", "window"); add_edge("usage", "used", "allowance", "used"); add_edge("allowance", "reached", "apps", "gate"); add_edge("home", "present", "apps", "home");
+			if (document.home_allowance.outside_windows === "block_at_home") { add_edge("schedule", "outside", "apps", "outside"); }
+		}
 	} else if (document.rules.block_during_focus) { add_edge(nodes.some((node) => node.kind === "timer") ? "timer" : "schedule", "active", "apps", "gate"); }
 	if (document.rules.notify_on_complete) { nodes.push({ id: "completion-notification", kind: "notification", x: 640, y: 40 }); add_edge("timer", "finished", "notification", "finished"); }
 	if (document.behaviors) { graph.nodes.push(...structuredClone(document.behaviors.nodes)); graph.connections.push(...structuredClone(document.behaviors.connections)); }
@@ -79,7 +82,9 @@ export function compile_graph(base: AppDocument, graph: LogicGraph): AppDocument
 	let checked: LogicGraph = { nodes: graph.nodes, connections: [] };
 	for (const edge of graph.connections) { checked = connect(checked, edge); }
 	const linked = (from: NodeKind, output: string, to: NodeKind, input: string) => graph.connections.some((edge) => edge.from === by_kind(from)?.id && edge.output === output && edge.to === by_kind(to)?.id && edge.input === input);
-	const home = Boolean(by_kind("home") || by_kind("usage") || by_kind("allowance"));
+	const legacy_home = Boolean(by_kind("home") || by_kind("usage") || by_kind("allowance"));
+	const behaviors = behavior_part(graph);
+	const compiled_allowance = derive_home_allowance(behaviors);
 	const result = structuredClone(base);
 	const blocks: Block[] = [];
 	for (const node of graph.nodes) {
@@ -96,7 +101,32 @@ export function compile_graph(base: AppDocument, graph: LogicGraph): AppDocument
 	for (const block of blocks) { if (!result.blocks.some((item) => item.id === block.id)) { result.blocks.push(block); } }
 	result.rules = { block_during_focus: linked("timer", "active", "apps", "gate") || linked("schedule", "active", "apps", "gate"), notify_on_complete: linked("timer", "finished", "notification", "finished") };
 	if (by_kind("notification") && !result.rules.notify_on_complete) { throw new Error("Set Notify me to use the timer's finished event."); }
-	if (home) {
+	if (compiled_allowance) {
+		if (by_kind("timer")) { throw new Error("A background home allowance cannot also use the native focus timer."); }
+		result.home_allowance = structuredClone(compiled_allowance.policy);
+		result.rules.block_during_focus = true;
+		let schedule_index = result.blocks.findIndex(block => block.type === "schedule");
+		if (schedule_index < 0) {
+			let id = "compiled-home-schedule"; let suffix = 2;
+			while (graph.nodes.some(node => node.id === id) || result.blocks.some(block => block.id === id)) { id = `compiled-home-schedule-${suffix++}`; }
+			result.blocks.push({ id, type: "schedule", title: "Home allowance schedule", days: [1, 2, 3, 4, 5, 6, 7], start: "00:00", end: "23:59" });
+			schedule_index = result.blocks.length - 1;
+		}
+		const schedule = result.blocks[schedule_index];
+		if (schedule.type === "schedule") { result.blocks[schedule_index] = { ...schedule, days: [1, 2, 3, 4, 5, 6, 7], start: "00:00", end: "23:59" }; }
+		let shield_index = result.blocks.findIndex(block => block.type === "screen_time");
+		if (shield_index < 0) {
+			let id = "compiled-home-shield"; let suffix = 2;
+			while (graph.nodes.some(node => node.id === id) || result.blocks.some(block => block.id === id)) { id = `compiled-home-shield-${suffix++}`; }
+			result.blocks.push({ id, type: "screen_time", title: "Home distractions", mode: "block", groups: [compiled_allowance.group] });
+			shield_index = result.blocks.length - 1;
+		}
+		const shield = result.blocks[shield_index];
+		if (shield.type === "screen_time") {
+			const { limit_minutes: _limit_minutes, ...without_limit } = shield;
+			result.blocks[shield_index] = { ...without_limit, mode: "block", groups: [compiled_allowance.group] };
+		}
+	} else if (legacy_home) {
 		const required: [NodeKind, string, NodeKind, string][] = [["home", "present", "usage", "home"], ["schedule", "active", "usage", "window"], ["usage", "used", "allowance", "used"], ["allowance", "reached", "apps", "gate"], ["home", "present", "apps", "home"]];
 		if (by_kind("timer") || !required.every((edge) => linked(...edge))) { throw new Error("Home allowances require Home and Time window for Count usage, Daily allowance, and Control apps."); }
 		const policy = by_kind("allowance")?.policy;
@@ -107,8 +137,9 @@ export function compile_graph(base: AppDocument, graph: LogicGraph): AppDocument
 		const schedule = result.blocks.find((block) => block.type === "schedule")!;
 		if (schedule.type === "schedule") { schedule.days = [1, 2, 3, 4, 5, 6, 7]; schedule.start = "00:00"; schedule.end = "23:59"; }
 	} else { delete result.home_allowance; result.schema_version = 1; }
-	if (by_kind("schedule")) { result.enabled = base.blocks.some((block) => block.id === by_kind("schedule")?.id) ? base.enabled ?? false : false; } else { delete result.enabled; }
-	const behaviors = behavior_part(graph);
+	if (compiled_allowance) { result.enabled = base.enabled ?? false; }
+	else if (by_kind("schedule")) { result.enabled = base.blocks.some((block) => block.id === by_kind("schedule")?.id) ? base.enabled ?? false : false; }
+	else { delete result.enabled; }
 	if (behaviors.nodes.length) { behavior_order(behaviors, external_ports(graph), true); result.behaviors = behaviors_schema.parse(behaviors); result.schema_version = requires_format_five(behaviors) ? 5 : requires_format_four(behaviors) ? 4 : 3; } else { delete result.behaviors; }
 	const parsed = document_schema.safeParse(result);
 	if (!parsed.success) { throw new Error(parsed.error.issues[0].message); }

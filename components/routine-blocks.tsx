@@ -12,11 +12,12 @@ import { BlockIcon, InlineText, NumberField } from "./creation-controls";
 import { PrimitiveSettings } from "./primitive-settings";
 import { Button } from "./ui";
 
-export function RoutineBlocks({ graph, selected, section, leading_block, on_select, on_change, on_add, on_error }: {
+export function RoutineBlocks({ graph, selected, section, leading_block, native_background = false, on_select, on_change, on_add, on_error }: {
 	graph: LogicGraph;
 	selected: string | null;
 	section: PageSection;
 	leading_block?: ReactNode;
+	native_background?: boolean;
 	on_select: (id: string | null) => void;
 	on_change: (graph: LogicGraph) => void;
 	on_add: () => void;
@@ -62,14 +63,14 @@ export function RoutineBlocks({ graph, selected, section, leading_block, on_sele
 	const description = section === "data" ? "Values, logs, and things you can display." : "Events, conditions, and actions.";
 	return <section className="document-system-section" aria-labelledby={`${section}-section-title`}>
 		<div className="document-section-heading"><span className="document-eyebrow">{title.toUpperCase()}</span><h2 id={`${section}-section-title`}>{title}</h2><p>{description}</p></div>
-		{section === "routines" && (leading_block || visible_blocks.length > 0) && <p className="document-runtime-note">Custom routines run while this page is open. Native schedules keep running on iPhone.</p>}
+		{section === "routines" && (leading_block || visible_blocks.length > 0) && <p className="document-runtime-note">{native_background ? "This block setup runs as a native background home allowance on your iPhone." : "Custom routines run while this page is open. Native schedules keep running on iPhone."}</p>}
 		{!leading_block && visible_blocks.length === 0 && <p className="document-section-empty">No {section} yet.</p>}
 		<div className="document-logic-blocks">{leading_block}{visible_blocks.map(node => {
 			const open = selected === node.id;
 			return <section key={node.id} className={`document-logic-block ${open ? "is-open" : ""}`}>
 				<button type="button" className="document-logic-heading" aria-expanded={open} aria-label={`Edit ${node_name(node)}`} onClick={() => on_select(open ? null : node.id)}><BlockIcon kind={node.kind} /><span><strong>{node_name(node)}</strong><small>{connected_summary(graph, node)}</small></span><span className="document-logic-kind">{node_catalog[node.kind].title}</span><ChevronDown /></button>
 				{open && <div className="document-logic-body"><label className="block-property"><span>Name</span><InlineText label={`Name for ${node_name(node)}`} value={node.kind === "branch" && node.config?.label === "If / else" ? "If" : node.config?.label ?? ""} placeholder={node_catalog[node.kind].title} on_commit={label => update({ ...node, config: { ...node.config!, label } })} /></label>
-					<NodeSettings node={node} graph={graph} patch={patch => update({ ...node, config: { ...node.config!, ...patch } })} />
+					<NodeSettings node={node} graph={graph} native_background={native_background} patch={patch => update({ ...node, config: { ...node.config!, ...patch } })} />
 					{["elapsed_timer", "variable"].includes(node.kind)
 						? <details className="document-details"><summary>Controls (optional)</summary><div className="block-properties">{node_ports(node).inputs.map(input => input_field(node, input))}</div></details>
 						: node_ports(node).inputs.filter(input => !(node.kind === "change_value" && input === "amount" && node.config?.change === "reset")).map(input => input_field(node, input))}
@@ -92,7 +93,7 @@ function BranchPaths({ graph, node, on_change }: { graph: LogicGraph; node: Logi
 	</div>;
 }
 
-function NodeSettings({ node, graph, patch }: { node: LogicNode; graph: LogicGraph; patch: (config: Partial<BehaviorConfig>) => void }) {
+function NodeSettings({ node, graph, native_background, patch }: { node: LogicNode; graph: LogicGraph; native_background: boolean; patch: (config: Partial<BehaviorConfig>) => void }) {
 	const config = node.config!;
 	const interval_unit = config.interval_unit ?? "hours";
 	const interval_max = interval_unit === "minutes" ? 10080 : interval_unit === "hours" ? 168 : 7;
@@ -110,7 +111,7 @@ function NodeSettings({ node, graph, patch }: { node: LogicNode; graph: LogicGra
 		{["chart", "aggregate"].includes(node.kind) && <label className="block-property"><span>Number to use</span><select aria-label={`Numeric field: ${node_name(node)}`} value={config.field ?? "value"} onChange={event => patch({ field: event.target.value })}>{!numeric_fields(graph, node).some(field => field.id === (config.field ?? "value")) && <option value={config.field ?? "value"}>{config.field ?? "value"} (missing)</option>}{numeric_fields(graph, node).map(field => <option key={field.id} value={field.id}>{field.label}</option>)}</select></label>}
 		{node.kind === "app_gate" && <><label className="block-property"><span>App groups</span><InlineText label="App groups to control" value={(config.groups ?? []).join(", ")} placeholder="Social, Games" max_length={400} on_commit={value => patch({ groups: [...new Set(value.split(",").map(name => name.trim()).filter(Boolean))] })} /></label><p>Separate names with commas. Choose the actual apps privately on your iPhone.</p></>}
 		{["chart", "number_input", "progress", "add_allowance"].includes(node.kind) ? null : node.kind === "aggregate" ? <label className="block-property"><span>Calculate</span><select value={config.operation ?? "sum"} onChange={event => patch({ operation: event.target.value as BehaviorConfig["operation"] })}>{["sum", "average", "minimum", "maximum", "count"].map(value => <option value={value} key={value}>{value}</option>)}</select></label> : <BuilderSettings node={node} patch={patch} advanced={false} />}
-		{["location", "arrive", "leave"].includes(node.kind) && <p className="block-help">Uses the single saved location on your iPhone. This event currently checks while the page is open.</p>}
+		{["location", "arrive", "leave"].includes(node.kind) && <p className="block-help">{native_background && node.kind === "location" ? "Uses the saved location on your iPhone as part of this background allowance." : "Uses the single saved location on your iPhone. This event currently checks while the page is open."}</p>}
 		{node.kind === "add_allowance" && <p className="block-help">Requires an enabled home allowance on the phone. Its location and time rules still apply.</p>}
 		{node.kind === "app_usage" && <p className="block-help">Uses Apple Screen Time. It currently reads minutes counted by your home allowance. Separate totals for each app are not available.</p>}
 	</div>;

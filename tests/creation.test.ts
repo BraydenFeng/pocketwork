@@ -10,6 +10,7 @@ describe("block descriptions", () => {
 		["elapsed_timer", "Stopwatch or countdown"],
 		["variable", "Store a number"],
 		["time_window", "Active between two times"],
+		["location", "Inside the saved place on your phone"],
 		["app_usage", "Apple Screen Time integration"],
 		["branch", "Run when a condition is true"],
 		["interval", "Do something every few minutes, hours, or days"],

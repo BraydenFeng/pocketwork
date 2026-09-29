@@ -1,7 +1,9 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { fetch_library, push_library, type Cloud, type CloudSnapshot } from "../lib/cloud";
 import { empty_library, type Library } from "../lib/library";
+import { requested_home_policy } from "../lib/home-policy";
 import { call_mcp_tool, mcp_tools } from "../lib/mcp";
+import { personal_routine } from "../lib/personal-routine";
 import * as release_flags from "../lib/release-flags";
 
 vi.mock("../lib/cloud", () => ({ fetch_library: vi.fn(), push_library: vi.fn() }));
@@ -14,8 +16,8 @@ function parsed(result: Awaited<ReturnType<typeof call_mcp_tool>>) {
 	return JSON.parse(result.content[0].text!);
 }
 
-function use_memory_cloud() {
-	let snapshot: CloudSnapshot | null = null;
+function use_memory_cloud(initial: Library | null = null) {
+	let snapshot: CloudSnapshot | null = initial ? { library: initial, updated_at: "initial" } : null;
 	vi.mocked(fetch_library).mockImplementation(async () => snapshot);
 	vi.mocked(push_library).mockImplementation(async (_cloud, who, library) => {
 		expect(who).toEqual(account);
@@ -96,6 +98,34 @@ it("creates pages and builds real connected blocks from the shared catalog", asy
 		expect.objectContaining({ from: branch.block_id, output: "no", input: "send" }),
 	]));
 	await expect(call_mcp_tool(cloud, account, "update_block", { page_id: "gym-page", block_id: branch.block_id, settings: { else_enabled: false } })).rejects.toThrow("Else is still used");
+});
+
+it("rebuilds the native home allowance through only public catalog blocks", async () => {
+	vi.spyOn(release_flags, "native_format_four", "get").mockReturnValue(true);
+	const library = use_memory_cloud({ schema_version: 1, tools: [{ document: personal_routine, updated_at: "2026-09-29T00:00:00.000Z" }] });
+	const add = async (kind: string, options: Record<string, unknown> = {}) => parsed(await call_mcp_tool(cloud, account, "add_block", { page_id: personal_routine.id, kind, ...options }));
+	const home = await add("location", { name: "At home" });
+	const usage = await add("app_usage", { name: "Distraction time" });
+	const weekday_early = await add("time_window", { name: "Weekday early window", settings: { days: [2, 3, 4, 5], time: "18:00", end_time: "18:30" } });
+	const weekday_late = await add("time_window", { name: "Weekday late window", settings: { days: [2, 3, 4, 5], time: "19:00", end_time: "20:50" } });
+	const friday = await add("time_window", { name: "Friday window", settings: { days: [6], time: "14:30", end_time: "20:20" } });
+	const weekend = await add("time_window", { name: "Weekend window", settings: { days: [1, 7], time: "06:30", end_time: "20:30" } });
+	const weekday_window = await add("or", { name: "Either weekday window", inputs: { a: { block_id: weekday_early.block_id, output: "active" }, b: { block_id: weekday_late.block_id, output: "active" } } });
+	const weekday_used = await add("compare", { name: "Used 30 minutes", settings: { operator: "gte", value: 30 }, inputs: { value: { block_id: usage.block_id, output: "minutes" } } });
+	const friday_used = await add("compare", { name: "Used 120 minutes", settings: { operator: "gte", value: 120 }, inputs: { value: { block_id: usage.block_id, output: "minutes" } } });
+	const weekend_used = await add("compare", { name: "Used 180 minutes", settings: { operator: "gte", value: 180 }, inputs: { value: { block_id: usage.block_id, output: "minutes" } } });
+	const weekday_limit = await add("and", { name: "Weekday limit reached", inputs: { a: { block_id: weekday_window.block_id, output: "result" }, b: { block_id: weekday_used.block_id, output: "result" } } });
+	const friday_limit = await add("and", { name: "Friday limit reached", inputs: { a: { block_id: friday.block_id, output: "active" }, b: { block_id: friday_used.block_id, output: "result" } } });
+	const weekend_limit = await add("and", { name: "Weekend limit reached", inputs: { a: { block_id: weekend.block_id, output: "active" }, b: { block_id: weekend_used.block_id, output: "result" } } });
+	const first_limits = await add("or", { name: "Weekday or Friday limit", inputs: { a: { block_id: weekday_limit.block_id, output: "result" }, b: { block_id: friday_limit.block_id, output: "result" } } });
+	const all_limits = await add("or", { name: "Any daily limit", inputs: { a: { block_id: first_limits.block_id, output: "result" }, b: { block_id: weekend_limit.block_id, output: "result" } } });
+	const home_limit = await add("and", { name: "At home with limit reached", inputs: { a: { block_id: home.block_id, output: "present" }, b: { block_id: all_limits.block_id, output: "result" } } });
+	const completed = await add("app_gate", { name: "Block distractions", settings: { groups: ["Distractions"] }, inputs: { closed: { block_id: home_limit.block_id, output: "result" } } });
+	const document = library().tools[0].document;
+	const routines = completed.page.sections.routines as { kind: string }[];
+	expect(document.home_allowance).toEqual(requested_home_policy);
+	expect(routines.some(block => block.kind === "home_allowance")).toBe(false);
+	expect(routines).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "location" }), expect.objectContaining({ kind: "app_gate" })]));
 });
 
 it("updates and removes the same stored blocks", async () => {

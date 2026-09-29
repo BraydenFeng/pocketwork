@@ -1,4 +1,5 @@
 import { behavior_catalog, behavior_config_schema, is_behavior } from "./behaviors";
+import { is_block_authored_home_allowance } from "./background-allowance";
 import { add_connected_block, checked_document, creation_catalog, generated_storage, input_name, insert_page_block, is_page_kind, node_name, page_section, port_name, remove_connected_block, remove_page_block, set_source, visible_outputs, type CreationKind } from "./creation";
 import { block_schema, type AppDocument, type Block } from "./document";
 import { home_policy_schema } from "./home-policy";
@@ -74,6 +75,7 @@ export function block_catalog() {
 
 export function page_snapshot(document: AppDocument) {
 	const graph = graph_from_document(document);
+	const block_authored_allowance = is_block_authored_home_allowance(document);
 	const hidden_native = document.home_allowance ? new Set(document.blocks.filter(block => block.type === "schedule" || block.type === "screen_time").map(block => block.id)) : new Set<string>();
 	const page: SnapshotBlock[] = document.blocks.filter(block => !hidden_native.has(block.id)).map(block => {
 		const node = graph.nodes.find(item => item.id === block.id);
@@ -88,7 +90,7 @@ export function page_snapshot(document: AppDocument) {
 		outputs: block_outputs(graph, node),
 	}));
 	const routines = custom.filter(block => page_section(block.kind) === "routines");
-	if (document.home_allowance) {
+	if (document.home_allowance && !block_authored_allowance) {
 		routines.unshift({
 			id: home_allowance_block_id,
 			kind: "home_allowance",
