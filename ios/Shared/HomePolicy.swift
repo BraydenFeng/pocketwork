@@ -59,10 +59,38 @@ struct HomeLedger: Codable, Equatable {
 		return policy.calendar.component(.weekday, from: date)
 	}
 	func budget(_ base: Int) -> Int { min(1440, base + (bonuses ?? [:]).values.reduce(0,+)) }
+	mutating func set_bonus(_ key: String, minutes: Int) throws -> Bool {
+		guard (0...1440).contains(minutes) else { throw DocumentError.invalid("Choose 0 to 1440 bonus minutes.") }
+		let current = bonuses?[key] ?? 0
+		guard current != minutes else { return false }
+		if bonuses == nil { bonuses = [:] }
+		if minutes == 0 { bonuses?.removeValue(forKey: key) } else { bonuses?[key] = minutes }
+		pause()
+		return true
+	}
 	mutating func grant(_ key: String, minutes: Int) throws -> Bool {
 		guard (1...1440).contains(minutes) else { throw DocumentError.invalid("Choose 1 to 1440 bonus minutes.") }
 		if bonuses?[key] != nil { return false }
-		if bonuses == nil { bonuses = [:] }; bonuses?[key] = minutes; pause(); return true
+		return try set_bonus(key, minutes: minutes)
+	}
+	func usage_entries(policy: HomePolicy, now: Date) -> [BuilderEntry] {
+		var days = history ?? [:]
+		let today = policy.day_key(now)
+		let base = policy.rule(at: now)?.allowance_minutes ?? 0
+		if day == today {
+			days[today] = [used_minutes, budget(base)]
+		} else {
+			if !day.isEmpty {
+				let previous_base = policy.rules.first { $0.days.contains(HomeLedger.weekday(of: day, policy: policy)) }?.allowance_minutes ?? 0
+				days[day] = [used_minutes, budget(previous_base)]
+			}
+			days[today] = [0, base]
+		}
+		return days.compactMap { key, values in
+			let parts = key.split(separator: "-").compactMap { Int($0) }
+			guard parts.count == 3, values.count >= 2, let date = policy.calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2])) else { return nil }
+			return BuilderEntry(id: key, at: date.timeIntervalSince1970 * 1000, values: ["minutes":.number(Double(values[0])), "budget":.number(Double(values[1]))])
+		}.sorted { $0.at < $1.at }.suffix(StatusReport.history_days).map { $0 }
 	}
 	mutating func checkpoint(generation: String, minutes: Int, at_home: Bool) {
 		guard at_home, self.generation == generation, minutes > 0 else { return }

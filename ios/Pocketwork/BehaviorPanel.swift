@@ -54,7 +54,16 @@ struct BehaviorPanel: View {
 			}.onAppear { visible = true; load(graph); Task { if graph.nodes.contains(where: { $0.kind == "health" }) { await health.refresh(graph.nodes.filter { $0.kind == "health" }.map { $0.config.metric ?? "steps" }) }; await run() } }
 			.onDisappear { visible = false; release_gates() }
 			.onChange(of: paused) { _, value in if value { release_gates() } else { reconcile_actions = true } }
-			.onChange(of: scene_phase) { _, value in if value != .active { release_gates() } else { reconcile_actions = true } }
+			.onChange(of: scene_phase) { _, value in
+				if value != .active { release_gates() }
+				else {
+					reconcile_actions = true
+					Task {
+						if graph.nodes.contains(where: { $0.kind == "health" }) { await health.refresh(graph.nodes.filter { $0.kind == "health" }.map { $0.config.metric ?? "steps" }) }
+						await run()
+					}
+				}
+			}
 			.sheet(isPresented: $groups_open) { NavigationStack { GroupsView().toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { groups_open = false; reconcile_actions = true } } } } }
 			.onChange(of: graph) { _, next in load(next) }
 			.onChange(of: library.behavior_owner_key) { _, _ in load(graph) }
@@ -88,9 +97,10 @@ struct BehaviorPanel: View {
 			let now = Date(); let testing = CommandLine.arguments.contains("--ui-testing")
 			var used: Double?
 			var allowance: Int?
+			var usage_history: [BuilderEntry]?
 			if !testing && (document.home_allowance != nil || graph.nodes.contains(where: { $0.kind == "app_usage" })) {
 				let snapshot = try await HomeWorker.run { try HomeEngine.snapshot() }
-				if let policy = snapshot.document?.home_allowance { used = snapshot.ledger.day == policy.day_key(now) ? Double(snapshot.ledger.used_minutes) : 0; let base = policy.rule(at: now)?.allowance_minutes ?? 0; allowance = snapshot.ledger.day == policy.day_key(now) ? snapshot.ledger.budget(base) : base }
+				if let policy = snapshot.document?.home_allowance { used = snapshot.ledger.day == policy.day_key(now) ? Double(snapshot.ledger.used_minutes) : 0; let base = policy.rule(at: now)?.allowance_minutes ?? 0; allowance = snapshot.ledger.day == policy.day_key(now) ? snapshot.ledger.budget(base) : base; usage_history = snapshot.ledger.usage_entries(policy: policy, now: now) }
 			}
 			guard key == storage_key, run_epoch == epoch, visible, !paused, scene_phase == .active else { return }
 			if let session = sessions.session, session.document_id == document.id { timer_end = session.ends_at }
@@ -110,7 +120,7 @@ struct BehaviorPanel: View {
 				external["daily-allowance"] = ["reached":signal(reached,String(reached))]
 				external["daily-allowance"]?["reached"]?.available = used != nil
 			}
-			let result = try BehaviorRuntime.run(graph, state: state, context: BehaviorContext(now: now, at_location: location, usage_minutes: used, tap: tap, external: external, inputs: inputs, submission: submission, health: health.values, reconcile_actions: reconcile_actions, timer_command: timer_command))
+			let result = try BehaviorRuntime.run(graph, state: state, context: BehaviorContext(now: now, at_location: location, usage_minutes: used, usage_history: usage_history, tap: tap, external: external, inputs: inputs, submission: submission, health: health.values, reconcile_actions: reconcile_actions, timer_command: timer_command))
 			if !testing {
 				let id = document.id, groups = library.groups, active_nodes = Set(graph.nodes.filter { $0.kind == "app_gate" }.map(\.id)), reconcile = reconcile_actions
 				try await HomeWorker.run {

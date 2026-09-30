@@ -37,7 +37,7 @@ struct BehaviorGraph: Codable, Equatable {
 		"location": ([:], ["present":"boolean", "away":"boolean"]),
 		"button": ([:], ["pressed":"boolean"]), "check_in": ([:], ["done":"boolean"]),
 		"arrive": ([:], ["arrived":"boolean"]), "leave": ([:], ["left":"boolean"]),
-		"clock": ([:], ["due":"boolean"]), "app_usage": ([:], ["minutes":"number", "reached":"boolean"]),
+		"clock": ([:], ["due":"boolean"]), "app_usage": ([:], ["minutes":"number", "reached":"boolean", "history":"table"]),
 		"and": (["a":"boolean", "b":"boolean"], ["result":"boolean"]), "or": (["a":"boolean", "b":"boolean"], ["result":"boolean"]),
 		"not": (["condition":"boolean"], ["result":"boolean"]), "branch": (["condition":"boolean"], ["yes":"boolean", "no":"boolean"]),
 		"delay": (["start":"boolean"], ["done":"boolean"]), "variable": (["set":"number"], ["value":"number"]),
@@ -49,6 +49,7 @@ struct BehaviorGraph: Codable, Equatable {
 		var result = ports[kind] ?? (inputs: [:], outputs: [:])
 		if kind == "form" { for field in config?.fields ?? BuilderRuntime.fields { result.outputs[field.id] = field.type } }
 		if kind == "record" { result.inputs = Dictionary(uniqueKeysWithValues: (config?.fields ?? BuilderRuntime.fields).map { ($0.id, $0.type) }) }
+		if kind == "calculate", config?.operation == "floor" { result.inputs.removeValue(forKey: "b") }
 		return result
 	}
 	func ordered(external: [String: [String: String]], require_inputs: Bool = true) throws -> [BehaviorNode] {
@@ -95,6 +96,7 @@ struct BehaviorContext {
 	var now: Date
 	var at_location: Bool?
 	var usage_minutes: Double?
+	var usage_history: [BuilderEntry]? = nil
 	var tap: String?
 	var external: [String: [String: BehaviorSignal]] = [:]
 	var inputs: [String: BuilderValue] = [:]
@@ -170,7 +172,10 @@ enum BehaviorRuntime {
 				} else {
 					state.pending.append(BehaviorPending(id: node.id, at: context.now.timeIntervalSince1970 + duration, token: pulse)); boolean("due", false, "")
 				}
-			case "app_usage": emit("minutes", context.usage_minutes ?? 0); boolean("reached", context.usage_minutes.map { $0 >= c.value } ?? false, day); output["minutes"]?.available = context.usage_minutes != nil; output["reached"]?.available = context.usage_minutes != nil
+			case "app_usage":
+				emit("minutes", context.usage_minutes ?? 0); boolean("reached", context.usage_minutes.map { $0 >= c.value } ?? false, day)
+				output["history"] = BehaviorSignal(value: 0, token: day, type: "table", available: context.usage_history != nil, rows: context.usage_history ?? [])
+				output["minutes"]?.available = context.usage_minutes != nil; output["reached"]?.available = context.usage_minutes != nil
 			case "and", "or": let a = input("a"), b = input("b"); boolean("result", node.kind == "and" ? a.value != 0 && b.value != 0 : a.value != 0 || b.value != 0, (a.value != 0 ? a.token : "") + ":" + (b.value != 0 ? b.token : ""))
 			case "not": boolean("result", input("condition").value == 0)
 			case "branch": boolean("yes", input("condition").value != 0, input("condition").token); boolean("no", input("condition").value == 0)

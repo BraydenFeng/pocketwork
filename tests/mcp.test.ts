@@ -41,6 +41,8 @@ it("advertises Every only after the format-5 phone rollout", async () => {
 	vi.spyOn(release_flags, "native_format_five", "get").mockReturnValue(true);
 	catalog = parsed(await call_mcp_tool(cloud, account, "get_block_catalog", {}));
 	expect(catalog.blocks).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "interval", name: "Every", settings: ["value", "interval_unit"], outputs: [expect.objectContaining({ output: "due", label: "every interval" })] })]));
+	expect(catalog.blocks.find((block: { kind: string }) => block.kind === "add_allowance").inputs).toEqual(expect.arrayContaining([expect.objectContaining({ input: "minutes" })]));
+	expect(catalog.blocks.find((block: { kind: string }) => block.kind === "app_usage").outputs).toEqual(expect.arrayContaining([expect.objectContaining({ output: "history" })]));
 });
 
 it("creates an Every block through the shared MCP model once format 5 is available", async () => {
@@ -53,6 +55,29 @@ it("creates an Every block through the shared MCP model once format 5 is availab
 	await call_mcp_tool(cloud, account, "add_block", { page_id: "hourly", kind: "reminder", settings: { message: "One hour passed." }, inputs: { send: { block_id: every.block_id, output: "due" } } });
 	expect(library().tools[0].document.schema_version).toBe(5);
 	expect(library().tools[0].document.behaviors?.connections).toContainEqual(expect.objectContaining({ from: every.block_id, output: "due", input: "send" }));
+});
+
+it("builds calculated Screen Time rewards and a usage chart through public MCP blocks", async () => {
+	vi.spyOn(release_flags, "native_format_four", "get").mockReturnValue(true);
+	vi.spyOn(release_flags, "native_format_five", "get").mockReturnValue(true);
+	const library = use_memory_cloud({ schema_version: 1, tools: [{ document: personal_routine, updated_at: "2026-09-29T00:00:00.000Z" }] });
+	const add = async (kind: string, options: Record<string, unknown> = {}) => parsed(await call_mcp_tool(cloud, account, "add_block", { page_id: personal_routine.id, kind, ...options }));
+	const steps = await add("health", { name: "Today's steps", settings: { metric: "steps" } });
+	const step_size = await add("number_input", { name: "Steps per reward", settings: { value: 3000 } });
+	const groups = await add("calculate", { name: "Step groups", settings: { operation: "divide" }, inputs: { a: { block_id: steps.block_id, output: "value" }, b: { block_id: step_size.block_id, output: "value" } } });
+	const whole_groups = await add("calculate", { name: "Whole step groups", settings: { operation: "floor" }, inputs: { a: { block_id: groups.block_id, output: "value" } } });
+	const reward_size = await add("number_input", { name: "Minutes per reward", settings: { value: 40 } });
+	const reward_minutes = await add("calculate", { name: "Earned minutes", settings: { operation: "multiply" }, inputs: { a: { block_id: whole_groups.block_id, output: "value" }, b: { block_id: reward_size.block_id, output: "value" } } });
+	const weekend = await add("time_window", { name: "Weekend", settings: { days: [1, 7], time: "00:00", end_time: "23:59" } });
+	await add("add_allowance", { name: "Add earned weekend time", inputs: { grant: { block_id: weekend.block_id, output: "active" }, minutes: { block_id: reward_minutes.block_id, output: "value" } } });
+	const usage = await add("app_usage", { name: "Distraction time" });
+	await add("chart", { name: "Distraction time over time", settings: { field: "minutes" }, inputs: { rows: { block_id: usage.block_id, output: "history" } } });
+	const document = library().tools[0].document;
+	expect(document.schema_version).toBe(5);
+	expect(document.behaviors?.connections).toEqual(expect.arrayContaining([
+		expect.objectContaining({ from: reward_minutes.block_id, output: "value", input: "minutes" }),
+		expect.objectContaining({ from: usage.block_id, output: "history", input: "rows" }),
+	]));
 });
 
 it("advertises block operations instead of raw graphs, documents, or presets", () => {

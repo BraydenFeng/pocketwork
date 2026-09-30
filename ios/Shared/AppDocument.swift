@@ -179,7 +179,7 @@ struct AppDocument: Codable, Equatable {
 		guard (schema_version >= 3) == (behaviors != nil) else { throw DocumentError.invalid("Connected behaviors require routine format 3, 4, or 5.") }
 		if let behaviors {
 			guard schema_version >= 4 || !PrimitiveRuntime.requires_four(behaviors) else { throw DocumentError.invalid("These blocks require routine format 4 or newer.") }
-			guard schema_version >= 5 || !PrimitiveRuntime.requires_five(behaviors) else { throw DocumentError.invalid("The Every block requires routine format 5.") }
+			guard schema_version >= 5 || !PrimitiveRuntime.requires_five(behaviors) else { throw DocumentError.invalid("These newer blocks require routine format 5.") }
 			_ = try behaviors.ordered(external: behavior_external_ports)
 		}
 		try Self.validate_id(id)

@@ -34,4 +34,14 @@ final class HomePolicyTests: XCTestCase {
 		var bad = policy; bad.rules[0].windows[1].start = "18:20"
 		XCTAssertThrowsError(try bad.validate())
 	}
+	func test_bonus_updates_and_usage_entries_include_today() throws {
+		let now = ISO8601DateFormatter().date(from: "2026-09-20T19:00:00Z")!
+		var ledger = HomeLedger(day: policy.day_key(now), used_minutes: 35, segment_base: 35, generation: "active", bonuses: [:], history: ["2026-9-19":[20,60]])
+		XCTAssertTrue(try ledger.set_bonus("steps", minutes: 80)); XCTAssertEqual(ledger.budget(180), 260); XCTAssertNil(ledger.generation)
+		XCTAssertTrue(try ledger.set_bonus("steps", minutes: 120)); XCTAssertEqual(ledger.budget(180), 300)
+		XCTAssertFalse(try ledger.set_bonus("steps", minutes: 120))
+		let entries = ledger.usage_entries(policy: policy, now: now)
+		XCTAssertEqual(entries.map(\.id), ["2026-9-19", "2026-9-20"])
+		XCTAssertEqual(entries.last?.values["minutes"], .number(35)); XCTAssertEqual(entries.last?.values["budget"], .number(300))
+	}
 }

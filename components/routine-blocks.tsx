@@ -25,12 +25,13 @@ export function RoutineBlocks({ graph, selected, section, leading_block, native_
 }) {
 	const visible_blocks = graph.nodes.filter(node => is_behavior(node.kind) && page_section(node.kind) === section && !generated_storage(graph, node));
 	function update(node: LogicNode) {
+		const ports = node_ports(node);
 		on_change({
 			...graph,
 			nodes: graph.nodes.map(item => item.id === node.id ? node : item),
-			connections: node.kind === "change_value" && node.config?.change === "reset"
+			connections: (node.kind === "change_value" && node.config?.change === "reset"
 				? graph.connections.filter(edge => edge.to !== node.id || edge.input !== "amount")
-				: graph.connections,
+				: graph.connections).filter(edge => edge.to !== node.id || ports.inputs.includes(edge.input)).filter(edge => edge.from !== node.id || ports.outputs.includes(edge.output)),
 		});
 	}
 	function remove(node: LogicNode) {
@@ -57,7 +58,7 @@ export function RoutineBlocks({ graph, selected, section, leading_block, native_
 		return <label key={input} className="block-property"><span>{label}</span><select aria-label={`${label}: ${node_name(node)}`} value={edge ? `${edge.from}:${edge.output}` : ""} onChange={event => {
 			try { on_change(set_source(graph, node.id, input, event.target.value)); }
 			catch (failure) { on_error(failure instanceof Error ? failure.message : "That block cannot be used here."); }
-		}}><option value="">{optional ? ["amount", "duration", "threshold", "target"].includes(input) ? "Use the fixed value above" : "None" : "Choose a block…"}</option>{options.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</select>{!options.length && !optional && <span className="block-help">Add a compatible block first.</span>}</label>;
+		}}><option value="">{optional ? ["amount", "duration", "threshold", "target", "minutes"].includes(input) ? "Use the fixed value above" : "None" : "Choose a block…"}</option>{options.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</select>{!options.length && !optional && <span className="block-help">Add a compatible block first.</span>}</label>;
 	}
 	const title = section === "data" ? "Data" : "Routines";
 	const description = section === "data" ? "Values, logs, and things you can display." : "Events, conditions, and actions.";
@@ -101,7 +102,7 @@ function NodeSettings({ node, graph, native_background, patch }: { node: LogicNo
 		<PrimitiveSettings node={node} graph={graph} patch={patch} />
 		{node.kind === "number_input" && <NumberField label="Initial value" value={config.value} min={-1000000} max={1000000} on_commit={value => patch({ value })} />}
 		{node.kind === "progress" && !graph.connections.some(edge => edge.to === node.id && edge.input === "target") && <NumberField label="Target" value={config.value} min={1} max={1000000} on_commit={value => patch({ value })} />}
-		{node.kind === "add_allowance" && <NumberField label="Minutes to award" value={config.minutes} min={1} max={1440} unit="minutes" on_commit={minutes => patch({ minutes })} />}
+		{node.kind === "add_allowance" && !graph.connections.some(edge => edge.to === node.id && edge.input === "minutes") && <NumberField label="Minutes to award" value={config.minutes} min={1} max={1440} unit="minutes" on_commit={minutes => patch({ minutes })} />}
 		{["count", "goal", "compare", "app_usage"].includes(node.kind) && !graph.connections.some(edge => edge.to === node.id && edge.input === "threshold") && <NumberField label={node.kind === "count" ? "Add each time" : node.kind === "goal" ? "Target" : "Value"} value={config.value} min={-1000000} max={1000000} integer={false} on_commit={value => patch({ value })} />}
 		{node.kind === "compare" && <label className="block-property"><span>Condition</span><select value={config.operator} onChange={event => patch({ operator: event.target.value as BehaviorConfig["operator"] })}><option value="gte">At least</option><option value="gt">More than</option><option value="eq">Exactly</option><option value="lt">Less than</option><option value="lte">At most</option></select></label>}
 		{node.kind === "delay" && <NumberField label="Wait" value={config.minutes} min={1} max={1440} unit="minutes" on_commit={minutes => patch({ minutes })} />}
@@ -112,7 +113,7 @@ function NodeSettings({ node, graph, native_background, patch }: { node: LogicNo
 		{node.kind === "app_gate" && <><label className="block-property"><span>App groups</span><InlineText label="App groups to control" value={(config.groups ?? []).join(", ")} placeholder="Social, Games" max_length={400} on_commit={value => patch({ groups: [...new Set(value.split(",").map(name => name.trim()).filter(Boolean))] })} /></label><p>Separate names with commas. Choose the actual apps privately on your iPhone.</p></>}
 		{["chart", "number_input", "progress", "add_allowance"].includes(node.kind) ? null : node.kind === "aggregate" ? <label className="block-property"><span>Calculate</span><select value={config.operation ?? "sum"} onChange={event => patch({ operation: event.target.value as BehaviorConfig["operation"] })}>{["sum", "average", "minimum", "maximum", "count"].map(value => <option value={value} key={value}>{value}</option>)}</select></label> : <BuilderSettings node={node} patch={patch} advanced={false} />}
 		{["location", "arrive", "leave"].includes(node.kind) && <p className="block-help">{native_background && node.kind === "location" ? "Uses the saved location on your iPhone as part of this background allowance." : "Uses the single saved location on your iPhone. This event currently checks while the page is open."}</p>}
-		{node.kind === "add_allowance" && <p className="block-help">Requires an enabled home allowance on the phone. Its location and time rules still apply.</p>}
-		{node.kind === "app_usage" && <p className="block-help">Uses Apple Screen Time. It currently reads minutes counted by your home allowance. Separate totals for each app are not available.</p>}
+		{node.kind === "add_allowance" && <p className="block-help">Requires an enabled home allowance on the phone. Connect a number to update the reward as that number changes.</p>}
+		{node.kind === "app_usage" && <p className="block-help">Uses Apple Screen Time. Minutes are counted by your home allowance; History contains up to 30 days for charts and tables.</p>}
 	</div>;
 }

@@ -34,7 +34,7 @@ enum BuilderRuntime {
 		"form": ([:], ["submitted":"boolean", "record":"record"]), "save_entry": (["record":"record", "save":"boolean", "clear":"boolean"], ["rows":"table", "count":"number", "saved":"boolean"]),
 		"aggregate": (["rows":"table"], ["value":"number"]), "calculate": (["a":"number", "b":"number"], ["value":"number"]), "text_compare": (["text":"text"], ["result":"boolean"]),
 		"table": (["rows":"table"], ["rows":"table"]), "chart": (["rows":"table"], ["rows":"table"]), "progress": (["value":"number", "target":"number"], ["value":"number", "fraction":"number", "target":"number"]),
-		"health": ([:], ["value":"number"]), "app_gate": (["closed":"boolean"], ["active":"boolean"]), "add_allowance": (["grant":"boolean"], ["granted":"boolean"])
+		"health": ([:], ["value":"number"]), "app_gate": (["closed":"boolean"], ["active":"boolean"]), "add_allowance": (["grant":"boolean", "minutes":"number"], ["granted":"boolean"])
 	]
 	static func validate(_ node: BehaviorNode) throws {
 		let c = node.config
@@ -43,8 +43,8 @@ enum BuilderRuntime {
 			for field in fields { guard field.id.range(of: "^[a-zA-Z][a-zA-Z0-9_]{0,31}$", options: .regularExpression) != nil, !["record", "submitted", "__proto__", "constructor", "prototype"].contains(field.id), !field.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, field.label.count <= 80, ["number","text","boolean"].contains(field.type) else { throw DocumentError.invalid("Invalid form field.") } }
 		}
 		guard (c.field?.count ?? 0) <= 32, (c.text?.count ?? 0) <= 240, c.metric == nil || health_metrics.contains(c.metric!), (c.groups?.count ?? 0) <= 20, c.groups?.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.count <= 40 }) ?? true else { throw DocumentError.invalid("Invalid block settings.") }
-		let allowed = ["calculate":["add","subtract","multiply","divide"], "aggregate":["sum","average","minimum","maximum","count"], "text_compare":["equals","contains","starts_with"]]
-		if let operation = c.operation { guard ["add","subtract","multiply","divide","sum","average","minimum","maximum","count","equals","contains","starts_with"].contains(operation), allowed[node.kind]?.contains(operation) ?? true else { throw DocumentError.invalid("Choose an operation supported by this block.") } }
+		let allowed = ["calculate":["add","subtract","multiply","divide","floor"], "aggregate":["sum","average","minimum","maximum","count"], "text_compare":["equals","contains","starts_with"]]
+		if let operation = c.operation { guard ["add","subtract","multiply","divide","floor","sum","average","minimum","maximum","count","equals","contains","starts_with"].contains(operation), allowed[node.kind]?.contains(operation) ?? true else { throw DocumentError.invalid("Choose an operation supported by this block.") } }
 		if node.kind == "app_gate" { guard !(c.groups ?? []).isEmpty else { throw DocumentError.invalid("Choose at least one app group for App gate.") } }
 	}
 	static func run(_ node: BehaviorNode, state: inout BehaviorState, context: BehaviorContext, signals: [String: [String: BehaviorSignal]], connections: [BehaviorEdge], actions: inout [BuilderAction], day: String, primitive_events: Bool = false) throws -> [String: BehaviorSignal] {
@@ -83,13 +83,20 @@ enum BuilderRuntime {
 			switch operation { case "count": value = Double(rows.count); case "average": value = values.isEmpty ? 0 : values.reduce(0,+)/Double(values.count); case "minimum": value = values.min() ?? 0; case "maximum": value = values.max() ?? 0; default: value = values.reduce(0,+) }; emit("value", value)
 		case "calculate":
 			let a = input("a").value, b = input("b").value; let value: Double
-			switch c.operation ?? "add" { case "subtract": value = a-b; case "multiply": value = a*b; case "divide": value = a/b; default: value = a+b }; emit("value", value)
+			switch c.operation ?? "add" { case "subtract": value = a-b; case "multiply": value = a*b; case "divide": value = a/b; case "floor": value = floor(a); default: value = a+b }; emit("value", value)
 		case "text_compare": let text = input("text").text ?? "", target = c.text ?? ""; let matches = c.operation == "contains" ? text.contains(target) : c.operation == "starts_with" ? text.hasPrefix(target) : text == target; emit("result", matches ? 1 : 0)
 		case "table", "chart": output["rows"] = input("rows")
 		case "progress": let value = input("value").value; let target = connections.contains { $0.to == node.id && $0.input == "target" } ? input("target").value : c.value; emit("value", value); emit("target", target); emit("fraction", target > 0 ? max(0,min(1,value/target)) : 0)
 		case "health": let value = context.health[c.metric ?? "steps"]; emit("value", value ?? 0); output["value"]?.available = value != nil
 		case "app_gate": let active = input("closed").value != 0; if data.gates[node.id] != active || context.reconcile_actions { actions.append(BuilderAction(id: node.id, kind: node.kind, token: node.id + ":" + String(active), active: active, groups: c.groups ?? [])); data.gates[node.id] = active }; emit("active", active ? 1 : 0)
-		case "add_allowance": let grant = input("grant").value != 0 && data.rewards[node.id] != day; if grant { actions.append(BuilderAction(id: node.id, kind: node.kind, token: node.id + ":" + day, minutes: c.minutes)); data.rewards[node.id] = day }; emit("granted", grant ? 1 : 0, token: day)
+		case "add_allowance":
+			let dynamic = connections.contains { $0.to == node.id && $0.input == "minutes" }
+			let minutes = dynamic ? floor(input("minutes").value) : c.minutes
+			guard minutes.isFinite, (0...1440).contains(minutes) else { throw DocumentError.invalid("Screen-time rewards must be between 0 and 1,440 minutes.") }
+			let token = dynamic ? day + ":" + String(Int(minutes)) : day
+			let grant = input("grant").value != 0 && minutes > 0 && data.rewards[node.id] != token
+			if grant { actions.append(BuilderAction(id: node.id, kind: node.kind, token: node.id + ":" + token, minutes: minutes)); data.rewards[node.id] = token }
+			emit("granted", grant ? 1 : 0, token: token)
 		default: throw DocumentError.invalid("Unknown building block.")
 		}
 		state.data = data

@@ -47,7 +47,7 @@ export const document_schema = z.object({
 	if (document.home_allowance && (!document.blocks.some((b) => b.type === "schedule") || !document.rules.block_during_focus || !document.blocks.some((b) => b.type === "screen_time" && b.mode === "block" && b.groups?.length === 1))) { context.addIssue({ code: "custom", message: "Home allowances require a schedule and one distraction group in block mode." }); }
 	if ((document.schema_version >= 3) !== Boolean(document.behaviors)) { context.addIssue({ code: "custom", message: "Custom blocks require page format 3, 4, or 5 and the updated phone app." }); }
 	if (document.behaviors && requires_format_four(document.behaviors) && document.schema_version < 4) { context.addIssue({ code: "custom", message: "These building blocks require routine format 4 or newer and a compatible phone update." }); }
-	if (document.behaviors && requires_format_five(document.behaviors) && document.schema_version < 5) { context.addIssue({ code: "custom", message: "The Every block requires routine format 5 and a compatible phone update." }); }
+	if (document.behaviors && requires_format_five(document.behaviors) && document.schema_version < 5) { context.addIssue({ code: "custom", message: "These newer blocks require routine format 5 and a compatible phone update." }); }
 	if (document.behaviors) {
 		const ports: Record<string, Record<string, "boolean" | "number">> = {};
 		for (const block of document.blocks) { if (block.type === "timer") { ports[block.id] = { active: "boolean", finished: "boolean" }; } if (block.type === "schedule") { ports[block.id] = { active: "boolean", outside: "boolean" }; } }

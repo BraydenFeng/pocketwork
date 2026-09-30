@@ -61,6 +61,34 @@ describe("user-defined variables", () => {
 });
 
 describe("general timers and records", () => {
+	it("calculates a changing weekend Screen Time reward from steps", () => {
+		const graph: Behaviors = {
+			nodes: [
+				node("weekend", "checkbox"), node("steps", "health", { metric: "steps" }), node("step_size", "number_input", { value: 3000 }),
+				node("groups", "calculate", { operation: "divide" }), node("whole_groups", "calculate", { operation: "floor" }),
+				node("reward_size", "number_input", { value: 40 }), node("reward_minutes", "calculate", { operation: "multiply" }), node("reward", "add_allowance"),
+			],
+			connections: [
+				wire("steps", "value", "groups", "a"), wire("step_size", "value", "groups", "b"), wire("groups", "value", "whole_groups", "a"),
+				wire("whole_groups", "value", "reward_minutes", "a"), wire("reward_size", "value", "reward_minutes", "b"),
+				wire("weekend", "checked", "reward", "grant"), wire("reward_minutes", "value", "reward", "minutes"),
+			],
+		};
+		let result = run_behaviors(graph, initial_behaviors(), { now: 0, health: { steps: 7500 }, inputs: { weekend: true } });
+		expect(result.actions).toContainEqual(expect.objectContaining({ kind: "add_allowance", minutes: 80 }));
+		result = run_behaviors(graph, result.state, { now: 1000, health: { steps: 7500 } });
+		expect(result.actions).toEqual([]);
+		result = run_behaviors(graph, result.state, { now: 2000, health: { steps: 9000 } });
+		expect(result.actions).toContainEqual(expect.objectContaining({ kind: "add_allowance", minutes: 120 }));
+		const document = compile_graph(blank_tool(), { ...graph_from_document(blank_tool()), nodes: graph.nodes, connections: graph.connections });
+		expect(document.schema_version).toBe(5); expect(document_schema.safeParse({ ...document, schema_version: 4 }).success).toBe(false);
+	});
+	it("feeds Screen Time history into a normal chart", () => {
+		const graph: Behaviors = { nodes: [node("usage", "app_usage"), node("chart", "chart", { field: "minutes" })], connections: [wire("usage", "history", "chart", "rows")] };
+		const history = [{ id: "2026-09-29", at: 1, values: { minutes: 42, budget: 60 } }];
+		const result = run_behaviors(graph, initial_behaviors(), { now: 0, usage_minutes: 42, usage_history: history });
+		expect(result.signals.chart.rows.value).toEqual(history);
+	});
 	it("emits one event per interval without firing immediately or replaying every missed event", () => {
 		const graph: Behaviors = { nodes: [node("every", "interval", { value: 1, interval_unit: "hours" }), node("count", "count")], connections: [wire("every", "due", "count", "increment")] };
 		let result = run_behaviors(graph, initial_behaviors(), { now: 0 });

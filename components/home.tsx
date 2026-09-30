@@ -1,6 +1,6 @@
 "use client";
 
-import { native_format_four } from "@/lib/release-flags";
+import { native_format_five, native_format_four } from "@/lib/release-flags";
 
 import { useRef } from "react";
 import { useState } from "react";
@@ -73,7 +73,7 @@ export function Home({ library, now, error, notice, storage_blocked, phone_statu
 				{tools.length ? <ul className="tool-grid" aria-label="Your pages">{tools.map((entry) => {
 					const schedule = entry.document.blocks.find((block) => block.type === "schedule");
 					return <li key={entry.document.id} className="tool-card">
-					<button type="button" className="tool-open" onClick={() => on_open(entry.document.id)} aria-label={`Open ${entry.document.name}`}><strong>{entry.document.name}</strong><span className="tool-summary">{summarize_tool(entry.document)}</span>{entry.document.description && <span className="supporting">{entry.document.description}</span>}<span className="tool-meta">{entry.document.schema_version === 4 && !native_format_four ? "Local draft · phone update required" : phone_line(entry.document) ?? (entry.document.home_allowance ? (entry.document.enabled ? "Home allowance enabled" : "Home allowance off") : schedule?.type === "schedule" ? describe_status(schedule, entry.document.enabled === true, now) : format_edited(entry.updated_at, now))}</span></button>
+					<button type="button" className="tool-open" onClick={() => on_open(entry.document.id)} aria-label={`Open ${entry.document.name}`}><strong>{entry.document.name}</strong><span className="tool-summary">{summarize_tool(entry.document)}</span>{entry.document.description && <span className="supporting">{entry.document.description}</span>}<span className="tool-meta">{(entry.document.schema_version === 5 && !native_format_five) || (entry.document.schema_version === 4 && !native_format_four) ? "Local draft · phone update required" : phone_line(entry.document) ?? (entry.document.home_allowance ? (entry.document.enabled ? "Home allowance enabled" : "Home allowance off") : schedule?.type === "schedule" ? describe_status(schedule, entry.document.enabled === true, now) : format_edited(entry.updated_at, now))}</span></button>
 					<div className="tool-actions">{is_standing(entry.document) && !entry.document.home_allowance && <label className="card-switch"><input type="checkbox" role="switch" aria-label={`Switch ${entry.document.name} on or off`} checked={entry.document.enabled === true} onChange={(event) => on_toggle(entry.document.id, event.target.checked)} /><span>{entry.document.enabled ? "On" : "Off"}</span></label>}<button type="button" className="text-button" onClick={() => on_duplicate(entry.document.id)} aria-label={`Duplicate ${entry.document.name}`}><Copy />Duplicate</button><button type="button" className="text-button is-danger" onClick={() => on_delete(entry.document.id)} aria-label={`Delete ${entry.document.name}`}><Trash2 />Delete</button></div>
 				</li>; })}</ul> : <p className="empty-hint home-empty">Start with a blank page. Add routines to make things happen, and data to keep track. Your first three pages are free, including MCP and sync.</p>}
 			</section>

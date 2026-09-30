@@ -20,7 +20,7 @@ export function BehaviorRunner({ graph, simple = false }: { graph: LogicGraph; s
 	function run(tap?: string, next_location = location, now = Date.now()+offset, event: Partial<BehaviorContext> = {}) {
 		try {
 			const external = Object.fromEntries(graph.nodes.filter(n => !is_behavior(n.kind)).map(n => [n.id, Object.fromEntries(Object.entries(legacy_ports(n)).map(([port, type]) => [port, { value: type === "number" ? usage : n.kind === "home" ? next_location : false, token: String(next_location) }]))]));
-			const result = run_behaviors(behavior_part(graph), current.current, { ...event, health, now, at_location: next_location, usage_minutes: usage, tap, external });
+			const result = run_behaviors(behavior_part(graph), current.current, { ...event, health, now, at_location: next_location, usage_minutes: usage, usage_history: [{ id: "simulated-today", at: now, values: { minutes: usage, budget: 60 } }], tap, external });
 			current.current = result.state; set_state(result.state); set_outputs(result.signals); set_messages(previous => [...previous, ...result.effects.map(e => e.message), ...result.actions.map(a => a.kind === "add_allowance" ? `Simulated: +${a.minutes} minutes` : `Simulated: app gate ${a.active ? "closed" : "open"}`)].slice(-8)); set_error(null);
 		} catch (failure) { set_error(failure instanceof Error ? failure.message : "Could not run this page."); }
 	}

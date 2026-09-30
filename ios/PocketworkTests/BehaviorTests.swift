@@ -64,4 +64,32 @@ final class BehaviorTests: XCTestCase {
 		state.reconcile(from: old, to: next)
 		XCTAssertNil(state.values["count"]); XCTAssertNil(state.fired["count.increment"])
 	}
+
+	func testCalculatedScreenTimeRewardAndUsageHistory() throws {
+		func config(_ label: String, operation: String? = nil, value: Double = 1, metric: String? = nil, field: String? = nil) -> BehaviorConfig {
+			BehaviorConfig(label: label, value: value, minutes: 5, time: "18:00", days: [1,2,3,4,5,6,7], message: "", operator: "gte", field: field, operation: operation, metric: metric)
+		}
+		func node(_ id: String, _ kind: String, _ config: BehaviorConfig) -> BehaviorNode { BehaviorNode(id: id, kind: kind, x: 0, y: 0, config: config) }
+		func edge(_ from: String, _ output: String, _ to: String, _ input: String) -> BehaviorEdge { BehaviorEdge(from: from, output: output, to: to, input: input) }
+		let graph = BehaviorGraph(nodes: [
+			node("weekend", "checkbox", config("Weekend")), node("steps", "health", config("Steps", metric: "steps")),
+			node("step_size", "number_input", config("Step size", value: 3000)), node("groups", "calculate", config("Groups", operation: "divide")),
+			node("whole", "calculate", config("Whole groups", operation: "floor")), node("reward_size", "number_input", config("Reward size", value: 40)),
+			node("minutes", "calculate", config("Minutes", operation: "multiply")), node("reward", "add_allowance", config("Reward")),
+			node("usage", "app_usage", config("Usage")), node("chart", "chart", config("Chart", field: "minutes")),
+		], connections: [
+			edge("steps", "value", "groups", "a"), edge("step_size", "value", "groups", "b"), edge("groups", "value", "whole", "a"),
+			edge("whole", "value", "minutes", "a"), edge("reward_size", "value", "minutes", "b"), edge("weekend", "checked", "reward", "grant"),
+			edge("minutes", "value", "reward", "minutes"), edge("usage", "history", "chart", "rows"),
+		])
+		let history = [BuilderEntry(id: "2026-09-29", at: 1, values: ["minutes":.number(42), "budget":.number(60)])]
+		var result = try BehaviorRuntime.run(graph, state: BehaviorState(), context: BehaviorContext(now: Date(timeIntervalSince1970: 0), at_location: nil, usage_minutes: 42, usage_history: history, tap: nil, inputs: ["weekend":.boolean(true)], health: ["steps":7500]))
+		XCTAssertEqual(result.actions.first?.minutes, 80); XCTAssertEqual(result.signals["chart"]?["rows"]?.rows, history)
+		result = try BehaviorRuntime.run(graph, state: result.state, context: BehaviorContext(now: Date(timeIntervalSince1970: 1), at_location: nil, usage_minutes: 42, usage_history: history, tap: nil, health: ["steps":7500]))
+		XCTAssertTrue(result.actions.isEmpty)
+		result = try BehaviorRuntime.run(graph, state: result.state, context: BehaviorContext(now: Date(timeIntervalSince1970: 2), at_location: nil, usage_minutes: 42, usage_history: history, tap: nil, health: ["steps":9000]))
+		XCTAssertEqual(result.actions.first?.minutes, 120)
+		var document = AppDocument.blank(); document.schema_version = 5; document.behaviors = graph
+		XCTAssertNoThrow(try document.validate()); document.schema_version = 4; XCTAssertThrowsError(try document.validate())
+	}
 }

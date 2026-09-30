@@ -155,11 +155,10 @@ export function update_actual_block(document: AppDocument, id: string, options: 
 	let graph = graph_from_document(document);
 	const node = graph.nodes.find(item => item.id === id && is_behavior(item.kind));
 	if (!node) { throw new Error("That block is no longer on this page."); }
+	if (node.kind === "branch" && settings.else_enabled === false && graph.connections.some(edge => edge.from === node.id && edge.output === "no")) { throw new Error("Else is still used by another block. Remove that block before removing Else."); }
 	node.config = behavior_config_schema.parse({ ...node.config!, ...settings, label: options.name ?? node.config!.label });
-	if (node.kind === "branch" && settings.else_enabled === false) {
-		if (graph.connections.some(edge => edge.from === node.id && edge.output === "no")) { throw new Error("Else is still used by another block. Remove that block before removing Else."); }
-		graph = { ...graph, connections: graph.connections.filter(edge => edge.from !== node.id || edge.output !== "no") };
-	}
+	const ports = node_ports(node);
+	graph = { ...graph, connections: graph.connections.filter(edge => edge.to !== node.id || ports.inputs.includes(edge.input)).filter(edge => edge.from !== node.id || ports.outputs.includes(edge.output)) };
 	graph = apply_inputs(graph, id, inputs);
 	return compile_graph(document, graph);
 }

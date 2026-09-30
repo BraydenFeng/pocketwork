@@ -36,6 +36,7 @@ export const creation_catalog: { kind: CreationKind; title: string; detail: stri
 	{ kind: "clock", title: "At a time", detail: "At a set time", section: "Controls & events" },
 	{ kind: "interval", title: "Every", detail: "Do something every few minutes, hours, or days", section: "Controls & events" },
 	{ kind: "app_gate", title: "Control app access", detail: "Block selected apps", section: "Actions & logic" },
+	{ kind: "add_allowance", title: "Add screen time", detail: "Add minutes to your active home allowance", section: "Actions & logic" },
 	{ kind: "reminder", title: "Show a message", detail: "Display a message", section: "Actions & logic" },
 	{ kind: "count", title: "Count events", detail: "Count how many times something happens", section: "Actions & logic" },
 	{ kind: "streak", title: "Streak", detail: "Count consecutive check-in days", section: "Actions & logic" },
@@ -46,7 +47,7 @@ export const creation_catalog: { kind: CreationKind; title: string; detail: stri
 	{ kind: "not", title: "Reverse condition", detail: "Flip true and false", section: "Actions & logic" },
 	{ kind: "branch", title: "If", detail: "Run when a condition is true", section: "Actions & logic" },
 	{ kind: "aggregate", title: "Summarize entries", detail: "Sum, average, or count entries", section: "Actions & logic" },
-	{ kind: "calculate", title: "Calculate", detail: "Add, subtract, multiply, or divide", section: "Actions & logic" },
+	{ kind: "calculate", title: "Calculate", detail: "Add, subtract, multiply, divide, or round down", section: "Actions & logic" },
 	{ kind: "timer", title: "Focus timer", detail: "Timed focus session", section: "Native presets" },
 	{ kind: "schedule", title: "Schedule", detail: "Block apps on a weekly schedule", section: "Native presets" },
 	{ kind: "screen_time", title: "App blocker", detail: "Block apps or set a daily limit", section: "Native presets" },
@@ -94,7 +95,7 @@ export function node_name(node: LogicNode): string {
 	if (node.kind === "branch" && node.config?.label === "If / else") { return "If"; }
 	return node.config?.label || node.block?.title || node_catalog[node.kind].title;
 }
-const readable_ports: Record<string, string> = { pressed: "when tapped", submitted: "when submitted", record: "entry fields", rows: "saved entries", saved: "when saved", active: "while active", finished: "when finished", present: "at the saved place", away: "away from the saved place", arrived: "on arrival", left: "on departure", due: "at the chosen time", checked: "switched on", changed: "when changed", done: "when checked in", value: "value", count: "entry count", result: "result", yes: "then", no: "else", days: "streak days", reached: "goal reached", minutes: "minutes used", granted: "reward granted", outside: "outside the window" };
+const readable_ports: Record<string, string> = { pressed: "when tapped", submitted: "when submitted", record: "entry fields", rows: "saved entries", history: "usage history", saved: "when saved", active: "while active", finished: "when finished", present: "at the saved place", away: "away from the saved place", arrived: "on arrival", left: "on departure", due: "at the chosen time", checked: "switched on", changed: "when changed", done: "when checked in", value: "value", count: "entry count", result: "result", yes: "then", no: "else", days: "streak days", reached: "goal reached", minutes: "minutes used", granted: "reward granted", outside: "outside the window" };
 export function port_name(port: string, kind?: string): string {
 	if (kind === "interval" && port === "due") { return "every interval"; }
 	return readable_ports[port] ?? port.replaceAll("_", " ");
@@ -111,6 +112,7 @@ export function input_name(kind: NodeKind, input: string): string {
 	if (input === "record") { return "Entry fields from"; }
 	if (input === "closed") { return "Block apps when"; }
 	if (input === "grant") { return "Award minutes when"; }
+	if (kind === "add_allowance" && input === "minutes") { return "Minutes from (optional)"; }
 	if (input === "send") { return "Show message when"; }
 	if (input === "save") { return "Save an entry when"; }
 	if (input === "increment") { return "Count when"; }
@@ -213,6 +215,8 @@ export function numeric_fields(graph: LogicGraph, node: LogicNode): { id: string
 		for (const edge of graph.connections.filter(entry => entry.to === id && ["rows", "record"].includes(entry.input))) { const form = visit(edge.from); if (form) { return form; } }
 	}
 	const form = visit(node.id);
+	const history = graph.connections.find(edge => edge.to === node.id && edge.input === "rows");
+	if (history && graph.nodes.some(item => item.id === history.from && item.kind === "app_usage" && history.output === "history")) { return [{ id: "minutes", label: "Distraction minutes" }, { id: "budget", label: "Available minutes" }]; }
 	return (form?.config?.fields ?? [{ id: "value", label: "Value", type: "number" }]).filter(field => field.type === "number").map(({ id, label }) => ({ id, label }));
 }
 

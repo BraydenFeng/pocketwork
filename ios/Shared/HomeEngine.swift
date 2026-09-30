@@ -113,7 +113,7 @@ enum HomeEngine {
 		try transaction { state in
 			guard state.enabled, let policy = state.document?.home_allowance else { throw DocumentError.invalid("Enable a home allowance before adding screen time.") }
 			state.ledger.reset_if_needed(policy: policy, now: .now)
-			_ = try state.ledger.grant(key, minutes: minutes)
+			_ = try state.ledger.set_bonus(key, minutes: minutes)
 		}
 		try reconcile()
 	}
