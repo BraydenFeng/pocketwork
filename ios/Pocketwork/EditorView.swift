@@ -39,7 +39,7 @@ struct EditorView: View {
 				}
 				.padding(24).padding(.bottom, 24)
 			}.paper_page().scrollDismissesKeyboard(.interactively)
-			.navigationTitle(is_new ? "New page" : "Edit page").navigationBarTitleDisplayMode(.inline)
+			.navigationTitle(is_new ? "New routine" : "Edit routine").navigationBarTitleDisplayMode(.inline)
 			.toolbar {
 				ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(saving) }
 				ToolbarItem(placement: .topBarTrailing) { Menu { Button("Advanced logic…", systemImage: "point.3.connected.trianglepath.dotted") { showing_behavior = true }.accessibilityIdentifier("editor.logic") } label: { Image(systemName: "ellipsis") } }

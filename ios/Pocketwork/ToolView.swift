@@ -92,7 +92,7 @@ struct ToolView: View {
 				VStack(spacing: 12) {
 					Image(systemName: "square.stack.3d.up").font(.system(size: 28)).foregroundStyle(Theme.text_faint)
 					Text("This routine was deleted").heading_font(17)
-					Text("Go back to My pages to pick another.").supporting()
+					Text("Go back to Routines to pick another.").supporting()
 				}
 				.frame(maxWidth: .infinity, maxHeight: .infinity)
 				.page()

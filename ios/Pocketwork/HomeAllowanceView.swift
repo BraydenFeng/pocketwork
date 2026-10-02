@@ -41,7 +41,7 @@ struct HomeAllowanceView: View {
 					}
 				}
 				Group {
-				if !editor.active, document.behaviors != nil { BehaviorPanel(document: document) }
+				if !editor.active, document.behaviors != nil, !document.behaviors_are_compiled_allowance { BehaviorPanel(document: document) }
 				Text(home.status).heading_font(15)
 				if let remaining = allowance.remaining { Text("\(remaining) minutes left today").supporting() }
 				Button(home.has_home ? "Update home to here" : "Set home here") { home.set_here() }.buttonStyle(QuietButtonStyle())
@@ -52,6 +52,7 @@ struct HomeAllowanceView: View {
 				})).disabled(sessions.is_busy || !home.has_home || !home.always_allowed).tint(Theme.success)
 				if sessions.is_busy { ProgressView("Updating home allowance…") }
 				Button("Refresh remaining time") { refresh() }.buttonStyle(TextButtonStyle())
+				if let state = allowance.state, let policy = document.home_allowance { diagnostics(state, policy: policy) }
 				Text("Outside the windows and away from home, nothing is blocked. Home uses a 150 m boundary. iOS may detect crossings late. Usage is saved in whole minutes; a final partial minute may not count when you leave.").supporting()
 				}.disabled(editor.active)
 				if let error = home.error_message ?? sessions.error_message { Text(error).foregroundStyle(Theme.danger).font(.system(size: 13)) }
@@ -72,6 +73,21 @@ struct HomeAllowanceView: View {
 		.alert("Couldn’t save changes", isPresented: Binding(get: { editor.failure != nil }, set: { if !$0 { editor.failure = nil } })) { Button("OK") { editor.failure = nil } } message: { Text(editor.failure ?? "") }
 		.fullScreenCover(isPresented: $showing_logic) { if let draft = editor.draft { LogicEditorView(document: Binding(get: { editor.draft ?? draft }, set: { editor.draft = $0 })) } }
 		.sheet(item: $picking_group) { group in AppGroupSelectionSheet(group: group) }
+	}
+
+	private func diagnostics(_ state: HomeState, policy: HomePolicy) -> some View {
+		DisclosureGroup("Diagnostics") {
+			VStack(alignment: .leading, spacing: 6) {
+				Text("Switched on: \(state.enabled ? "yes" : "no") · At home: \(state.at_home ? "yes" : "no") · In a window: \(policy.allows(at: .now) ? "yes" : "no")")
+				Text("Used today: \(state.ledger.used_minutes) min · Counting now: \(state.ledger.generation == nil ? "no" : "yes")")
+				ForEach(Array((state.log ?? []).reversed().enumerated()), id: \.offset) { _, entry in
+					Text("\(Date(timeIntervalSince1970: entry.at).formatted(date: .omitted, time: .shortened))  \(entry.text)")
+				}
+				if (state.log ?? []).isEmpty { Text("No events recorded yet.") }
+			}
+			.font(.system(size: 12, design: .monospaced)).foregroundStyle(Theme.text_dim).frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8)
+		}
+		.font(.system(size: 13, weight: .medium)).tint(Theme.text_dim)
 	}
 
 	private func refresh_if_active() {

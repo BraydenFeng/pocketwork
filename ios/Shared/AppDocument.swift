@@ -90,6 +90,12 @@ struct AppDocument: Codable, Equatable {
 	var enabled: Bool?
 	var home_allowance: HomePolicy? = nil
 	var behaviors: BehaviorGraph? = nil
+	// Pages built from blocks keep their graph after the editor compiles it into home_allowance; the native engine already runs that graph.
+	var behaviors_are_compiled_allowance: Bool {
+		guard home_allowance != nil, let graph = behaviors else { return false }
+		let compiled: Set<String> = ["location", "time_window", "app_usage", "compare", "and", "or", "app_gate"]
+		return graph.nodes.allSatisfy { compiled.contains($0.kind) }
+	}
 
 	var focus_minutes: Int? { blocks.first(where: { $0.type == .timer })?.minutes }
 	var has_timer: Bool { blocks.contains(where: { $0.type == .timer }) }

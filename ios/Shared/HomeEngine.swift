@@ -13,7 +13,15 @@ struct HomeState: Codable {
 	var ledger = HomeLedger()
 	// Set once the engine's own copy of the policy has been moved off the old "block outside the windows" behavior.
 	var outside_migrated: Bool? = nil
+	// Recent engine decisions, newest last, so a missed minute can be traced on the device.
+	var log: [HomeLogEntry]? = nil
+	mutating func note(_ text: String, at date: Date = .now) {
+		var entries = log ?? []
+		entries.append(HomeLogEntry(at: date.timeIntervalSince1970, text: text))
+		log = Array(entries.suffix(40))
+	}
 }
+struct HomeLogEntry: Codable, Equatable { var at: Double; var text: String }
 
 // One shared file and a process lock serialize app/geofence and monitor-extension callbacks.
 enum HomeEngine {
@@ -46,6 +54,7 @@ enum HomeEngine {
 	}
 
 	static func snapshot() throws -> HomeState { try transaction { $0 } }
+	static func note(_ text: String) { do { try transaction { $0.note(text) } } catch { /* Storage itself failed; the caller logs to OSLog. */ } }
 
 	// Launch and foreground: re-evaluate the shield against the clock so a policy change (or the migration above) takes effect without a toggle.
 	static func refresh_on_launch() throws {
@@ -58,7 +67,7 @@ enum HomeEngine {
 	}
 	static func location_changed(_ at_home: Bool) throws {
 		try transaction { state in
-			if state.at_home != at_home { state.ledger.pause() }
+			if state.at_home != at_home { state.ledger.pause(); state.note(at_home ? "Arrived home" : "Left home or location unknown") }
 			state.at_home = at_home
 		}
 		try reconcile()
@@ -124,7 +133,11 @@ enum HomeEngine {
 		try transaction { state in
 			guard let policy = state.document?.home_allowance else { return }
 			state.ledger.reset_if_needed(policy: policy, now: .now)
+			let before = state.ledger.used_minutes
 			state.ledger.checkpoint(generation: generation, minutes: minutes, at_home: state.at_home && state.enabled)
+			if state.ledger.used_minutes != before { state.note("iOS reported \(minutes) min since counting started; \(state.ledger.used_minutes) min used today") }
+			else if !(state.at_home && state.enabled) { state.note("Ignored a \(minutes)-min report because you were away") }
+			else if state.ledger.generation != generation { state.note("Ignored a \(minutes)-min report from an earlier count") }
 		}
 		try reconcile()
 	}
@@ -132,9 +145,13 @@ enum HomeEngine {
 		let prepared = try transaction { state -> (HomeState, Bool) in
 			guard state.enabled, let policy = state.document?.home_allowance else { state.ledger.pause(); return (state, false) }
 			state.ledger.reset_if_needed(policy: policy, now: .now)
-			guard state.at_home, policy.allows(at: .now), state.ledger.used_minutes < state.ledger.budget(policy.rule(at: .now)?.allowance_minutes ?? 0) else { state.ledger.pause(); return (state, false) }
+			let budget = state.ledger.budget(policy.rule(at: .now)?.allowance_minutes ?? 0)
+			guard state.at_home, policy.allows(at: .now), state.ledger.used_minutes < budget else {
+				if state.ledger.generation != nil { state.note(!state.at_home ? "Stopped counting: away" : !policy.allows(at: .now) ? "Stopped counting: window ended" : "Allowance used up; apps locked") }
+				state.ledger.pause(); return (state, false)
+			}
 			let start = state.ledger.generation == nil
-			if start { state.ledger.generation = UUID().uuidString; state.ledger.segment_base = state.ledger.used_minutes }
+			if start { state.ledger.generation = UUID().uuidString; state.ledger.segment_base = state.ledger.used_minutes; state.note("Started counting: \(budget - state.ledger.used_minutes) min left") }
 			return (state, start)
 		}
 		let state = prepared.0
@@ -163,7 +180,7 @@ enum HomeEngine {
 				// The generation is persisted before IPC so callbacks can immediately read it.
 				try center.startMonitoring(DeviceActivityName(prefix + "meter." + generation), during: schedule, events: events)
 			} catch {
-				try transaction { if $0.ledger.generation == generation { $0.ledger.pause() } }
+				try transaction { if $0.ledger.generation == generation { $0.ledger.pause() }; $0.note("Could not start counting: \(error.localizedDescription)") }
 				throw error
 			}
 		}

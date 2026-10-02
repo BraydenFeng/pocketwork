@@ -1,5 +1,9 @@
 # Pocketwork — interface brief
 
+## October 1: phone tabs
+
+Brayden asked for the iPhone app to split into two tabs, Routines and Data. Routines lists each routine as one row: a switch for routines that enforce themselves (schedules and the home allowance), Start/Stop for timer routines, and nothing for plain pages. Tapping a row opens the routine in edit mode; Cancel or Save returns to its live page. Data is read-only and shows what the phone has recorded: home allowance minutes against budget and focus-session minutes, each for the last 14 days. App groups stay under Routines. A block-authored home allowance no longer shows its compiled graph as a second live panel on the phone, and the Home allowance page has a Diagnostics section listing the engine's recent decisions so missed minutes can be traced on a device.
+
 ## September 27: one page, no graph
 
 Brayden rejected the remaining node canvas, Connections workflow, and separate Routines/Data tabs. The web creator is now one Notion-like document. A page contains its content, routines, and data in a single vertical flow. The saved graph may remain an internal runtime format, but the interface must never ask a person to place nodes, draw wires, open advanced wiring, or save connections.

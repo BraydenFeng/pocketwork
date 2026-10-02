@@ -4,6 +4,7 @@ import Foundation
 @MainActor
 final class HomeAllowanceDisplay: ObservableObject {
 	@Published private(set) var remaining: Int?
+	@Published private(set) var state: HomeState?
 	private var refreshing = false
 	private let read_state: () async throws -> HomeState
 	private let now: () -> Date
@@ -28,5 +29,6 @@ final class HomeAllowanceDisplay: ObservableObject {
 		let base = policy?.rule(at: date)?.allowance_minutes ?? 0
 		let budget = same_day ? state.ledger.budget(base) : base
 		remaining = max(0, budget - (same_day ? state.ledger.used_minutes : 0))
+		self.state = state
 	}
 }
