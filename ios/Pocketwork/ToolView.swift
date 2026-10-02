@@ -32,8 +32,7 @@ struct ToolView: View {
 							if editor.active {
 								TextField("Page name", text: Binding(get: { editor.draft?.name ?? "" }, set: { editor.draft?.name = $0 })).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text_dim).accessibilityIdentifier("page.name")
 							} else {
-								Button { begin_editing(document) } label: { HStack(spacing: 6) { Text(document.name).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text_dim); Image(systemName: "pencil").font(.system(size: 11)).foregroundStyle(Theme.text_faint) } }
-									.buttonStyle(.plain).disabled(!can_edit(document)).accessibilityLabel("Edit \(document.name)")
+								Text(document.name).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text_dim)
 							}
 						}
 						ForEach(document.blocks) { block in
@@ -50,9 +49,6 @@ struct ToolView: View {
 							} else { block_view(block, in: document) }
 						}
 						if !editor.active, document.behaviors != nil { BehaviorPanel(document: document) }
-						if !editor.active, can_edit(document) {
-							Button { begin_editing(document) } label: { Label("Edit this page", systemImage: "pencil") }.buttonStyle(TextButtonStyle()).frame(minHeight: 44)
-						}
 						Text("Made for you. By you.").mono_caption().padding(.top, 8)
 					}
 					.padding(Theme.pad)
@@ -136,7 +132,6 @@ struct ToolView: View {
 		switch block.type {
 		case .heading:
 			VStack(alignment: .leading, spacing: 8) {
-				Text("Your space, your pace").mono_caption().textCase(.uppercase)
 				Text(block.title).font(.system(size: 30, weight: .semibold)).tracking(-1).foregroundStyle(Theme.text).fixedSize(horizontal: false, vertical: true)
 				Text(block.subtitle ?? "").font(.system(size: 15)).foregroundStyle(Theme.text_faint)
 			}

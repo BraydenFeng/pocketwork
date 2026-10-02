@@ -35,7 +35,6 @@ struct EditorView: View {
 					VStack(alignment: .leading, spacing: 0) {
 						ForEach(Array(draft.blocks.enumerated()), id: \.element.id) { index, block in block_row(index: index, block: block) }
 					}
-					Button { showing_blocks = true } label: { Label("Add a block to this page", systemImage: "plus") }.buttonStyle(TextButtonStyle()).frame(minHeight: 44, alignment: .leading)
 					if draft.blocks.count == 1 { Text("Tap a block to edit it. Add a timer, schedule, or anything else your routine needs.").supporting() }
 				}
 				.padding(24).padding(.bottom, 24)

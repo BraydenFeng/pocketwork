@@ -13,7 +13,6 @@ struct InlineRoutineBlock: View {
 			switch block.type {
 			case .heading:
 				VStack(alignment: .leading, spacing: 8) {
-					Text("Your space, your pace").mono_caption().textCase(.uppercase)
 					title.font(.system(size: 30, weight: .semibold)).tracking(-1)
 					TextField("Add supporting text", text: string(\.subtitle), axis: .vertical).font(.system(size: 15)).foregroundStyle(Theme.text_faint)
 				}.padding(.leading, 12).overlay(alignment: .leading) { Rectangle().fill(Theme.border).frame(width: 2) }

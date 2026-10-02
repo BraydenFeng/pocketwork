@@ -55,8 +55,6 @@ struct HomeView: View {
 						Button { showing_groups = true } label: { Label(library.groups.isEmpty ? "Create an app group" : "Manage app groups", systemImage: "plus") }.buttonStyle(QuietButtonStyle()).accessibilityIdentifier("home.groups")
 					}
 
-					Hairline()
-					footer
 				}
 			}
 			.refreshable { await cloud.sync() }
@@ -97,8 +95,8 @@ struct HomeView: View {
 
 	private var account_buttons: some View {
 		Group {
-			Button("Create account") { account_intent = .create }.buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("home.create-account")
-			Button("Sign in") { account_intent = .sign_in }.buttonStyle(QuietButtonStyle()).accessibilityIdentifier("home.sign-in")
+			Button { account_intent = .create } label: { Text("Create account").frame(maxWidth: .infinity) }.buttonStyle(QuietButtonStyle()).accessibilityIdentifier("home.create-account")
+			Button { account_intent = .sign_in } label: { Text("Sign in").frame(maxWidth: .infinity) }.buttonStyle(QuietButtonStyle()).accessibilityIdentifier("home.sign-in")
 		}
 	}
 
@@ -112,7 +110,6 @@ struct HomeView: View {
 
 	private var intro: some View {
 		VStack(alignment: .leading, spacing: 8) {
-			Text("My pages").heading_font(28)
 			Text("Your own little tools.").supporting()
 			HStack(spacing: 8) {
 				Circle().fill(library.storage_blocked ? Theme.danger : Theme.success).frame(width: 6, height: 6)
@@ -131,17 +128,6 @@ struct HomeView: View {
 				Button("Replace unreadable data") { library.replace_unreadable() }.buttonStyle(QuietButtonStyle(danger: true))
 			}
 		}
-	}
-
-	private var footer: some View {
-		HStack {
-			HStack(spacing: 8) { Circle().fill(Theme.border_hi).frame(width: 6, height: 6); Text("Your own little tools.") }
-			Spacer()
-			Text("PERSONAL WORKSPACE")
-		}
-		.mono_caption()
-		.padding(Theme.pad)
-		.background(Theme.surface)
 	}
 
 	private func section<Content: View>(number: String, label: String, heading: String, supporting: String?, @ViewBuilder content: () -> Content) -> some View {
