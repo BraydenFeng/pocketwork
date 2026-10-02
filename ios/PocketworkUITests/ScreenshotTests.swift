@@ -140,9 +140,11 @@ final class ScreenshotTests: XCTestCase {
 	private func open_logic() {
 		let item = app.buttons["editor.logic"]
 		if !item.waitForExistence(timeout: 2) {
-			let menus = app.navigationBars.buttons.matching(NSPredicate(format: "label == %@ OR identifier == %@", "More", "ellipsis"))
+			// The Routines tab keeps its own ⋯ menu in the hierarchy; use the editor's bar, the one with Save.
+			let editor_bar = app.navigationBars.allElementsBoundByIndex.last { $0.buttons["Save"].exists } ?? app.navigationBars.firstMatch
+			let menus = editor_bar.buttons.matching(NSPredicate(format: "label == %@ OR identifier == %@", "More", "ellipsis"))
 			// Toolbar buttons cannot be scrolled into view; tap the menu by its coordinates instead of letting XCTest try.
-			(menus.count > 0 ? menus.element(boundBy: menus.count - 1) : app.navigationBars.buttons.element(boundBy: app.navigationBars.buttons.count - 1)).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+			(menus.count > 0 ? menus.element(boundBy: menus.count - 1) : editor_bar.buttons.element(boundBy: editor_bar.buttons.count - 1)).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
 			XCTAssertTrue(item.waitForExistence(timeout: 10), "Advanced logic menu item")
 		}
 		item.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
