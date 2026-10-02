@@ -107,7 +107,7 @@ struct RoutineWidget: Widget {
 			RoutineWidgetView(entry: entry)
 		}
 		.configurationDisplayName("Routine")
-		.description("One of your routines, a tap away. Shows the countdown while it runs.")
+		.description("Opens one of your routines. Shows the countdown while it runs.")
 		.supportedFamilies([.systemSmall, .systemMedium])
 	}
 }

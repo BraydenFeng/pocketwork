@@ -2,9 +2,9 @@
 	"schema_version": 1,
 	"id": "my-focus-space",
 	"name": "My focus space",
-	"description": "A quieter place to get things done.",
+	"description": "A 25-minute timer, a short list, and fewer distractions.",
 	"blocks": [
-		{ "id": "welcome", "type": "heading", "title": "A little less noise.", "subtitle": "A little more room for your next good idea." },
+		{ "id": "welcome", "type": "heading", "title": "Focus", "subtitle": "Pick one thing and give it 25 minutes." },
 		{ "id": "focus", "type": "timer", "title": "Make some headway", "minutes": 25 },
 		{ "id": "tasks", "type": "checklist", "title": "What matters today", "items": [
 			{ "id": "task-one", "text": "Choose one thing to work on" },

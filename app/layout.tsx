@@ -4,7 +4,7 @@ import "./globals.css";
 import "./creation.css";
 import "./account.css";
 
-export const metadata: Metadata = { title: "Pocketwork — your own little routines", description: "Build iPhone routines that hold you to what you decided, from small, useful blocks. No code to maintain." };
+export const metadata: Metadata = { title: "Pocketwork", description: "Build iPhone routines that block apps, run timers, and track what you do. No code." };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
 	return <html lang="en"><body>{children}</body></html>;

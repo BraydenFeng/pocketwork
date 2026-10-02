@@ -44,7 +44,7 @@ test("native settings are editable inline and preview is a separate mode", async
 
 test("a routine without a timer can add a counter and test it", async ({ page }) => {
 	await seed_library(page, [{ ...starter_document, blocks: [starter_document.blocks[0]], rules: { block_during_focus: false, notify_on_complete: false } }]); await page.goto(STARTER_URL);
-	await expect(page.getByLabel("Supporting text: A little less noise.", { exact: true })).toBeEditable();
+	await expect(page.getByLabel("Supporting text: Focus", { exact: true })).toBeEditable();
 	await page.getByRole("button", { name: "Add a block", exact: true }).click();
 	await page.getByRole("button", { name: "Add Counter", exact: true }).click();
 	await page.getByRole("button", { name: "Preview", exact: true }).click();

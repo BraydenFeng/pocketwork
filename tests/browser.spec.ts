@@ -40,7 +40,7 @@ test("runs the preview and completes its simulated rules", async ({ page }) => {
 	await expect(page.locator(".event-log")).toContainText("notification simulated");
 	await page.getByRole("button", { name: "Start again", exact: true }).click();
 	await page.getByRole("button", { name: "End session", exact: true }).click();
-	await expect(page.getByText("Ready when you are", { exact: true })).toBeVisible();
+	await expect(page.getByText("Not started", { exact: true })).toBeVisible();
 });
 
 test("exports strict JSON and cleans dependent rules when deleting blocks", async ({ page }) => {

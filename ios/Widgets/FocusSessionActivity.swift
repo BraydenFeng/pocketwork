@@ -36,7 +36,7 @@ struct FocusSessionActivity: Widget {
 			VStack(alignment: .leading, spacing: 4) {
 				Text(context.attributes.caption.uppercased()).font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(0.8).foregroundStyle(WidgetTheme.text_faint)
 				Text(context.attributes.routine_name).font(.system(size: 17, weight: .semibold)).tracking(-0.3).foregroundStyle(WidgetTheme.text).lineLimit(1)
-				Text(context.state.blocks_apps ? "Your chosen apps stay locked until this ends." : "One thing at a time.").font(.system(size: 12)).foregroundStyle(WidgetTheme.text_dim).lineLimit(2)
+				Text(context.state.blocks_apps ? "Your chosen apps stay locked until this ends." : "Session in progress.").font(.system(size: 12)).foregroundStyle(WidgetTheme.text_dim).lineLimit(2)
 			}
 			Spacer(minLength: 0)
 			VStack(alignment: .trailing, spacing: 8) {

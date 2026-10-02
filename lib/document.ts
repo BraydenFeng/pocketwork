@@ -149,11 +149,11 @@ export function new_id(): string { return crypto.randomUUID(); }
 export function create_block(type: BlockType): Block {
 	const id = new_id();
 	switch (type) {
-		case "heading": return { id, type, title: "Make room for what matters.", subtitle: "A little space, just for you." };
+		case "heading": return { id, type, title: "Today", subtitle: "What I'm working on." };
 		case "timer": return { id, type, title: "Focus session", minutes: 25 };
 		case "checklist": return { id, type, title: "On my list", items: [{ id: new_id(), text: "My first task" }] };
 		case "counter": return { id, type, title: "Small wins", target: 5 };
-		case "note": return { id, type, title: "A note to myself", text: "One thing at a time." };
+		case "note": return { id, type, title: "A note to myself", text: "Anything you want to remember." };
 		case "screen_time": return { id, type, title: "Fewer distractions" };
 		case "schedule": return { id, type, title: "Every evening", days: [1, 2, 3, 4, 5, 6, 7], start: "22:00", end: "07:00" };
 	}
@@ -183,9 +183,9 @@ export function move_block(document: AppDocument, block_id: string, direction: -
 }
 
 export const starter_document: AppDocument = {
-	schema_version: 1, id: "my-focus-space", name: "My focus space", description: "A quieter place to get things done.",
+	schema_version: 1, id: "my-focus-space", name: "My focus space", description: "A 25-minute timer, a short list, and fewer distractions.",
 	blocks: [
-		{ id: "welcome", type: "heading", title: "A little less noise.", subtitle: "A little more room for your next good idea." },
+		{ id: "welcome", type: "heading", title: "Focus", subtitle: "Pick one thing and give it 25 minutes." },
 		{ id: "focus", type: "timer", title: "Make some headway", minutes: 25 },
 		{ id: "tasks", type: "checklist", title: "What matters today", items: [{ id: "task-one", text: "Choose one thing to work on" }, { id: "task-two", text: "Give it my full attention" }, { id: "task-three", text: "Leave a note for next time" }] },
 		{ id: "shield", type: "screen_time", title: "Leave distractions outside" },

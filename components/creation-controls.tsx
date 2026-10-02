@@ -109,6 +109,6 @@ export function BlockPicker({ on_close, on_pick, scope = "all" }: { on_close: ()
 		<div className="picker-heading"><h2 id="block-picker-title">{scope === "page" ? "Add to page" : scope === "routines" ? "Add a routine block" : scope === "data" ? "Add a data block" : "Add a block"}</h2><Button variant="quiet" aria-label="Close block picker" onClick={on_close}><X /></Button></div>
 		<label className="picker-search"><Search /><input ref={input} aria-label="Find a block" placeholder="Search blocks…" value={query} onChange={event => { set_query(event.target.value); set_active(0); }} /><kbd>Esc</kbd></label>
 		<div className="picker-options">{entries.map((item, index) => <div key={item.kind}>{entries[index - 1]?.section !== item.section && <p className="picker-section">{item.section}</p>}<button type="button" className="picker-option" data-option-index={index} data-active={index === active} onMouseEnter={() => set_active(index)} onClick={() => on_pick(item.kind)} aria-label={`Add ${item.title}`}><span className="picker-glyph"><BlockIcon kind={item.kind} /></span><span><strong>{item.title}</strong><small>{item.detail}</small></span><ArrowUpRight /></button></div>)}{!entries.length && <p className="document-empty">No blocks match “{query}”. Try “chart”, “timer”, or “log”.</p>}</div>
-		<div className="picker-footer"><CirclePlus /><span>Add it now. Change its properties right on the page.</span></div>
+		<div className="picker-footer"><CirclePlus /><span>Pick a block to add it. Change its settings on the page.</span></div>
 	</dialog>;
 }

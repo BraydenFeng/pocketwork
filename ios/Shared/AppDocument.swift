@@ -63,11 +63,11 @@ struct BlockDocument: Codable, Identifiable, Equatable {
 	static func make(_ kind: BlockKind) -> BlockDocument {
 		let id = UUID().uuidString
 		switch kind {
-		case .heading: return BlockDocument(id: id, type: kind, title: "Make room for what matters.", subtitle: "A little space, just for you.", minutes: nil, items: nil, target: nil, text: nil, days: nil, start: nil, end: nil, mode: nil, groups: nil, limit_minutes: nil)
+		case .heading: return BlockDocument(id: id, type: kind, title: "Today", subtitle: "What I'm working on.", minutes: nil, items: nil, target: nil, text: nil, days: nil, start: nil, end: nil, mode: nil, groups: nil, limit_minutes: nil)
 		case .timer: return BlockDocument(id: id, type: kind, title: "Focus session", subtitle: nil, minutes: 25, items: nil, target: nil, text: nil, days: nil, start: nil, end: nil, mode: nil, groups: nil, limit_minutes: nil)
 		case .checklist: return BlockDocument(id: id, type: kind, title: "On my list", subtitle: nil, minutes: nil, items: [TaskDocument(id: UUID().uuidString, text: "My first task")], target: nil, text: nil, days: nil, start: nil, end: nil, mode: nil, groups: nil, limit_minutes: nil)
 		case .counter: return BlockDocument(id: id, type: kind, title: "Small wins", subtitle: nil, minutes: nil, items: nil, target: 5, text: nil, days: nil, start: nil, end: nil, mode: nil, groups: nil, limit_minutes: nil)
-		case .note: return BlockDocument(id: id, type: kind, title: "A note to myself", subtitle: nil, minutes: nil, items: nil, target: nil, text: "One thing at a time.", days: nil, start: nil, end: nil, mode: nil, groups: nil, limit_minutes: nil)
+		case .note: return BlockDocument(id: id, type: kind, title: "A note to myself", subtitle: nil, minutes: nil, items: nil, target: nil, text: "Anything you want to remember.", days: nil, start: nil, end: nil, mode: nil, groups: nil, limit_minutes: nil)
 		case .screen_time: return BlockDocument(id: id, type: kind, title: "Fewer distractions", subtitle: nil, minutes: nil, items: nil, target: nil, text: nil, days: nil, start: nil, end: nil, mode: nil, groups: nil, limit_minutes: nil)
 		case .schedule: return BlockDocument(id: id, type: kind, title: "Every evening", subtitle: nil, minutes: nil, items: nil, target: nil, text: nil, days: [1, 2, 3, 4, 5, 6, 7], start: "22:00", end: "07:00", mode: nil, groups: nil, limit_minutes: nil)
 		}

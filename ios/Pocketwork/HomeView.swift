@@ -34,13 +34,13 @@ struct HomeView: View {
 						}.padding(Theme.pad)
 					}
 					Hairline()
-					section(number: "01", label: "My pages", heading: library.sorted_tools.isEmpty ? "Nothing here yet." : "Pick up where you left off.", supporting: library.sorted_tools.isEmpty ? "Create a page here, or sign in to bring in pages from your computer." : nil) {
+					section(number: "01", label: "My pages", heading: library.sorted_tools.isEmpty ? "Nothing here yet." : "Open a page to use or edit it.", supporting: library.sorted_tools.isEmpty ? "Create a page here, or sign in to bring in pages from your computer." : nil) {
 						if library.storage_blocked { storage_warning }
 						Button { editing = RoutineDraft(document: AppDocument.blank(), is_new: true) } label: { Label("New page", systemImage: "plus") }.buttonStyle(PrimaryButtonStyle(accent: true))
 						ForEach(library.sorted_tools) { entry in routine_card(entry) }
 					}
 					Hairline()
-					section(number: "02", label: "App groups", heading: "Your apps, grouped.", supporting: nil) {
+					section(number: "02", label: "App groups", heading: "Groups of apps to block or limit.", supporting: nil) {
 						ForEach(library.groups) { group in
 							Button { picking_group = group } label: {
 								DocumentRow(icon: "square.grid.2x2") {
@@ -110,7 +110,7 @@ struct HomeView: View {
 
 	private var intro: some View {
 		VStack(alignment: .leading, spacing: 8) {
-			Text("Your own little tools.").supporting()
+			Text("Each page holds a routine and the data it tracks.").supporting()
 			HStack(spacing: 8) {
 				Circle().fill(library.storage_blocked ? Theme.danger : Theme.success).frame(width: 6, height: 6)
 				Text(library.storage_blocked ? "Saved routines need attention" : "\(library.sorted_tools.count) saved on this iPhone").font(.system(size: 13)).foregroundStyle(library.storage_blocked ? Theme.danger : Theme.text_faint)

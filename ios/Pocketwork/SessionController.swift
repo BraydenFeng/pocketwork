@@ -211,7 +211,7 @@ final class SessionController: ObservableObject {
 			}
 			if document.rules.notify_on_complete {
 				let content = UNMutableNotificationContent()
-				content.title = "A little progress feels good."
+				content.title = "Session finished"
 				content.body = "\(document.name) has finished."
 				content.sound = .default
 				let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, record.ends_at.timeIntervalSinceNow), repeats: false)

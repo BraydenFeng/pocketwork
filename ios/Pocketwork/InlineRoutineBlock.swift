@@ -88,7 +88,7 @@ struct InlineRoutineBlock: View {
 							VStack(alignment: .leading, spacing: 4) { Text("Until").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.text_dim); DatePicker("Until", selection: clock(\.end), displayedComponents: .hourAndMinute).labelsHidden() }
 							Spacer()
 						}
-						Text("Ends before it starts? It runs past midnight.").font(.system(size: 11)).foregroundStyle(Theme.text_faint)
+						Text("If the end time is earlier than the start, it runs past midnight.").font(.system(size: 11)).foregroundStyle(Theme.text_faint)
 					}
 				}
 			case .screen_time:

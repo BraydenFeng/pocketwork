@@ -16,8 +16,8 @@ struct GroupsView: View {
 			VStack(alignment: .leading, spacing: 20) {
 				VStack(alignment: .leading, spacing: 6) {
 					SectionLabel(number: "02", text: "App groups")
-					Text("Your apps, grouped.").heading_font(20)
-					Text("Choose apps once. Use the group in any routine. Your app selections stay on this iPhone.").supporting()
+					Text("Groups of apps to block or limit.").heading_font(20)
+					Text("Pick the apps for a group once, then use the group in any routine. Your app choices stay on this iPhone.").supporting()
 				}
 				if library.groups.isEmpty {
 					Card(tinted: true, dashed: true) { Text("No groups yet. Name one below, then tap it to choose its apps.").supporting() }

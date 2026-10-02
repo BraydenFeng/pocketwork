@@ -15,7 +15,7 @@ export function PhonePreview({ document, runtime, now, selected_id, interactive,
 	function content(block: Block) {
 		switch (block.type) {
 			case "heading": return <div className="preview-heading"><span className="eyebrow">YOUR SPACE, YOUR PACE</span><h2>{block.title}</h2><p>{block.subtitle}</p></div>;
-			case "timer": return <div className="preview-timer"><span className="preview-label">{block.title}</span><div className="timer-digits" aria-label="Time remaining">{format_duration(remaining_seconds(document, runtime, now))}</div><span className="timer-caption">{runtime.status === "running" ? "One thing at a time." : runtime.status === "completed" ? "A little progress feels good." : "A fresh start is one tap away."}</span>
+			case "timer": return <div className="preview-timer"><span className="preview-label">{block.title}</span><div className="timer-digits" aria-label="Time remaining">{format_duration(remaining_seconds(document, runtime, now))}</div><span className="timer-caption">{runtime.status === "running" ? "Session in progress." : runtime.status === "completed" ? "Done." : "Press Start to begin."}</span>
 				<button type="button" className="session-button" disabled={!interactive} onClick={() => dispatch({ type: runtime.status === "running" ? "stop" : "start", now: Date.now() })}>
 					{runtime.status === "running" ? <Pause /> : <Play />} {runtime.status === "running" ? "End session" : runtime.status === "completed" ? "Start again" : "Start focusing"}
 				</button></div>;
@@ -33,6 +33,5 @@ export function PhonePreview({ document, runtime, now, selected_id, interactive,
 			{document.blocks.map((block) => <div className={`preview-block ${selected_id === block.id && !interactive ? "is-selected" : ""}`} key={block.id}>
 				{!interactive && <button className="block-hit-area" type="button" aria-label={`Select ${block.title}`} onClick={() => on_select(block.id)} />}{content(block)}
 			</div>)}
-			<div className="phone-footer">Made for you. By you.</div>
-		</div><div className="home-indicator" aria-hidden="true" /></div>;
+					</div><div className="home-indicator" aria-hidden="true" /></div>;
 }

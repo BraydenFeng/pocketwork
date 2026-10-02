@@ -49,7 +49,6 @@ struct ToolView: View {
 							} else { block_view(block, in: document) }
 						}
 						if !editor.active, document.behaviors != nil { BehaviorPanel(document: document) }
-						Text("Made for you. By you.").mono_caption().padding(.top, 8)
 					}
 					.padding(Theme.pad)
 					.padding(.bottom, 24).disabled(editor.saving)
@@ -147,7 +146,7 @@ struct ToolView: View {
 						let seconds = running ? (sessions.session?.remaining(at: timeline.date) ?? 0) : (block.minutes ?? 25) * 60
 						Text(String(format: "%02d:%02d", seconds / 60, seconds % 60)).font(.system(size: 56, weight: .medium, design: .monospaced)).tracking(-2).foregroundStyle(Theme.text)
 					}
-					Text(running ? "One thing at a time." : "A fresh start is one tap away.").supporting()
+					Text(running ? "Session in progress." : "Tap Start to begin.").supporting()
 					Button {
 						if running { sessions.stop() } else { Task { await sessions.start(document, groups: library.groups) } }
 					} label: {
