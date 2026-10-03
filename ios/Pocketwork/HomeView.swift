@@ -8,6 +8,7 @@ struct HomeView: View {
 	@EnvironmentObject private var cloud: CloudController
 	@EnvironmentObject private var library: LibraryController
 	@EnvironmentObject private var sessions: SessionController
+	@EnvironmentObject private var home: HomeLocationController
 	private struct RoutineRoute: Hashable { let id: String; var editing = false }
 	@State private var path: [RoutineRoute] = []
 	@State private var showing_groups = false
@@ -25,7 +26,7 @@ struct HomeView: View {
 					intro
 					if !cloud.signed_in {
 						VStack(alignment: .leading, spacing: Theme.gap) {
-							Text("Save your pages to an account").heading_font(15)
+							Text("Save your routines to an account").heading_font(15)
 							Text("Open them on your iPhone or computer. You can also keep using this device without an account.").supporting()
 							ViewThatFits(in: .horizontal) {
 								HStack(spacing: Theme.gap) { account_buttons }
@@ -185,7 +186,8 @@ struct HomeView: View {
 			Toggle("On", isOn: Binding(get: { document.enabled == true }, set: { enabled in
 				Task { if await sessions.set_routine(document, enabled: enabled, groups: library.groups) { library.set_enabled(document.id, enabled) } }
 			}))
-			.labelsHidden().tint(Theme.success).disabled(sessions.is_busy)
+			// Matches the allowance page: without a saved home and Always location, the engine could be on but never count anything.
+			.labelsHidden().tint(Theme.success).disabled(sessions.is_busy || (document.home_allowance != nil && document.enabled != true && !(home.has_home && home.always_allowed)))
 			.accessibilityLabel("Switch \(document.name) on or off")
 		} else if document.has_timer {
 			let running = sessions.is_running(document)
@@ -203,7 +205,10 @@ struct HomeView: View {
 		if let session = sessions.session, session.document_id == document.id {
 			return "Running · ends \(session.ends_at.formatted(date: .omitted, time: .shortened))"
 		}
-		if document.home_allowance != nil { return document.enabled == true ? "Home allowance · on" : "Home allowance · off" }
+		if document.home_allowance != nil {
+			if document.enabled == true { return "Home allowance · on" }
+			return home.has_home && home.always_allowed ? "Home allowance · off" : "Home allowance · tap to set home first"
+		}
 		if let schedule = document.schedule { return ScheduleWindow.describe_status(schedule, enabled: document.enabled == true, at: .now) }
 		if let minutes = document.blocks.first(where: { $0.type == .timer })?.minutes { return "\(minutes)-minute session" }
 		return ToolCopy.edited(entry, now: .now)
