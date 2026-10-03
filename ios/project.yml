@@ -11,7 +11,7 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
     CODE_SIGN_STYLE: Automatic
     APP_GROUP: group.com.braydenfeng.pocketwork
-    TARGETED_DEVICE_FAMILY: "1,2"
+    TARGETED_DEVICE_FAMILY: "1"
     POCKETWORK_WEBSITE_URL: https://pocketwork-wine.vercel.app
 targets:
   Pocketwork:
@@ -39,7 +39,7 @@ targets:
         SupabaseAnonKey: $(SUPABASE_ANON_KEY)
         PocketworkWebsiteURL: $(POCKETWORK_WEBSITE_URL)
         PocketworkProProductID: com.braydenfeng.pocketwork.pro.monthly
-        PocketworkSubscriptionsEnabled: true
+        PocketworkSubscriptionsEnabled: false
         ITSAppUsesNonExemptEncryption: false
         NSSupportsLiveActivities: true
         NSHealthShareUsageDescription: Read the health metrics you choose as inputs to your personal routines.

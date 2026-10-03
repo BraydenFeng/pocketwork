@@ -24,6 +24,7 @@ struct PocketworkApp: App {
 				do { _ = try ToolLibrary.decode(data); UserDefaults.standard.set(data, forKey: LibraryController.library_key) }
 				catch { assertionFailure("Invalid UI test library: \(error)") }
 			}
+			if let history = ProcessInfo.processInfo.environment["POCKETWORK_UI_SESSION_HISTORY"] { UserDefaults.standard.set(Data(history.utf8), forKey: SessionHistory.key) }
 		}
 	}
 

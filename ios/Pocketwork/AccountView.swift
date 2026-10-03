@@ -25,8 +25,8 @@ struct AccountView: View {
 			if cloud.signed_in {
 				Text(cloud.email ?? "Your routines, on both devices").heading_font(15)
 				Text(cloud.status).supporting()
-				Text(library.has_pro ? "Pocketwork Pro · up to 50 pages" : "Free · 3 pages at a time").heading_font(15)
-				Text("MCP and sync are included. Pages hold routines and data. Existing pages stay available if you cancel Pro.").supporting()
+				Text(library.has_pro ? "Pocketwork Pro · up to 50 routines" : "Free · 3 routines at a time").heading_font(15)
+				Text(subscriptions.configured ? "Sync and MCP are included. Existing routines stay available if you cancel Pro." : "Sync and MCP are included.").supporting()
 				if subscriptions.configured {
 					if let product = subscriptions.product, !library.has_pro { Button("Subscribe · " + product.displayPrice + " / month") { Task { await subscriptions.purchase() } }.buttonStyle(PrimaryButtonStyle()).disabled(subscriptions.busy) }
 					else if !library.has_pro {
@@ -37,8 +37,8 @@ struct AccountView: View {
 					if subscriptions.is_sandbox {
 						Text("TestFlight purchase testing. No charge. Test Pro applies to this phone only; extra test pages are not synced to the live website.").supporting()
 					} else { Text("Renews monthly until cancelled in your Apple account. Payment is charged to your Apple account.").supporting() }
-				} else { Text("Pro purchases are not enabled in this build.").supporting() }
-				Link("Manage subscriptions", destination: URL(string: "https://apps.apple.com/account/subscriptions")!)
+				}
+				if subscriptions.configured || library.has_pro { Link("Manage subscriptions", destination: URL(string: "https://apps.apple.com/account/subscriptions")!) }
 				if let message = subscriptions.message { Text(message).supporting() }
 				Hairline()
 				HStack {
@@ -73,6 +73,6 @@ struct AccountView: View {
 			TextField("Type DELETE", text: $confirmation).textInputAutocapitalization(.characters)
 			Button("Delete account", role: .destructive) { Task { await cloud.delete_account() } }.disabled(confirmation != "DELETE")
 			Button("Cancel", role: .cancel) { }
-		} message: { Text("This deletes your cloud pages and this phone's account library. Export anything you want to keep. Cancel your Apple subscription separately first. Apple sign-in requires one more confirmation.") }
+		} message: { Text("This deletes your cloud routines and this phone's account library. Export anything you want to keep. " + (subscriptions.configured ? "Cancel your Apple subscription separately first. " : "") + "Apple sign-in requires one more confirmation.") }
 	}
 }

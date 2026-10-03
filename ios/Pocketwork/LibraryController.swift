@@ -130,7 +130,7 @@ final class LibraryController: ObservableObject {
 	private func persist(_ next: ToolLibrary) throws {
 		guard !storage_blocked else { throw DocumentError.invalid("Saved tools need attention before new changes can be kept. Choose Replace unreadable data from the menu.") }
 		let old_ids = Set(library.tools.map(\.id))
-		if !has_pro && next.tools.count > 3 && next.tools.contains(where: { !old_ids.contains($0.id) }) { throw DocumentError.invalid("Your free plan holds 3 pages. Delete one to make room, or upgrade in Account & sync. Existing pages stay available.") }
+		if !has_pro && next.tools.count > 3 && next.tools.contains(where: { !old_ids.contains($0.id) }) { throw DocumentError.invalid(Bundle.main.object(forInfoDictionaryKey: "PocketworkSubscriptionsEnabled") as? Bool == true ? "Your free plan holds 3 routines. Delete one to make room, or upgrade in Account & sync. Existing routines stay available." : "You can keep 3 routines at a time. Delete one to make room for another.") }
 		defaults.set(try next.encoded(), forKey: current_key)
 		defaults.removeObject(forKey: Self.legacy_key)
 		library = next

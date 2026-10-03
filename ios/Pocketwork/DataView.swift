@@ -103,7 +103,14 @@ struct DataView: View {
 
 	private func load() async {
 		focus = SessionHistory.load(from: .standard)
-		guard !CommandLine.arguments.contains("--ui-testing") else { return }
+		guard !CommandLine.arguments.contains("--ui-testing") else {
+			// Screenshot runs pass a sample ledger; the real engine is never touched under UI tests.
+			if let sample = ProcessInfo.processInfo.environment["POCKETWORK_UI_HOME_STATE"] {
+				do { home = try JSONDecoder().decode(HomeState.self, from: Data(sample.utf8)) }
+				catch { load_error = "Invalid sample home state: \(error.localizedDescription)" }
+			}
+			return
+		}
 		do { home = try await HomeWorker.run { try HomeEngine.snapshot() }; load_error = nil }
 		catch { load_error = "Could not read home allowance data: \(error.localizedDescription)" }
 	}
