@@ -50,6 +50,8 @@ final class HomeLocationController: NSObject, ObservableObject, CLLocationManage
 		manager.startMonitoring(for: region); manager.requestState(for: region)
 	}
 	func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+		// Unsigned UI-test builds have no App Group, so the engine call below would only report a storage error.
+		guard !CommandLine.arguments.contains("--ui-testing") else { return }
 		always_allowed = manager.authorizationStatus == .authorizedAlways
 		if setting_home, manager.authorizationStatus == .authorizedAlways || manager.authorizationStatus == .authorizedWhenInUse { manager.requestLocation() }
 		if always_allowed { restore() }

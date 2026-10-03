@@ -30,21 +30,24 @@ final class AppStoreScreenshots: XCTestCase {
 		// Charts render a moment after the page appears.
 		_ = app.descendants(matching: .any)["page.focus"].waitForExistence(timeout: 10)
 		try snap("02-page")
+		app.swipeUp()
+		_ = app.descendants(matching: .any)["page.focus"].waitForExistence(timeout: 10)
+		try snap("03-page-data")
 		app.navigationBars["Homework block"].buttons["My pages"].tap()
 
 		app.buttons["Open Home allowance"].tap()
 		XCTAssertTrue(app.navigationBars["Home allowance"].waitForExistence(timeout: 10))
-		try snap("03-home-allowance")
+		try snap("04-home-allowance")
 		app.swipeUp()
 		_ = app.descendants(matching: .any)["allowance.chart"].waitForExistence(timeout: 10)
-		try snap("04-home-allowance-data")
+		try snap("05-home-allowance-data")
 		app.navigationBars["Home allowance"].buttons["My pages"].tap()
 
 		app.buttons["New page"].tap()
 		let add = app.buttons["editor.add-block"].waitForExistence(timeout: 10) ? app.buttons["editor.add-block"] : app.descendants(matching: .any)["editor.add-block"]
 		add.tap()
 		XCTAssertTrue(app.navigationBars["Add block"].waitForExistence(timeout: 10))
-		try snap("05-add-block")
+		try snap("06-add-block")
 	}
 
 	private func snap(_ name: String) throws {
