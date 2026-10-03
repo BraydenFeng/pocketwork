@@ -238,7 +238,7 @@ final class SessionController: ObservableObject {
 		UserDefaults.standard.removeObject(forKey: started_key)
 		let elapsed = max(0, Int(min(ended_at, running.ends_at).timeIntervalSince(started) / 60))
 		var history = SessionHistory.load(from: .standard)
-		history.record(minutes: elapsed, at: ended_at)
+		history.record(minutes: elapsed, at: ended_at, page: running.document_id)
 		do { try history.save(to: .standard) } catch { logger.warning("Session history not saved: \(error.localizedDescription, privacy: .public)") }
 	}
 

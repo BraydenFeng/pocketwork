@@ -24,6 +24,10 @@ final class HomeAllowanceDisplay: ObservableObject {
 		// Only read the ledger; restarting the meter here would interrupt usage tracking.
 		let state = try await read_state()
 		try Task.checkCancellation()
+		show(state, policy: policy)
+	}
+
+	func show(_ state: HomeState, policy: HomePolicy?) {
 		let date = now()
 		let same_day = state.ledger.day == policy?.day_key(date)
 		let base = policy?.rule(at: date)?.allowance_minutes ?? 0

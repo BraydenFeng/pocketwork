@@ -3,12 +3,11 @@ import OSLog
 import SwiftUI
 import UniformTypeIdentifiers
 
-// The Routines tab: each routine is one row with its own switch or Start button; tapping a row opens it for editing.
+// The front door: saved pages as a grid of tiles. Tapping a tile opens the page, where its routines sit above its data.
 struct HomeView: View {
 	@EnvironmentObject private var cloud: CloudController
 	@EnvironmentObject private var library: LibraryController
 	@EnvironmentObject private var sessions: SessionController
-	@EnvironmentObject private var home: HomeLocationController
 	private struct RoutineRoute: Hashable { let id: String; var editing = false }
 	@State private var path: [RoutineRoute] = []
 	@State private var showing_groups = false
@@ -26,7 +25,7 @@ struct HomeView: View {
 					intro
 					if !cloud.signed_in {
 						VStack(alignment: .leading, spacing: Theme.gap) {
-							Text("Save your routines to an account").heading_font(15)
+							Text("Save your pages to an account").heading_font(15)
 							Text("Open them on your iPhone or computer. You can also keep using this device without an account.").supporting()
 							ViewThatFits(in: .horizontal) {
 								HStack(spacing: Theme.gap) { account_buttons }
@@ -35,18 +34,11 @@ struct HomeView: View {
 						}.padding(Theme.pad)
 					}
 					Hairline()
-					section(number: "01", label: "Routines", heading: library.sorted_tools.isEmpty ? "Nothing here yet." : nil, supporting: library.sorted_tools.isEmpty ? "Create a routine here, or sign in to bring in routines from your computer." : nil) {
+					section(number: "01", label: "My pages", heading: library.sorted_tools.isEmpty ? "Nothing here yet." : nil, supporting: library.sorted_tools.isEmpty ? "Create a page here, or sign in to bring in pages from your computer." : nil) {
 						if library.storage_blocked { storage_warning }
-						Button { editing = RoutineDraft(document: AppDocument.blank(), is_new: true) } label: { Label("New routine", systemImage: "plus") }.buttonStyle(PrimaryButtonStyle(accent: true))
-						if !library.sorted_tools.isEmpty {
-							VStack(spacing: 0) {
-								ForEach(library.sorted_tools) { entry in
-									routine_row(entry)
-									if entry.id != library.sorted_tools.last?.id { Hairline() }
-								}
-							}
-							.background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.radius_small))
-							.overlay(RoundedRectangle(cornerRadius: Theme.radius_small).strokeBorder(Theme.border))
+						Button { editing = RoutineDraft(document: AppDocument.blank(), is_new: true) } label: { Label("New page", systemImage: "plus") }.buttonStyle(PrimaryButtonStyle(accent: true))
+						LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+							ForEach(library.sorted_tools) { entry in page_tile(entry) }
 						}
 					}
 					Hairline()
@@ -69,7 +61,7 @@ struct HomeView: View {
 			}
 			.refreshable { await cloud.sync() }
 			.page()
-			.navigationTitle("Routines")
+			.navigationTitle("My pages")
 			.navigationBarTitleDisplayMode(.inline)
 			.navigationDestination(for: RoutineRoute.self) { route in ToolView(document_id: route.id, edit_on_open: route.editing) }
 			.navigationDestination(isPresented: $showing_groups) { GroupsView() }
@@ -90,7 +82,7 @@ struct HomeView: View {
 			.onOpenURL { url in if let id = WidgetSnapshot.routine_id(from: url), library.tool(id) != nil { path = [RoutineRoute(id: id)] } }
 			.sheet(item: $account_intent) { intent in NavigationStack { ScrollView { AccountView(intent: intent) }.page().navigationTitle(cloud.signed_in ? "Account & sync" : intent.title).navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .confirmationAction) { Button(cloud.signed_in ? "Done" : "Not now") { account_intent = nil }.accessibilityIdentifier("account.dismiss") } } } }
 			.fileImporter(isPresented: $showing_import, allowedContentTypes: [.json]) { result in import_file(result) }
-			.confirmationDialog("Delete \"\(pending_delete?.document.name ?? "this routine")\"? This cannot be undone.", isPresented: Binding(get: { pending_delete != nil }, set: { if !$0 { pending_delete = nil } }), titleVisibility: .visible) {
+			.confirmationDialog("Delete \"\(pending_delete?.document.name ?? "this page")\"? This cannot be undone.", isPresented: Binding(get: { pending_delete != nil }, set: { if !$0 { pending_delete = nil } }), titleVisibility: .visible) {
 				Button("Delete", role: .destructive) {
 					if let entry = pending_delete { Task { await sessions.forget(entry.document.id); library.delete(entry.document.id) } }
 					pending_delete = nil
@@ -100,9 +92,6 @@ struct HomeView: View {
 			.alert("Couldn’t complete that action", isPresented: Binding(get: { library.error_message != nil }, set: { if !$0 { library.error_message = nil } })) {
 				Button("OK") { library.error_message = nil }
 			} message: { Text(library.error_message ?? "") }
-			.alert("Couldn’t change that routine", isPresented: Binding(get: { sessions.error_message != nil && library.error_message == nil }, set: { if !$0 { sessions.error_message = nil } })) {
-				Button("OK") { sessions.error_message = nil }
-			} message: { Text(sessions.error_message ?? "") }
 		}
 	}
 
@@ -123,10 +112,10 @@ struct HomeView: View {
 
 	private var intro: some View {
 		VStack(alignment: .leading, spacing: 8) {
-			Text("Switch a routine on, or tap it to edit.").supporting()
+			Text("Each page holds routines and the data they track.").supporting()
 			HStack(spacing: 8) {
 				Circle().fill(library.storage_blocked ? Theme.danger : Theme.success).frame(width: 6, height: 6)
-				Text(library.storage_blocked ? "Saved routines need attention" : "\(library.sorted_tools.count) saved on this iPhone").font(.system(size: 13)).foregroundStyle(library.storage_blocked ? Theme.danger : Theme.text_faint)
+				Text(library.storage_blocked ? "Saved pages need attention" : "\(library.sorted_tools.count) saved on this iPhone").font(.system(size: 13)).foregroundStyle(library.storage_blocked ? Theme.danger : Theme.text_faint)
 			}.padding(.top, 4)
 		}
 		.padding(Theme.pad)
@@ -137,7 +126,7 @@ struct HomeView: View {
 	private var storage_warning: some View {
 		Card(tinted: true) {
 			VStack(alignment: .leading, spacing: 10) {
-				Label("Your saved routines could not be opened. Nothing has been overwritten.", systemImage: "exclamationmark.triangle").font(.system(size: 13)).foregroundStyle(Theme.danger)
+				Label("Your saved pages could not be opened. Nothing has been overwritten.", systemImage: "exclamationmark.triangle").font(.system(size: 13)).foregroundStyle(Theme.danger)
 				Button("Replace unreadable data") { library.replace_unreadable() }.buttonStyle(QuietButtonStyle(danger: true))
 			}
 		}
@@ -155,48 +144,31 @@ struct HomeView: View {
 		.padding(Theme.pad)
 	}
 
-	private func routine_row(_ entry: LibraryEntry) -> some View {
+	private func page_tile(_ entry: LibraryEntry) -> some View {
 		let document = entry.document
-		return HStack(spacing: 12) {
-			Button { path = [RoutineRoute(id: document.id, editing: true)] } label: {
-				VStack(alignment: .leading, spacing: 4) {
-					Text(document.name).heading_font(16).multilineTextAlignment(.leading)
-					Text(status_line(entry)).font(.system(size: 12)).foregroundStyle(Theme.text_faint).multilineTextAlignment(.leading)
+		let running = sessions.session?.document_id == document.id
+		return Button { path = [RoutineRoute(id: document.id)] } label: {
+			VStack(alignment: .leading, spacing: 8) {
+				HStack(alignment: .top, spacing: 6) {
+					Text(document.name).heading_font(16).multilineTextAlignment(.leading).lineLimit(3)
+					Spacer(minLength: 0)
+					if running || document.enabled == true { Circle().fill(Theme.success).frame(width: 7, height: 7).padding(.top, 6).accessibilityHidden(true) }
 				}
-				.frame(maxWidth: .infinity, alignment: .leading)
-				.contentShape(Rectangle())
+				Spacer(minLength: 0)
+				Text(status_line(entry)).font(.system(size: 12)).foregroundStyle(Theme.text_faint).multilineTextAlignment(.leading).lineLimit(2)
 			}
-			.buttonStyle(.plain)
-			.accessibilityLabel("Edit \(document.name)")
-			.accessibilityIdentifier("home.edit.\(document.id)")
-			.disabled(sessions.is_busy || sessions.is_running(document))
-			control(for: document)
+			.padding(14)
+			.frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
+			.background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.radius))
+			.overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.border))
+			.contentShape(Rectangle())
 		}
-		.padding(.horizontal, 14).padding(.vertical, 12)
-		.frame(minHeight: 60)
+		.buttonStyle(.plain)
+		.accessibilityLabel("Open \(document.name)")
+		.accessibilityIdentifier("tool.\(document.id)")
 		.contextMenu {
 			Button("Duplicate", systemImage: "doc.on.doc") { _ = library.duplicate(document.id) }.disabled(document.home_allowance != nil)
 			Button("Delete", systemImage: "trash", role: .destructive) { pending_delete = entry }
-		}
-	}
-
-	// Routines that enforce themselves get a switch; routines you start yourself get Start/Stop; plain pages get nothing.
-	@ViewBuilder private func control(for document: AppDocument) -> some View {
-		if document.home_allowance != nil || document.is_standing {
-			Toggle("On", isOn: Binding(get: { document.enabled == true }, set: { enabled in
-				Task { if await sessions.set_routine(document, enabled: enabled, groups: library.groups) { library.set_enabled(document.id, enabled) } }
-			}))
-			// Matches the allowance page: without a saved home and Always location, the engine could be on but never count anything.
-			.labelsHidden().tint(Theme.success).disabled(sessions.is_busy || (document.home_allowance != nil && document.enabled != true && !(home.has_home && home.always_allowed)))
-			.accessibilityLabel("Switch \(document.name) on or off")
-		} else if document.has_timer {
-			let running = sessions.is_running(document)
-			Button(running ? "Stop" : "Start") {
-				if running { sessions.stop() } else { Task { await sessions.start(document, groups: library.groups) } }
-			}
-			.buttonStyle(QuietButtonStyle())
-			.disabled(sessions.is_busy || (sessions.session != nil && !running))
-			.accessibilityLabel("\(running ? "Stop" : "Start") \(document.name)")
 		}
 	}
 
@@ -205,12 +177,9 @@ struct HomeView: View {
 		if let session = sessions.session, session.document_id == document.id {
 			return "Running · ends \(session.ends_at.formatted(date: .omitted, time: .shortened))"
 		}
-		if document.home_allowance != nil {
-			if document.enabled == true { return "Home allowance · on" }
-			return home.has_home && home.always_allowed ? "Home allowance · off" : "Home allowance · tap to set home first"
-		}
+		if document.home_allowance != nil { return document.enabled == true ? "Home allowance · on" : "Home allowance · off" }
 		if let schedule = document.schedule { return ScheduleWindow.describe_status(schedule, enabled: document.enabled == true, at: .now) }
-		if let minutes = document.blocks.first(where: { $0.type == .timer })?.minutes { return "\(minutes)-minute session" }
+		if let minutes = document.blocks.first(where: { $0.type == .timer })?.minutes { return "\(minutes)-minute timer" }
 		return ToolCopy.edited(entry, now: .now)
 	}
 

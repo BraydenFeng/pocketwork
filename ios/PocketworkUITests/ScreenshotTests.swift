@@ -30,8 +30,8 @@ final class ScreenshotTests: XCTestCase {
 		app.buttons["home.sign-in"].tap()
 		XCTAssertTrue(app.navigationBars["Sign in"].waitForExistence(timeout: 10))
 		app.buttons["account.dismiss"].tap()
-		app.buttons["New routine"].tap()
-		XCTAssertTrue(app.navigationBars["New routine"].waitForExistence(timeout: 10))
+		app.buttons["New page"].tap()
+		XCTAssertTrue(app.navigationBars["New page"].waitForExistence(timeout: 10))
 		app.buttons["Cancel"].tap()
 		XCTAssertTrue(app.buttons["home.create-account"].exists)
 	}
@@ -43,21 +43,21 @@ final class ScreenshotTests: XCTestCase {
 		let apple_sign_in = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts["Sign in to Apple Account"]
 		XCTAssertFalse(apple_sign_in.waitForExistence(timeout: 3), "Opening a guest workspace must not request an Apple purchase sign-in")
 		try snap("16-guest-without-purchase-prompt")
-		app.buttons["New routine"].tap()
-		XCTAssertTrue(app.navigationBars["New routine"].waitForExistence(timeout: 10))
+		app.buttons["New page"].tap()
+		XCTAssertTrue(app.navigationBars["New page"].waitForExistence(timeout: 10))
 	}
 
 	func test_walkthrough_screens() throws {
-		XCTAssertTrue(app.navigationBars["Routines"].waitForExistence(timeout: 10))
+		XCTAssertTrue(app.navigationBars["My pages"].waitForExistence(timeout: 10))
 		try snap("01-home-empty")
 		XCTAssertFalse(app.buttons["Use this routine"].exists)
-		app.buttons["New routine"].tap()
-		XCTAssertTrue(app.navigationBars["New routine"].waitForExistence(timeout: 10))
+		app.buttons["New page"].tap()
+		XCTAssertTrue(app.navigationBars["New page"].waitForExistence(timeout: 10))
 		XCTAssertTrue(app.textFields["editor.name"].exists || app.textViews["editor.name"].exists)
 		try snap("02-new-page")
 		app.buttons["Cancel"].tap()
-		XCTAssertFalse(app.buttons["Edit My routine"].exists)
-		app.buttons["New routine"].tap()
+		XCTAssertFalse(app.buttons["Open My page"].exists)
+		app.buttons["New page"].tap()
 		element("editor.add-block").tap()
 		XCTAssertTrue(app.navigationBars["Add block"].waitForExistence(timeout: 10))
 		try snap("03-block-picker")
@@ -65,12 +65,15 @@ final class ScreenshotTests: XCTestCase {
 		XCTAssertTrue(app.buttons["block.checklist"].waitForExistence(timeout: 10))
 		try snap("04-page-editor")
 		app.buttons["Save"].tap()
-		XCTAssertTrue(app.buttons["Edit My routine"].waitForExistence(timeout: 10))
-		try snap("05-home-with-routine")
-		app.buttons["Edit My routine"].tap()
-		XCTAssertTrue(app.navigationBars["My routine"].waitForExistence(timeout: 10))
+		XCTAssertTrue(app.buttons["Open My page"].waitForExistence(timeout: 10))
+		try snap("05-home-with-page")
+		app.buttons["Open My page"].tap()
+		XCTAssertTrue(app.navigationBars["My page"].waitForExistence(timeout: 10))
+		XCTAssertTrue(app.buttons["page.add-routine"].waitForExistence(timeout: 10))
+		try snap("09a-page-routines-and-data")
+		app.buttons["tool.edit"].tap()
 		XCTAssertTrue(app.textFields["page.name"].waitForExistence(timeout: 10))
-		XCTAssertFalse(app.navigationBars["Edit routine"].exists)
+		XCTAssertFalse(app.navigationBars["Edit page"].exists)
 		try snap("09-routine-inline-edit")
 		// The fixed footer is visible; bypass XCTest trying to scroll its accessibility node.
 		app.buttons["page.add-block"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
@@ -83,7 +86,7 @@ final class ScreenshotTests: XCTestCase {
 		app.buttons["Save"].tap()
 		XCTAssertTrue(app.staticTexts["A note to myself"].waitForExistence(timeout: 10))
 		try snap("10-routine-after-save")
-		app.navigationBars["My routine"].buttons["Routines"].tap()
+		app.navigationBars["My page"].buttons["My pages"].tap()
 		app.swipeUp()
 		element("home.groups").tap()
 		XCTAssertTrue(app.navigationBars["App groups"].waitForExistence(timeout: 10))
@@ -104,8 +107,9 @@ final class ScreenshotTests: XCTestCase {
 		{"schema_version":1,"tools":[{"updated_at":"2026-09-13T00:00:00.000Z","document":{"schema_version":2,"id":"home-distraction-allowance","name":"Home distraction allowance","description":"Only distraction time at home counts.","enabled":false,"rules":{"block_during_focus":true,"notify_on_complete":false},"blocks":[{"id":"heading","type":"heading","title":"Home allowance","subtitle":""},{"id":"schedule","type":"schedule","title":"Weekly windows","days":[1,2,3,4,5,6,7],"start":"00:00","end":"23:59"},{"id":"shield","type":"screen_time","title":"Distractions","mode":"block","groups":["Distractions"]}],"home_allowance":{"timezone":"America/Los_Angeles","away_usage_counts":false,"outside_windows":"block_at_home","rules":[{"days":[2,3,4,5],"allowance_minutes":30,"windows":[{"start":"18:00","end":"18:30"},{"start":"19:00","end":"20:50"}]},{"days":[6],"allowance_minutes":120,"windows":[{"start":"14:30","end":"20:20"}]},{"days":[1,7],"allowance_minutes":180,"windows":[{"start":"06:30","end":"20:30"}]}]}}}],"groups":[{"id":"distractions","name":"Distractions"}]}
 		"""
 		app.launch()
-		element("home.edit.home-distraction-allowance").tap()
+		element("tool.home-distraction-allowance").tap()
 		XCTAssertTrue(app.navigationBars["Home allowance"].waitForExistence(timeout: 10))
+		app.buttons["tool.edit"].tap()
 		try snap("08-home-allowance-editor")
 		let allowance = app.otherElements["home.allowance.2"].firstMatch.exists ? app.otherElements["home.allowance.2"].firstMatch : app.descendants(matching: .any)["home.allowance.2"].firstMatch
 		XCTAssertTrue(app.buttons["45 min"].firstMatch.waitForExistence(timeout: 10))
@@ -122,25 +126,17 @@ final class ScreenshotTests: XCTestCase {
 		XCTAssertTrue(app.buttons["45 min"].firstMatch.waitForExistence(timeout: 10))
 		XCTAssertEqual(allowance.value as? String, "45 minutes")
 		app.buttons["Cancel"].tap()
-		app.navigationBars["Home allowance"].buttons["Routines"].tap()
+		app.navigationBars["Home allowance"].buttons["My pages"].tap()
 		app.swipeUp()
 		element("home.group.distractions").tap()
 		XCTAssertTrue(app.navigationBars["Distractions"].waitForExistence(timeout: 10))
-	}
-
-	func test_data_tab() throws {
-		app.tabBars.buttons["Data"].tap()
-		XCTAssertTrue(app.navigationBars["Data"].waitForExistence(timeout: 10))
-		try snap("17-data")
-		app.tabBars.buttons["Routines"].tap()
-		XCTAssertTrue(app.navigationBars["Routines"].waitForExistence(timeout: 10))
 	}
 
 	// Advanced logic sits behind the ⋯ menu; open the menu, then the item.
 	private func open_logic() {
 		let item = app.buttons["editor.logic"]
 		if !item.waitForExistence(timeout: 2) {
-			// The Routines tab keeps its own ⋯ menu in the hierarchy; use the editor's bar, the one with Save.
+			// The home screen's ⋯ menu stays in the hierarchy under the editor sheet; use the editor's bar, the one with Save.
 			let editor_bar = app.navigationBars.allElementsBoundByIndex.last { $0.buttons["Save"].exists } ?? app.navigationBars.firstMatch
 			let menus = editor_bar.buttons.matching(NSPredicate(format: "label == %@ OR identifier == %@", "More", "ellipsis"))
 			// Toolbar buttons cannot be scrolled into view; tap the menu by its coordinates instead of letting XCTest try.
@@ -174,10 +170,8 @@ final class ScreenshotTests: XCTestCase {
 """#.replacingOccurrences(of: "behavior-test-id", with: UUID().uuidString)
 		app.launchEnvironment["POCKETWORK_UI_LIBRARY"] = fixture
 		app.launch()
-		XCTAssertTrue(app.buttons["Edit Gym check-ins"].waitForExistence(timeout: 10))
-		app.buttons["Edit Gym check-ins"].tap()
-		// Rows open in edit mode; Cancel returns to the live page.
-		app.buttons["Cancel"].tap()
+		XCTAssertTrue(app.buttons["Open Gym check-ins"].waitForExistence(timeout: 10))
+		app.buttons["Open Gym check-ins"].tap()
 		XCTAssertTrue(app.buttons["behavior.tap"].waitForExistence(timeout: 10))
 		app.buttons["behavior.tap"].tap()
 		app.buttons["behavior.tap"].tap()
@@ -185,7 +179,7 @@ final class ScreenshotTests: XCTestCase {
 		try snap("11-connected-behaviors")
 	}
 	func test_build_logic_on_phone() throws {
-		app.buttons["New routine"].tap()
+		app.buttons["New page"].tap()
 		open_logic()
 		XCTAssertTrue(app.navigationBars["Logic"].waitForExistence(timeout: 10))
 		for (kind, title) in [("button", "Button"), ("reminder", "Reminder")] {
@@ -205,9 +199,8 @@ final class ScreenshotTests: XCTestCase {
 		try snap("12-native-logic-canvas")
 		app.buttons["logic.apply"].tap()
 		app.buttons["Save"].tap()
-		XCTAssertTrue(app.buttons["Edit My routine"].waitForExistence(timeout: 10))
-		app.buttons["Edit My routine"].tap()
-		app.buttons["Cancel"].tap()
+		XCTAssertTrue(app.buttons["Open My page"].waitForExistence(timeout: 10))
+		app.buttons["Open My page"].tap()
 		let tap = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "behavior.")).firstMatch
 		XCTAssertTrue(tap.waitForExistence(timeout: 10)); tap.tap()
 		XCTAssertTrue(app.staticTexts["Time for your routine."].waitForExistence(timeout: 10))

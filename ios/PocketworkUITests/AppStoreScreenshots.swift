@@ -22,31 +22,25 @@ final class AppStoreScreenshots: XCTestCase {
 	}
 
 	func test_app_store_screenshots() throws {
-		XCTAssertTrue(app.buttons["Edit Homework block"].waitForExistence(timeout: 15))
-		try snap("01-routines")
+		XCTAssertTrue(app.buttons["Open Homework block"].waitForExistence(timeout: 15))
+		try snap("01-pages")
 
-		app.buttons["Edit Homework block"].tap()
-		XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 10))
-		app.buttons["Cancel"].tap()
+		app.buttons["Open Homework block"].tap()
 		XCTAssertTrue(app.navigationBars["Homework block"].waitForExistence(timeout: 10))
-		try snap("02-routine")
-		app.navigationBars["Homework block"].buttons["Routines"].tap()
+		// Charts render a moment after the page appears.
+		_ = app.descendants(matching: .any)["page.focus"].waitForExistence(timeout: 10)
+		try snap("02-page")
+		app.navigationBars["Homework block"].buttons["My pages"].tap()
 
-		app.tabBars.buttons["Data"].tap()
-		XCTAssertTrue(app.navigationBars["Data"].waitForExistence(timeout: 10))
-		// Charts render a moment after the tab appears.
-		_ = app.descendants(matching: .any)["data.focus"].waitForExistence(timeout: 10)
-		try snap("03-data")
-		app.tabBars.buttons["Routines"].tap()
-
-		app.buttons["Edit Home allowance"].tap()
-		XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 10))
-		app.buttons["Cancel"].tap()
+		app.buttons["Open Home allowance"].tap()
 		XCTAssertTrue(app.navigationBars["Home allowance"].waitForExistence(timeout: 10))
-		try snap("04-home-allowance")
-		app.navigationBars["Home allowance"].buttons["Routines"].tap()
+		try snap("03-home-allowance")
+		app.swipeUp()
+		_ = app.descendants(matching: .any)["allowance.chart"].waitForExistence(timeout: 10)
+		try snap("04-home-allowance-data")
+		app.navigationBars["Home allowance"].buttons["My pages"].tap()
 
-		app.buttons["New routine"].tap()
+		app.buttons["New page"].tap()
 		let add = app.buttons["editor.add-block"].waitForExistence(timeout: 10) ? app.buttons["editor.add-block"] : app.descendants(matching: .any)["editor.add-block"]
 		add.tap()
 		XCTAssertTrue(app.navigationBars["Add block"].waitForExistence(timeout: 10))
@@ -73,7 +67,9 @@ final class AppStoreScreenshots: XCTestCase {
 			let parts = calendar.dateComponents([.year, .month, .day], from: date)
 			days.append(String(format: "\"%04d-%02d-%02d\":{\"minutes\":%d,\"sessions\":%d}", parts.year!, parts.month!, parts.day!, value, max(1, value / 45)))
 		}
-		return "{\"days\":{\(days.joined(separator: ","))}}"
+		// The same days are filed under the Homework block page so its Data section has a chart.
+		let joined = days.joined(separator: ",")
+		return "{\"days\":{\(joined)},\"pages\":{\"homework-block\":{\(joined)}}}"
 	}
 
 	// The allowance ledger keys days as Y-M-D in Los Angeles time and stores [used, budget] per past day.

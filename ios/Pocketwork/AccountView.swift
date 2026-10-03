@@ -25,8 +25,8 @@ struct AccountView: View {
 			if cloud.signed_in {
 				Text(cloud.email ?? "Your routines, on both devices").heading_font(15)
 				Text(cloud.status).supporting()
-				Text(library.has_pro ? "Pocketwork Pro · up to 50 routines" : "Free · 3 routines at a time").heading_font(15)
-				Text(subscriptions.configured ? "Sync and MCP are included. Existing routines stay available if you cancel Pro." : "Sync and MCP are included.").supporting()
+				Text(library.has_pro ? "Pocketwork Pro · up to 50 pages" : "Free · 3 pages at a time").heading_font(15)
+				Text(subscriptions.configured ? "Sync and MCP are included. Existing pages stay available if you cancel Pro." : "Sync and MCP are included.").supporting()
 				if subscriptions.configured {
 					if let product = subscriptions.product, !library.has_pro { Button("Subscribe · " + product.displayPrice + " / month") { Task { await subscriptions.purchase() } }.buttonStyle(PrimaryButtonStyle()).disabled(subscriptions.busy) }
 					else if !library.has_pro {
@@ -73,6 +73,6 @@ struct AccountView: View {
 			TextField("Type DELETE", text: $confirmation).textInputAutocapitalization(.characters)
 			Button("Delete account", role: .destructive) { Task { await cloud.delete_account() } }.disabled(confirmation != "DELETE")
 			Button("Cancel", role: .cancel) { }
-		} message: { Text("This deletes your cloud routines and this phone's account library. Export anything you want to keep. " + (subscriptions.configured ? "Cancel your Apple subscription separately first. " : "") + "Apple sign-in requires one more confirmation.") }
+		} message: { Text("This deletes your cloud pages and this phone's account library. Export anything you want to keep. " + (subscriptions.configured ? "Cancel your Apple subscription separately first. " : "") + "Apple sign-in requires one more confirmation.") }
 	}
 }

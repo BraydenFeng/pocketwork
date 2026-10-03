@@ -46,24 +46,36 @@ struct SessionHistory: Codable, Equatable {
 	struct Day: Codable, Equatable { var minutes = 0; var sessions = 0 }
 	static let key = "session_history.v1"
 	var days: [String: Day] = [:]
+	// The same days per page, so a page can chart its own focus time. Sessions recorded before this existed only appear in `days`.
+	var pages: [String: [String: Day]]? = nil
 
 	static func day_key(_ date: Date, calendar: Calendar = .current) -> String {
 		let parts = calendar.dateComponents([.year, .month, .day], from: date)
 		return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
 	}
 
-	mutating func record(minutes: Int, at date: Date = .now) {
+	mutating func record(minutes: Int, at date: Date = .now, page: String? = nil) {
 		guard minutes > 0 else { return }
 		let key = Self.day_key(date)
 		var day = days[key] ?? Day()
 		day.minutes += minutes; day.sessions += 1
 		days[key] = day
+		if let page {
+			var page_days = pages?[page] ?? [:]
+			var page_day = page_days[key] ?? Day()
+			page_day.minutes += minutes; page_day.sessions += 1
+			page_days[key] = page_day
+			var all = pages ?? [:]
+			all[page] = page_days
+			pages = all
+		}
 		prune(before: date)
 	}
 
 	mutating func prune(before date: Date) {
 		let keep = Set((0..<StatusReport.history_days).compactMap { Calendar.current.date(byAdding: .day, value: -$0, to: date) }.map { Self.day_key($0) })
 		days = days.filter { keep.contains($0.key) }
+		if let all = pages { pages = all.mapValues { $0.filter { keep.contains($0.key) } }.filter { !$0.value.isEmpty } }
 	}
 
 	static func load(from defaults: UserDefaults) -> SessionHistory {

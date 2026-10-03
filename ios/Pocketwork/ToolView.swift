@@ -2,7 +2,8 @@ import Combine
 import FamilyControls
 import SwiftUI
 
-// Runs one routine, drawn like the phone preview in the web editor: the same blocks, with real timers, checklists, counters, and Screen Time.
+// One page: its routines on top (timers, schedules, app blocking) and its data below (checklists, counters, notes, history).
+// Edit turns the same page into the block editor.
 struct ToolView: View {
 	let document_id: String
 	var edit_on_open = false
@@ -16,6 +17,11 @@ struct ToolView: View {
 	@State private var draft_selection = FamilyActivitySelection()
 	@State private var showing_groups = false
 	@State private var showing_palette = false
+	@State private var palette_kinds: Set<BlockKind>?
+	@State private var palette_heading = "Add to this page"
+	@State private var focus = SessionHistory()
+	private static let routine_kinds: Set<BlockKind> = [.timer, .schedule, .screen_time]
+	private static let data_kinds: Set<BlockKind> = [.checklist, .counter, .note]
 	// UI tests freeze the clock; a view that redraws every second never lets XCUITest see the app as idle.
 	private static let frozen = CommandLine.arguments.contains("--ui-testing")
 	private let frozen = ToolView.frozen
@@ -27,28 +33,22 @@ struct ToolView: View {
 			else if let document = editor.draft ?? library.tool(document_id) {
 				ScrollView {
 					VStack(alignment: .leading, spacing: 20) {
-						HStack(spacing: 8) {
-							RoundedRectangle(cornerRadius: 3).fill(Theme.text).frame(width: 12, height: 12)
-							if editor.active {
+						if editor.active {
+							HStack(spacing: 8) {
+								RoundedRectangle(cornerRadius: 3).fill(Theme.text).frame(width: 12, height: 12)
 								TextField("Page name", text: Binding(get: { editor.draft?.name ?? "" }, set: { editor.draft?.name = $0 })).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text_dim).accessibilityIdentifier("page.name")
-							} else {
-								Text(document.name).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text_dim)
 							}
-						}
-						ForEach(document.blocks) { block in
-							if editor.active {
+							ForEach(document.blocks) { block in
 								InlineRoutineBlock(block: editor.block(block), groups: library.groups)
 									.contextMenu {
 										Button("Move up", systemImage: "arrow.up") { editor.move(block.id, by: -1) }.disabled(document.blocks.first?.id == block.id)
 										Button("Move down", systemImage: "arrow.down") { editor.move(block.id, by: 1) }.disabled(document.blocks.last?.id == block.id)
 										Button("Remove block", systemImage: "trash", role: .destructive) { editor.draft = editor.draft?.removing_block(block.id) }.disabled(document.blocks.count == 1)
 									}
-							} else if [.heading, .note, .schedule, .screen_time].contains(block.type) {
-								// Tapping a settings-only block opens the page for editing, like clicking into a Notion block.
-								block_view(block, in: document).contentShape(Rectangle()).onTapGesture { if can_edit(document) { begin_editing(document) } }
-							} else { block_view(block, in: document) }
+							}
+						} else {
+							page_sections(document)
 						}
-						if !editor.active, document.behaviors != nil { BehaviorPanel(document: document) }
 					}
 					.padding(Theme.pad)
 					.padding(.bottom, 24).disabled(editor.saving)
@@ -57,7 +57,7 @@ struct ToolView: View {
 				.navigationTitle(library.tool(document_id)?.name ?? document.name)
 				.navigationBarBackButtonHidden(editor.active)
 				.scrollDismissesKeyboard(.interactively)
-				.navigationBarTitleDisplayMode(.inline)
+				.navigationBarTitleDisplayMode(editor.active ? .inline : .large)
 				.toolbar {
 					ToolbarItem(placement: .topBarTrailing) {
 						if editor.active { Button("Save") { Task { await editor.save(library: library, sessions: sessions) } }.fontWeight(.semibold).foregroundStyle(Theme.accent).disabled(editor.saving || sessions.is_busy) }
@@ -73,9 +73,10 @@ struct ToolView: View {
 					}
 				}
 				.safeAreaInset(edge: .bottom) { if editor.active { editing_bar } }
-				.sheet(isPresented: $showing_palette) { BlockPalette(can_add: { editor.draft?.can_add($0) == true }, add: { editor.add($0) }) }
+				.sheet(isPresented: $showing_palette) { BlockPalette(can_add: { editor.draft?.can_add($0) == true }, add: { editor.add($0) }, kinds: palette_kinds, heading: palette_heading) }
 				.fullScreenCover(isPresented: $showing_behavior) { if let draft = editor.draft { LogicEditorView(document: Binding(get: { editor.draft ?? draft }, set: { editor.draft = $0 })) } }
-				.onAppear { if !opened { opened = true; if edit_on_open { editor.begin(document) } } }
+				.onAppear { focus = SessionHistory.load(from: .standard); if !opened { opened = true; if edit_on_open { editor.begin(document) } } }
+				.onChange(of: sessions.session) { _, _ in focus = SessionHistory.load(from: .standard) }
 				.alert("Couldn’t save changes", isPresented: Binding(get: { editor.failure != nil }, set: { if !$0 { editor.failure = nil } })) { Button("OK") { editor.failure = nil } } message: { Text(editor.failure ?? "") }
 				.navigationDestination(isPresented: $showing_groups) { GroupsView() }
 				.sheet(isPresented: $showing_picker) {
@@ -91,8 +92,8 @@ struct ToolView: View {
 			} else {
 				VStack(spacing: 12) {
 					Image(systemName: "square.stack.3d.up").font(.system(size: 28)).foregroundStyle(Theme.text_faint)
-					Text("This routine was deleted").heading_font(17)
-					Text("Go back to Routines to pick another.").supporting()
+					Text("This page was deleted").heading_font(17)
+					Text("Go back to My pages to pick another.").supporting()
 				}
 				.frame(maxWidth: .infinity, maxHeight: .infinity)
 				.page()
@@ -112,8 +113,122 @@ struct ToolView: View {
 			Button("Cancel") { editor.cancel() }.buttonStyle(TextButtonStyle()).frame(minHeight: 44)
 			Spacer()
 			if editor.saving { ProgressView() }
-			Button { showing_palette = true } label: { Label("Add block", systemImage: "plus").frame(minHeight: 44).contentShape(Rectangle()) }.buttonStyle(TextButtonStyle()).accessibilityIdentifier("page.add-block")
+			Button { palette_kinds = nil; palette_heading = "Add to this page"; showing_palette = true } label: { Label("Add block", systemImage: "plus").frame(minHeight: 44).contentShape(Rectangle()) }.buttonStyle(TextButtonStyle()).accessibilityIdentifier("page.add-block")
 		}.disabled(editor.saving)
+	}
+
+	// Not editing: description and headings, then Routines, then Data. Connected logic splits across both sections.
+	@ViewBuilder private func page_sections(_ document: AppDocument) -> some View {
+		if !document.description.isEmpty { Text(document.description).font(.system(size: 15)).foregroundStyle(Theme.text_dim) }
+		ForEach(document.blocks.filter { $0.type == .heading }) { block in
+			VStack(alignment: .leading, spacing: 4) {
+				Text(block.title).heading_font(20).fixedSize(horizontal: false, vertical: true)
+				if let subtitle = block.subtitle, !subtitle.isEmpty { Text(subtitle).supporting() }
+			}
+			.contentShape(Rectangle())
+			.onTapGesture { if can_edit(document) { begin_editing(document) } }
+		}
+		SectionLabel(text: "Routines").padding(.top, 4)
+		ForEach(document.blocks.filter { Self.routine_kinds.contains($0.type) }) { block in routine_view(block, in: document) }
+		if document.behaviors != nil {
+			BehaviorPanel(document: document, after_routines: { add_button("Add routine", kinds: Self.routine_kinds, in: document) }, data_section: { data_section(document) })
+		} else {
+			if !document.blocks.contains(where: { Self.routine_kinds.contains($0.type) }) { Text("No routines yet. Add a timer, a schedule, or app blocking.").supporting() }
+			add_button("Add routine", kinds: Self.routine_kinds, in: document)
+			data_section(document)
+		}
+	}
+
+	@ViewBuilder private func data_section(_ document: AppDocument) -> some View {
+		let blocks = document.blocks.filter { Self.data_kinds.contains($0.type) }
+		SectionLabel(text: "Data").padding(.top, 8)
+		ForEach(blocks) { block in
+			if block.type == .note { block_view(block, in: document).contentShape(Rectangle()).onTapGesture { if can_edit(document) { begin_editing(document) } } }
+			else { block_view(block, in: document) }
+		}
+		focus_history(document)
+		if blocks.isEmpty && !document.has_timer && document.behaviors == nil { Text("Nothing tracked yet. Add a checklist, a counter, or a note.").supporting() }
+		add_button("Add data", kinds: Self.data_kinds, in: document)
+	}
+
+	@ViewBuilder private func focus_history(_ document: AppDocument) -> some View {
+		if document.has_timer {
+			let days = MinutesHistory.focus(focus, page: document.id)
+			let total = days.reduce(0) { $0 + $1.minutes }
+			VStack(alignment: .leading, spacing: 8) {
+				HStack {
+					Text("Focus time").heading_font(15)
+					Spacer()
+					Text("\(total) min · 14 days").mono_caption()
+				}
+				if total > 0 { MinutesChart(days: days).accessibilityIdentifier("page.focus") }
+				else { Text("Finish a session to see your focus time here.").supporting() }
+			}
+		}
+	}
+
+	private func add_button(_ title: String, kinds: Set<BlockKind>, in document: AppDocument) -> some View {
+		Button {
+			palette_kinds = kinds; palette_heading = title
+			begin_editing(document)
+			showing_palette = true
+		} label: { Label(title, systemImage: "plus").frame(minHeight: 44).contentShape(Rectangle()) }
+		.buttonStyle(TextButtonStyle()).disabled(!can_edit(document))
+		.accessibilityIdentifier(kinds == Self.routine_kinds ? "page.add-routine" : "page.add-data")
+	}
+
+	// Routines are compact rows: what it is, its state, and the one control that runs it. Tapping the text edits the page.
+	@ViewBuilder private func routine_view(_ block: BlockDocument, in document: AppDocument) -> some View {
+		switch block.type {
+		case .timer:
+			let running = sessions.is_running(document)
+			let other_running = sessions.session != nil && !running
+			Card(tinted: true) {
+				HStack(spacing: 12) {
+					VStack(alignment: .leading, spacing: 4) {
+						Text(block.title).heading_font(16)
+						TimelineView(.periodic(from: .now, by: frozen ? 3600 : 1)) { timeline in
+							if running, let session = sessions.session {
+								let seconds = session.remaining(at: timeline.date)
+								Text(String(format: "Running · %d:%02d left", seconds / 60, seconds % 60)).supporting()
+							} else {
+								Text("\(block.minutes ?? 25)-minute timer").supporting()
+							}
+						}
+						if other_running { Text("Another page is running a session.").font(.system(size: 11)).foregroundStyle(Theme.text_faint) }
+					}
+					.frame(maxWidth: .infinity, alignment: .leading)
+					.contentShape(Rectangle())
+					.onTapGesture { if can_edit(document) { begin_editing(document) } }
+					Button(sessions.is_busy ? "Wait" : running ? "Stop" : "Start") {
+						if running { sessions.stop() } else { Task { await sessions.start(document, groups: library.groups) } }
+					}
+					.buttonStyle(QuietButtonStyle()).disabled(sessions.is_busy || other_running)
+					.accessibilityLabel("\(running ? "Stop" : "Start") \(block.title)")
+					.accessibilityIdentifier("tool.start")
+				}
+			}
+		case .schedule:
+			let enabled = document.enabled == true
+			Card(tinted: true) {
+				HStack(spacing: 12) {
+					VStack(alignment: .leading, spacing: 4) {
+						Text(block.title).heading_font(16)
+						Text(ScheduleWindow.describe(block)).supporting()
+						TimelineView(.periodic(from: .now, by: frozen ? 3600 : 30)) { timeline in
+							Text(ScheduleWindow.describe_status(block, enabled: enabled, at: timeline.date)).font(.system(size: 11)).foregroundStyle(Theme.text_faint)
+						}
+					}
+					.frame(maxWidth: .infinity, alignment: .leading)
+					.contentShape(Rectangle())
+					.onTapGesture { if can_edit(document) { begin_editing(document) } }
+					Toggle(enabled ? "On" : "Off", isOn: Binding(get: { enabled }, set: { set_standing(document, $0) }))
+						.labelsHidden().tint(Theme.success).accessibilityLabel("Switch \(block.title) on or off").accessibilityIdentifier("tool.switch")
+				}
+			}
+		default:
+			block_view(block, in: document).contentShape(Rectangle()).onTapGesture { if can_edit(document) { begin_editing(document) } }
+		}
 	}
 
 	private func can_edit(_ document: AppDocument) -> Bool { !sessions.is_running(document) && !sessions.is_busy }

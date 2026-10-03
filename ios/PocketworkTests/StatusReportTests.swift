@@ -36,6 +36,23 @@ final class StatusReportTests: XCTestCase {
 		XCTAssertEqual(history.days.count, 1, "entries older than the history window are dropped")
 	}
 
+	func test_session_history_keeps_each_page_separately() throws {
+		var history = SessionHistory()
+		let today = Date()
+		history.record(minutes: 25, at: today, page: "homework")
+		history.record(minutes: 10, at: today, page: "reading")
+		history.record(minutes: 5, at: today)
+		XCTAssertEqual(history.days[SessionHistory.day_key(today)], SessionHistory.Day(minutes: 40, sessions: 3))
+		XCTAssertEqual(history.pages?["homework"]?[SessionHistory.day_key(today)], SessionHistory.Day(minutes: 25, sessions: 1))
+		XCTAssertEqual(MinutesHistory.focus(history, page: "homework").last?.minutes, 25)
+		XCTAssertEqual(MinutesHistory.focus(history, page: "homework").count, MinutesHistory.shown_days)
+		history.record(minutes: 10, at: Calendar.current.date(byAdding: .day, value: -45, to: today)!, page: "old")
+		history.record(minutes: 1, at: today)
+		XCTAssertNil(history.pages?["old"], "pages with only expired days are dropped")
+		let older = try JSONDecoder().decode(SessionHistory.self, from: Data(#"{"days":{}}"#.utf8))
+		XCTAssertNil(older.pages, "history saved before pages existed still loads")
+	}
+
 	@MainActor func test_report_describes_allowance_inside_a_window() throws {
 		let document = try allowance_document()
 		let library = try ToolLibrary.empty.upserting(document, now: .now)

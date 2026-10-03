@@ -216,10 +216,13 @@ struct ChipRow<Value: Hashable>: View {
 	}
 }
 
-// The seven things a person can put on a routine page, in plain words. Shared by the page editor and the new-routine sheet.
+// The seven things a person can put on a page, in plain words. Shared by the page editor and the new-page sheet.
+// Add routine and Add data narrow the list to their own kinds.
 struct BlockPalette: View {
 	let can_add: (BlockKind) -> Bool
 	let add: (BlockKind) -> Void
+	var kinds: Set<BlockKind>? = nil
+	var heading = "Add to this page"
 	@Environment(\.dismiss) private var dismiss
 	struct Entry: Identifiable { let kind: BlockKind; let title: String; let detail: String; let icon: String; var id: BlockKind { kind } }
 	static let entries: [Entry] = [
@@ -235,8 +238,8 @@ struct BlockPalette: View {
 		NavigationStack {
 			ScrollView {
 				VStack(alignment: .leading, spacing: 0) {
-					Text("Add to this routine").heading_font(22).padding(.vertical, 16)
-					ForEach(Self.entries) { entry in
+					Text(heading).heading_font(22).padding(.vertical, 16)
+					ForEach(Self.entries.filter { kinds?.contains($0.kind) ?? true }) { entry in
 						let allowed = can_add(entry.kind)
 						Button { add(entry.kind); dismiss() } label: {
 							DocumentRow(icon: entry.icon) {

@@ -24,7 +24,24 @@ struct HomeAllowanceView: View {
 			VStack(alignment: .leading, spacing: 16) {
 				if editor.active { TextField("Page name", text: Binding(get: { editor.draft?.name ?? "" }, set: { editor.draft?.name = $0 }), axis: .vertical).heading_font(26).accessibilityIdentifier("page.name") }
 				else { Text(document.name).heading_font(26) }
-				Text("Inside your windows, at home, you get these minutes and then the apps lock until the next window. Outside a window, or away from home, nothing is blocked. Resets at midnight in Los Angeles.").supporting()
+				if !editor.active, !document.description.isEmpty { Text(document.description).font(.system(size: 15)).foregroundStyle(Theme.text_dim) }
+				SectionLabel(text: "Routines").padding(.top, 4)
+				Card(tinted: true) {
+					VStack(alignment: .leading, spacing: 8) {
+						HStack(spacing: 12) {
+							VStack(alignment: .leading, spacing: 4) {
+								Text("Home allowance").heading_font(16)
+								Text(home.status).supporting()
+							}
+							.frame(maxWidth: .infinity, alignment: .leading)
+							Toggle("Enable home allowance", isOn: Binding(get: { document.enabled == true }, set: { enabled in
+								Task { if await sessions.set_routine(document, enabled: enabled, groups: library.groups) { library.set_enabled(document.id, enabled); refresh() } }
+							})).labelsHidden().disabled(sessions.is_busy || !home.has_home || !home.always_allowed).tint(Theme.success).accessibilityLabel("Enable home allowance")
+						}
+						if sessions.is_busy { ProgressView("Updating home allowance…") }
+						Text("Inside your windows, at home, you get these minutes and then the apps lock until the next window. Outside a window, or away from home, nothing is blocked. Resets at midnight in Los Angeles.").font(.system(size: 12)).foregroundStyle(Theme.text_faint)
+					}
+				}.disabled(editor.active)
 				if let policy = shown.home_allowance {
 					ForEach(Array(policy.rules.enumerated()), id: \.offset) { index, rule in
 						Card { if editor.active {
@@ -41,24 +58,29 @@ struct HomeAllowanceView: View {
 					}
 				}
 				Group {
-				if !editor.active, document.behaviors != nil, !document.behaviors_are_compiled_allowance { BehaviorPanel(document: document) }
-				Text(home.status).heading_font(15)
-				if let remaining = allowance.remaining { Text("\(remaining) minutes left today").supporting() }
-				Button(home.has_home ? "Update home to here" : "Set home here") { home.set_here() }.buttonStyle(QuietButtonStyle())
-				if !home.always_allowed { Button("Allow background home detection") { home.allow_background() }.buttonStyle(QuietButtonStyle()) }
-				Button("Choose Distractions") { picking_group = library.groups.first { $0.name == document.shield?.group_names.first } }.buttonStyle(QuietButtonStyle())
-				Toggle("Enable home allowance", isOn: Binding(get: { document.enabled == true }, set: { enabled in
-					Task { if await sessions.set_routine(document, enabled: enabled, groups: library.groups) { library.set_enabled(document.id, enabled); refresh() } }
-				})).disabled(sessions.is_busy || !home.has_home || !home.always_allowed).tint(Theme.success)
-				if sessions.is_busy { ProgressView("Updating home allowance…") }
-				Button("Refresh remaining time") { refresh() }.buttonStyle(TextButtonStyle())
-				if let state = allowance.state, let policy = document.home_allowance { diagnostics(state, policy: policy) }
-				Text("Outside the windows and away from home, nothing is blocked. Home uses a 150 m boundary. iOS may detect crossings late. Usage is saved in whole minutes; a final partial minute may not count when you leave.").supporting()
+					Button(home.has_home ? "Update home to here" : "Set home here") { home.set_here() }.buttonStyle(QuietButtonStyle())
+					if !home.always_allowed { Button("Allow background home detection") { home.allow_background() }.buttonStyle(QuietButtonStyle()) }
+					Button("Choose Distractions") { picking_group = library.groups.first { $0.name == document.shield?.group_names.first } }.buttonStyle(QuietButtonStyle())
+					if !editor.active, document.behaviors != nil, !document.behaviors_are_compiled_allowance { BehaviorPanel(document: document) }
+				}.disabled(editor.active)
+				SectionLabel(text: "Data").padding(.top, 8)
+				Group {
+					if let policy = document.home_allowance {
+						let usage = MinutesHistory.allowance(allowance.state, policy: policy)
+						let budget = usage.last?.budget ?? policy.rule(at: .now)?.allowance_minutes ?? 0
+						VStack(alignment: .leading, spacing: 8) {
+							Text("\(usage.last?.minutes ?? 0) of \(budget) min used today").heading_font(17)
+							MinutesChart(days: usage).accessibilityIdentifier("allowance.chart")
+						}
+					}
+					Button("Refresh remaining time") { refresh() }.buttonStyle(TextButtonStyle())
+					if let state = allowance.state, let policy = document.home_allowance { diagnostics(state, policy: policy) }
+					Text("Home uses a 150 m boundary. iOS may detect crossings late. Usage is saved in whole minutes; a final partial minute may not count when you leave.").supporting()
 				}.disabled(editor.active)
 				if let error = home.error_message ?? sessions.error_message { Text(error).foregroundStyle(Theme.danger).font(.system(size: 13)) }
 			}.padding(Theme.pad).disabled(editor.saving)
 		}.page().navigationTitle("Home allowance").navigationBarTitleDisplayMode(.inline)
-		.onAppear { visible = true; if !ui_testing { home.restore(); refresh() }; if !opened { opened = true; if edit_on_open { editor.begin(document) } } }
+		.onAppear { visible = true; if !ui_testing { home.restore() }; refresh(); if !opened { opened = true; if edit_on_open { editor.begin(document) } } }
 		.onDisappear { visible = false }
 		.onReceive(refresh_clock) { _ in refresh_if_active() }
 		.onChange(of: scene_phase) { _, _ in refresh_if_active() }
@@ -95,7 +117,14 @@ struct HomeAllowanceView: View {
 		refresh()
 	}
 	private func refresh() {
-		guard !ui_testing else { return }
+		guard !ui_testing else {
+			// Screenshot runs pass a sample ledger; the real engine is never touched under UI tests.
+			if let sample = ProcessInfo.processInfo.environment["POCKETWORK_UI_HOME_STATE"] {
+				do { allowance.show(try JSONDecoder().decode(HomeState.self, from: Data(sample.utf8)), policy: document.home_allowance) }
+				catch { sessions.report(error) }
+			}
+			return
+		}
 		Task {
 			do { try await allowance.refresh(policy: document.home_allowance) }
 			catch { sessions.report(error) }

@@ -1,6 +1,10 @@
 # Pocketwork — interface brief
 
-## October 1: phone tabs
+## October 2: page tiles, routines over data
+
+Brayden rejected the October 1 Routines/Data tabs the same day. The phone home is My pages again, drawn as a grid of page tiles (name and a one-line status); tapping a tile opens the page. Inside a page, the description and headings come first, then a Routines section and then a Data section. Routines are compact rows: a timer with Start/Stop, a schedule or home allowance with its switch, and app blocking, plus Add routine; tapping a routine opens the page editor. Data holds checklists, counters, notes, and history: the page's own focus minutes for 14 days, or the allowance's usage against its budget with Diagnostics. Connected logic splits the same way, with controls under Routines and values, logs, and charts under Data. Edit still turns the whole page into the block editor.
+
+## October 1: phone tabs (superseded October 2)
 
 Brayden asked for the iPhone app to split into two tabs, Routines and Data. Routines lists each routine as one row: a switch for routines that enforce themselves (schedules and the home allowance), Start/Stop for timer routines, and nothing for plain pages. Tapping a row opens the routine in edit mode; Cancel or Save returns to its live page. Data is read-only and shows what the phone has recorded: home allowance minutes against budget and focus-session minutes, each for the last 14 days. App groups stay under Routines. A block-authored home allowance no longer shows its compiled graph as a second live panel on the phone, and the Home allowance page has a Diagnostics section listing the engine's recent decisions so missed minutes can be traced on a device.
 
