@@ -62,8 +62,9 @@ struct DataView: View {
 	private func chart(_ days: [Day], budget: Bool) -> some View {
 		Chart {
 			ForEach(days) { day in
-				if budget, let limit = day.budget { BarMark(x: .value("Day", day.date, unit: .day), y: .value("Budget", limit)).foregroundStyle(Theme.border).opacity(0.6) }
-				BarMark(x: .value("Day", day.date, unit: .day), y: .value("Minutes", day.minutes)).foregroundStyle(Theme.accent)
+				// Unstacked so the used bar sits in front of the budget bar instead of on top of it.
+				if budget, let limit = day.budget { BarMark(x: .value("Day", day.date, unit: .day), y: .value("Budget", limit), stacking: .unstacked).foregroundStyle(Theme.border).opacity(0.6) }
+				BarMark(x: .value("Day", day.date, unit: .day), y: .value("Minutes", day.minutes), stacking: .unstacked).foregroundStyle(Theme.accent)
 			}
 		}
 		.chartXAxis { AxisMarks(values: .stride(by: .day, count: 7)) { _ in AxisValueLabel(format: .dateTime.month(.abbreviated).day()) } }

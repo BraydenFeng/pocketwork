@@ -223,7 +223,7 @@ struct BlockPalette: View {
 	@Environment(\.dismiss) private var dismiss
 	struct Entry: Identifiable { let kind: BlockKind; let title: String; let detail: String; let icon: String; var id: BlockKind { kind } }
 	static let entries: [Entry] = [
-		Entry(kind: .heading, title: "Heading", detail: "A big line at the top of the page", icon: "textformat"),
+		Entry(kind: .heading, title: "Heading", detail: "A big line at the top", icon: "textformat"),
 		Entry(kind: .timer, title: "Timer", detail: "A session you start yourself, 15 to 120 minutes", icon: "timer"),
 		Entry(kind: .schedule, title: "Schedule", detail: "Days and hours when this routine runs by itself", icon: "calendar"),
 		Entry(kind: .screen_time, title: "Apps", detail: "Block, allow only, or limit your app groups", icon: "shield"),
@@ -235,7 +235,7 @@ struct BlockPalette: View {
 		NavigationStack {
 			ScrollView {
 				VStack(alignment: .leading, spacing: 0) {
-					Text("Add to this page").heading_font(22).padding(.vertical, 16)
+					Text("Add to this routine").heading_font(22).padding(.vertical, 16)
 					ForEach(Self.entries) { entry in
 						let allowed = can_add(entry.kind)
 						Button { add(entry.kind); dismiss() } label: {

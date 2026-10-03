@@ -123,7 +123,7 @@ final class LibraryTests: XCTestCase {
 		let created = try XCTUnwrap(controller.create_blank())
 		XCTAssertEqual(controller.sorted_tools.count, 2)
 		XCTAssertNil(defaults.data(forKey: LibraryController.legacy_key))
-		XCTAssertEqual(LibraryController(defaults: defaults).tool(created.id)?.name, "My new page")
+		XCTAssertEqual(LibraryController(defaults: defaults).tool(created.id)?.name, "My routine")
 		controller.delete(created.id)
 		XCTAssertEqual(LibraryController(defaults: defaults).sorted_tools.count, 1)
 	}

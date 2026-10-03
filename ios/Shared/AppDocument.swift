@@ -115,7 +115,7 @@ struct AppDocument: Codable, Equatable {
 	}
 
 	static func blank() -> AppDocument {
-		AppDocument(schema_version: 1, id: UUID().uuidString, name: "My new page", description: "", blocks: [BlockDocument.make(.heading)], rules: RuleDocument(block_during_focus: false, notify_on_complete: false), enabled: nil)
+		AppDocument(schema_version: 1, id: UUID().uuidString, name: "My routine", description: "", blocks: [BlockDocument.make(.heading)], rules: RuleDocument(block_during_focus: false, notify_on_complete: false), enabled: nil)
 	}
 
 	// Rules that depend on a removed block are switched off rather than left invalid, as remove_block does in the editor.
