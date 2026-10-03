@@ -8,8 +8,15 @@ export const LIBRARY_KEY = "pocketwork.library.v1";
 export const MAX_TOOLS = 50;
 
 const entry_schema = z.object({ document: document_schema, updated_at: z.string().datetime() }).strict();
-// App groups are named here and shared by every routine; which apps are in them is set on each phone.
-const group_schema = z.object({ id: z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/), name: group_name }).strict();
+// App groups are named here and shared by every page. Their app choices are Apple's opaque Screen Time tokens,
+// picked on a phone or iPad and synced as-is between a person's devices; nothing here can read which apps they are.
+export const MAX_GROUP_APPS = 60_000;
+const group_schema = z.object({
+	id: z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/),
+	name: group_name,
+	apps: z.string().max(MAX_GROUP_APPS).regex(/^[A-Za-z0-9+/]*={0,2}$/).optional(),
+	apps_updated_at: z.string().datetime().optional(),
+}).strict();
 
 // `removed` remembers deletions (id → when) so a routine deleted on one device does not come back from another.
 export const library_schema = z.object({ schema_version: z.literal(1), tools: z.array(entry_schema).max(MAX_TOOLS), groups_updated_at: z.string().datetime().optional(), removed: z.record(z.string(), z.string().datetime()).optional(), groups: z.array(group_schema).max(MAX_GROUPS).optional() }).strict().superRefine((library, context) => {

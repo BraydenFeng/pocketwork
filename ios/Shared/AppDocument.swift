@@ -24,6 +24,10 @@ enum ShieldMode: String, Codable {
 struct AppGroup: Codable, Equatable, Identifiable {
 	var id: String
 	var name: String
+	// The group's app choices as Apple's opaque Screen Time tokens (base64 of the saved selection), synced between a person's devices.
+	// Pocketwork cannot read which apps they are. apps_updated_at lets each group's choices merge on their own.
+	var apps: String? = nil
+	var apps_updated_at: String? = nil
 }
 
 struct BlockDocument: Codable, Identifiable, Equatable {

@@ -30,6 +30,19 @@ extension ToolLibrary {
 			}.sorted { $0.id < $1.id }
 			if result.groups?.isEmpty == true { result.groups = nil }
 		}
+		// App choices merge per group by their own stamp, so a rename on one device cannot wipe apps picked on another.
+		var newest: [String: AppGroup] = [:]
+		for group in (groups ?? []) + (remote.groups ?? []) {
+			guard let stamp = group.apps_updated_at, stamp > (newest[group.id]?.apps_updated_at ?? "") else { continue }
+			newest[group.id] = group
+		}
+		result.groups = result.groups?.map { group in
+			guard let best = newest[group.id], (group.apps_updated_at ?? "") < (best.apps_updated_at ?? "") else { return group }
+			var updated = group
+			updated.apps = best.apps
+			updated.apps_updated_at = best.apps_updated_at
+			return updated
+		}
 		try result.validate()
 		return result
 	}

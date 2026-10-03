@@ -49,6 +49,14 @@ struct SharedStore {
 
 	func remove_group_selection(_ group_id: String) { defaults.removeObject(forKey: group_key(group_id)) }
 
+	// The saved bytes themselves, for syncing a group's choice to the person's other devices unchanged.
+	func group_selection_data(_ group_id: String) -> Data? { defaults.data(forKey: group_key(group_id)) }
+
+	func save_group_selection_data(_ data: Data, for group_id: String) throws {
+		_ = try PropertyListDecoder().decode(FamilyActivitySelection.self, from: data)
+		defaults.set(data, forKey: group_key(group_id))
+	}
+
 	// What a running routine does to which apps, written when it starts so the monitor extension needs no library.
 	struct ShieldPlan: Codable, Equatable {
 		var mode: ShieldMode

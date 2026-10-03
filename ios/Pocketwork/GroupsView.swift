@@ -16,7 +16,7 @@ struct GroupsView: View {
 			VStack(alignment: .leading, spacing: 20) {
 				VStack(alignment: .leading, spacing: 6) {
 					Text("Make your own groups").heading_font(20)
-					Text("Name a group, like Social or Games, then tap it to choose its apps. Any page can block or limit a group. Your app choices stay on this device.").supporting()
+					Text("Name a group, like Social or Games, then tap it to choose its apps. Any page can block or limit a group. When you sign in, your app choices sync between your devices.").supporting()
 				}
 				if library.groups.isEmpty {
 					Card(tinted: true, dashed: true) { Text("No groups yet. Name one below, then tap it to choose its apps.").supporting() }

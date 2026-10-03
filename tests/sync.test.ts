@@ -63,3 +63,23 @@ it("deleting in the same millisecond does not resurrect the routine", () => {
 	const local = upsert_tool(empty_library, doc("a"), NOW);
 	expect(merge_libraries(local, delete_tool(local, "a", NOW), NOW).tools).toEqual([]);
 });
+
+describe("syncing each group's app choices", () => {
+	const base: Library = { schema_version: 1, tools: [], groups_updated_at: "2026-09-12T10:00:00.000Z", groups: [{ id: "social", name: "Social" }, { id: "games", name: "Games" }] };
+	it("keeps the newest app choices per group even when the other device's group list wins", () => {
+		const phone: Library = { ...base, groups: [{ id: "social", name: "Social", apps: "cGhvbmU=", apps_updated_at: "2026-09-12T11:00:00.000Z" }, { id: "games", name: "Games" }] };
+		const tablet: Library = { ...base, groups_updated_at: "2026-09-12T11:30:00.000Z", groups: [{ id: "social", name: "Social media" }, { id: "games", name: "Games", apps: "dGFibGV0", apps_updated_at: "2026-09-12T11:10:00.000Z" }] };
+		const merged = merge_libraries(phone, tablet, NOW);
+		expect(merged.groups).toEqual([
+			{ id: "social", name: "Social media", apps: "cGhvbmU=", apps_updated_at: "2026-09-12T11:00:00.000Z" },
+			{ id: "games", name: "Games", apps: "dGFibGV0", apps_updated_at: "2026-09-12T11:10:00.000Z" },
+		]);
+		expect(same_library(merge_libraries(merged, phone, NOW), merged)).toBe(true);
+	});
+	it("takes the later choice when both devices picked apps for the same group", () => {
+		const older: Library = { ...base, groups: [{ id: "social", name: "Social", apps: "b2xk", apps_updated_at: "2026-09-12T11:00:00.000Z" }] };
+		const newer: Library = { ...base, groups: [{ id: "social", name: "Social", apps: "bmV3", apps_updated_at: "2026-09-12T11:05:00.000Z" }] };
+		expect(merge_libraries(older, newer, NOW).groups?.[0].apps).toBe("bmV3");
+		expect(merge_libraries(newer, older, NOW).groups?.[0].apps).toBe("bmV3");
+	});
+});

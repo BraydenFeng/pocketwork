@@ -2,6 +2,7 @@ import AuthenticationServices
 import Combine
 import CryptoKit
 import Foundation
+import OSLog
 import Security
 import UIKit
 
@@ -17,6 +18,7 @@ struct CloudSession: Codable {
 
 @MainActor
 final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPresentationContextProviding {
+	private let logger = Logger(subsystem: "Pocketwork", category: "Cloud")
 	@Published private(set) var email: String?
 	@Published private(set) var signed_in = false
 	@Published private(set) var busy = false
@@ -251,6 +253,7 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 				let merged = try remote.map { try old.merging($0.library) } ?? old
 				if merged != old {
 					try library.receive_cloud(merged)
+					reconcile_group_apps(merged)
 					// Cloud settings take effect when this app opens, after on-device consent and selection.
 					for entry in old.tools {
 						if merged.find(entry.id) == nil { await sessions?.forget(entry.id) }
@@ -262,6 +265,7 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 						}
 					}
 				}
+				upload_unsynced_group_apps(merged)
 				if remote?.library != merged {
 					if merged.tools.count > 3 && merged.tools.contains(where: { remote?.library.find($0.id) == nil }) {
 						try await refresh_plan()
@@ -282,6 +286,30 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 			}
 			throw DocumentError.invalid("Another device is saving. Pull to refresh to retry.")
 		} catch { status = "Saved on this iPhone · sync needs attention"; fail(error) }
+	}
+
+	// A newer app choice from another device replaces this device's saved one before routines are re-applied below.
+	private func reconcile_group_apps(_ merged: ToolLibrary) {
+		do {
+			let shared = try SharedStore()
+			for group in merged.groups ?? [] {
+				guard let apps = group.apps, apps != shared.group_selection_data(group.id)?.base64EncodedString(), let data = Data(base64Encoded: apps) else { continue }
+				try shared.save_group_selection_data(data, for: group.id)
+			}
+			sessions?.objectWillChange.send()
+		} catch { logger.error("Synced app choices were not applied: \(error.localizedDescription, privacy: .public)") }
+	}
+
+	// Choices made before sync existed (or while signed out) upload once, unless another device already shared one.
+	private func upload_unsynced_group_apps(_ merged: ToolLibrary) {
+		guard let library else { return }
+		do {
+			let shared = try SharedStore()
+			for group in merged.groups ?? [] where group.apps == nil {
+				guard let data = shared.group_selection_data(group.id), data.base64EncodedString().count <= ToolLibrary.max_group_apps else { continue }
+				library.set_group_apps(group.id, apps: data.base64EncodedString())
+			}
+		} catch { logger.error("Local app choices were not uploaded: \(error.localizedDescription, privacy: .public)") }
 	}
 
 	private struct StatusRow: Encodable { let user_id: String; let status: StatusReport }

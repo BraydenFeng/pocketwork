@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { describe_shield, document_schema, serialize_document, starter_document, type AppDocument } from "../lib/document";
-import { add_group, delete_tool, duplicate_tool, empty_library, find_group, find_tool, format_edited, import_tool, LIBRARY_KEY, load_library, MAX_TOOLS, remove_group, rename_group, save_library, sorted_tools, summarize_tool, upsert_tool, type Library } from "../lib/library";
+import { add_group, delete_tool, duplicate_tool, empty_library, find_group, find_tool, format_edited, import_tool, LIBRARY_KEY, load_library, MAX_TOOLS, remove_group, rename_group, save_library, sorted_tools, summarize_tool, upsert_tool, type Library, library_schema, MAX_GROUP_APPS } from "../lib/library";
 import { DRAFT_KEY } from "../lib/storage";
 import { blank_tool, templates } from "../lib/templates";
 import routines_fixture from "../public/routines.pocketwork.json";
@@ -148,5 +148,18 @@ describe("app groups", () => {
 		expect(describe_shield({ id: "s", type: "screen_time", title: "S", mode: "limit", groups: ["Social"], limit_minutes: 30 })).toBe("Social · 30 min limit");
 		expect(describe_shield({ id: "s", type: "screen_time", title: "S", mode: "allow_only", groups: ["Work"] })).toBe("Only Work");
 		expect(describe_shield({ id: "s", type: "screen_time", title: "S" })).toBe("Apps chosen on iPhone");
+	});
+});
+
+describe("group app choices", () => {
+	it("accepts opaque app tokens on a group and keeps them through a rename", () => {
+		const library = library_schema.parse({ schema_version: 1, tools: [], groups_updated_at: "2026-09-12T10:00:00.000Z", groups: [{ id: "social", name: "Social", apps: "YXBwcw==", apps_updated_at: "2026-09-12T10:00:00.000Z" }] });
+		const renamed = rename_group(library, "social", "Social media", Date.parse("2026-09-12T11:00:00.000Z"));
+		expect(renamed.groups?.[0]).toMatchObject({ name: "Social media", apps: "YXBwcw==", apps_updated_at: "2026-09-12T10:00:00.000Z" });
+	});
+	it("rejects app choices that are not base64 or too large", () => {
+		const group = (apps: string) => ({ schema_version: 1, tools: [], groups: [{ id: "social", name: "Social", apps }] });
+		expect(library_schema.safeParse(group("not base64!")).success).toBe(false);
+		expect(library_schema.safeParse(group("A".repeat(MAX_GROUP_APPS + 4))).success).toBe(false);
 	});
 });

@@ -1,4 +1,4 @@
-import type { Library, LibraryEntry } from "./library";
+import type { AppGroup, Library, LibraryEntry } from "./library";
 import { native_format_five, native_format_four } from "./release-flags";
 
 export const TOMBSTONE_DAYS = 30;
@@ -44,12 +44,24 @@ export function merge_libraries(local: Library, remote: Library, now: number): L
 		merged.groups = source.groups ?? [];
 		merged.groups_updated_at = source.groups_updated_at;
 	} else {
-		const groups = new Map<string, { id: string; name: string }>();
+		const groups = new Map<string, AppGroup>();
 		const names = new Set<string>();
 		for (const group of [...(local.groups ?? []), ...(remote.groups ?? [])]) {
 			if (!groups.has(group.id) && !names.has(group.name.toLowerCase())) { groups.set(group.id, group); names.add(group.name.toLowerCase()); }
 		}
 		if (groups.size) { merged.groups = [...groups.values()].sort((a, b) => a.id.localeCompare(b.id)); }
+	}
+	// App choices merge per group by their own stamp, so a rename on one device cannot wipe apps picked on another.
+	if (merged.groups) {
+		const newest = new Map<string, AppGroup>();
+		for (const group of [...(local.groups ?? []), ...(remote.groups ?? [])]) {
+			if (group.apps_updated_at && group.apps_updated_at > (newest.get(group.id)?.apps_updated_at ?? "")) { newest.set(group.id, group); }
+		}
+		merged.groups = merged.groups.map((group) => {
+			const best = newest.get(group.id);
+			if (!best || (group.apps_updated_at ?? "") >= (best.apps_updated_at ?? "")) { return group; }
+			return { ...group, apps: best.apps, apps_updated_at: best.apps_updated_at };
+		});
 	}
 	return merged;
 }

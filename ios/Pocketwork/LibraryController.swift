@@ -52,6 +52,11 @@ final class LibraryController: ObservableObject {
 		do { try persist(library.renaming_group(id, to: name, now: .now)) } catch { report(error) }
 	}
 
+	// Records a group's app choices in the library so signed-in devices share them. Fails quietly into the error banner.
+	func set_group_apps(_ id: String, apps: String?) {
+		do { try persist(library.setting_group_apps(id, apps: apps, now: .now)) } catch { report(error) }
+	}
+
 	@discardableResult
 	func remove_group(_ id: String) -> Bool {
 		do { try persist(library.removing_group(id)); return true } catch { report(error); return false }

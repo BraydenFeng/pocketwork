@@ -16,7 +16,7 @@ struct AppGroupSelectionSheet: View {
 				if authorized { FamilyActivityPicker(selection: $selection) }
 				else {
 					VStack(alignment: .leading, spacing: 24) {
-						DocumentHeading(title: "Apps in \(group.name)", subtitle: "Allow Screen Time access to choose apps, websites, and categories. Your selection stays on this iPhone.", icon: "square.grid.2x2")
+						DocumentHeading(title: "Apps in \(group.name)", subtitle: "Allow Screen Time access to choose apps, websites, and categories. When you sign in, your choices sync to your other devices as Apple's private tokens; Pocketwork never sees which apps they are.", icon: "square.grid.2x2")
 						Button("Choose apps") { Task { authorized = await sessions.authorize_screen_time(); if !authorized { failure = sessions.error_message } } }.buttonStyle(PrimaryButtonStyle())
 						Spacer()
 					}.padding(24)
@@ -37,6 +37,7 @@ struct AppGroupSelectionSheet: View {
 		Task {
 			defer { saving = false }
 			do { try SharedStore().save_group_selection(selection, for: group.id) } catch { failure = error.localizedDescription; return }
+			do { if let data = try SharedStore().group_selection_data(group.id) { library.set_group_apps(group.id, apps: data.base64EncodedString()) } } catch { failure = error.localizedDescription; return }
 			sessions.objectWillChange.send()
 			for document in library.library.routines_using(group: group.name) where document.enabled == true {
 				if !(await sessions.set_routine(document, enabled: true, groups: library.groups)) { library.set_enabled(document.id, false); failure = sessions.error_message; return }

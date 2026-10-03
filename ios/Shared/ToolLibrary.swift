@@ -11,6 +11,7 @@ struct LibraryEntry: Codable, Equatable, Identifiable {
 
 struct ToolLibrary: Codable, Equatable {
 	static let max_tools = 50
+	static let max_group_apps = 60_000
 	static let iso_formatter: ISO8601DateFormatter = {
 		let formatter = ISO8601DateFormatter()
 		formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -51,6 +52,7 @@ struct ToolLibrary: Codable, Equatable {
 			try AppDocument.validate_id(group.id)
 			guard !group.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, group.name.utf16.count <= 40 else { throw DocumentError.invalid("An app group has an empty or overlong name.") }
 			guard names.insert(group.name.lowercased()).inserted else { throw DocumentError.invalid("Two app groups are called \"\(group.name)\".") }
+			guard (group.apps?.count ?? 0) <= Self.max_group_apps else { throw DocumentError.invalid("The apps chosen for \"\(group.name)\" are too many to sync.") }
 		}
 		guard (groups ?? []).count <= Self.max_groups else { throw DocumentError.invalid("Too many app groups to open.") }
 	}
@@ -97,7 +99,12 @@ struct ToolLibrary: Codable, Equatable {
 		if let clash = group(named: name), clash.id != id { throw DocumentError.invalid("There is already an app group called \"\(name)\".") }
 		var next = self
 		next.groups_updated_at = Self.iso_formatter.string(from: now)
-		next.groups = (groups ?? []).map { $0.id == id ? AppGroup(id: id, name: name) : $0 }
+		next.groups = (groups ?? []).map { group in
+			guard group.id == id else { return group }
+			var renamed = group
+			renamed.name = name
+			return renamed
+		}
 		next.tools = tools.map { entry in
 			guard entry.document.referenced_groups.contains(where: { $0.lowercased() == old.name.lowercased() }) else { return entry }
 			var document = entry.document
@@ -108,6 +115,21 @@ struct ToolLibrary: Codable, Equatable {
 				return copy
 			}
 			return LibraryEntry(document: document, updated_at: Self.iso_formatter.string(from: now))
+		}
+		return next
+	}
+
+	// App choices change without touching groups_updated_at, so they never decide which device's list of names wins.
+	func setting_group_apps(_ id: String, apps: String?, now: Date) throws -> ToolLibrary {
+		guard group(id: id) != nil else { throw DocumentError.invalid("That app group no longer exists.") }
+		guard (apps?.count ?? 0) <= Self.max_group_apps else { throw DocumentError.invalid("Too many apps are chosen for this group to sync. Your choice is saved on this device.") }
+		var next = self
+		next.groups = (groups ?? []).map { group in
+			guard group.id == id else { return group }
+			var updated = group
+			updated.apps = apps
+			updated.apps_updated_at = Self.iso_formatter.string(from: now)
+			return updated
 		}
 		return next
 	}

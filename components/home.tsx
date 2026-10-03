@@ -78,7 +78,7 @@ export function Home({ library, now, error, notice, storage_blocked, phone_statu
 				</li>; })}</ul> : <p className="empty-hint home-empty">Create a page, then add blocks like timers, checklists, app blocking, and logs. Your first three pages are free, including sync and MCP.</p>}
 			</section>
 			<section className="home-section" aria-labelledby="groups-heading">
-				<div className="home-section-heading"><SectionLabel number="02">APP GROUPS</SectionLabel><h2 id="groups-heading">Groups of apps to block or limit.</h2><p className="supporting">Name a group here, like Social or Work, then pick its apps on your iPhone. The app list stays on your phone. A routine can block a group, allow only that group, or limit it to a set number of minutes.</p></div>
+				<div className="home-section-heading"><SectionLabel number="02">APP GROUPS</SectionLabel><h2 id="groups-heading">Groups of apps to block or limit.</h2><p className="supporting">Name a group here, like Social or Work, then pick its apps on your iPhone or iPad. When you sign in, those app choices sync between your devices, and Pocketwork never sees which apps they are. A page can block a group, allow only that group, or limit it to a set number of minutes.</p></div>
 				<ul className="group-list" aria-label="App groups">{groups.map((group) => {
 					const used_by = routines_using_group(library, group.name);
 					return <li key={group.id} className="group-chip">{renaming?.id === group.id
