@@ -5,7 +5,7 @@ Status: release preparation, not permission to submit. Vercel deployment alone d
 ## Version 1.0 submission prep, October 2
 
 - Brayden chose to ship 1.0 free and iPhone-only, with Pro deferred to a later update. The phone build sets `PocketworkSubscriptionsEnabled: false` and `TARGETED_DEVICE_FAMILY: "1"`; the purchase UI and subscription wording are hidden while the 3-routine limit stays.
-- App Store Connect (filled through the API with Brayden's approval): build 34 attached, five 6.9-inch screenshots from the `App Store screenshots` workflow, new description/subtitle/keywords/promo text, Productivity, Free, US only, 4+ age rating (all None/No), no third-party content, manual release, reviewer contact and step-by-step notes.
+- App Store Connect (filled through the API with Brayden's approval): build 36 attached (page tiles, routines over data), six 6.9-inch screenshots from the `App Store screenshots` workflow, new description/subtitle/keywords/promo text, Productivity, Free, US only, 4+ age rating (all None/No), no third-party content, manual release, reviewer contact and step-by-step notes.
 - App Privacy was answered in the browser: Email Address, User ID, Other User Content, Other Usage Data, each App Functionality only, linked to identity, not used for tracking. Health and location stay on device and are not declared as collected.
 - The `com.braydenfeng.pocketwork.pro.monthly` subscription stays in Missing Metadata and is not attached to 1.0. Before Pro ships: paid apps agreement, tax and banking, subscription metadata, server keys, commercial hosting, and the 4.10 review risk above all still apply.
 
