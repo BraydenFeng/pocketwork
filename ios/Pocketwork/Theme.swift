@@ -137,6 +137,8 @@ struct Page: ViewModifier {
 
 extension View {
 	func page() -> some View { modifier(Page()) }
+	// On iPad, keep text and controls at a readable width, centered, instead of stretching across the screen.
+	func readable(_ width: CGFloat = 720) -> some View { frame(maxWidth: width, alignment: .leading).frame(maxWidth: .infinity) }
 	func heading_font(_ size: CGFloat = 20) -> some View { font(.system(size: size, weight: .semibold)).tracking(-0.4).foregroundStyle(Theme.text) }
 	func supporting() -> some View { font(.system(size: 13)).foregroundStyle(Theme.text_faint) }
 	func mono_caption() -> some View { font(.system(size: 10, weight: .medium, design: .monospaced)).tracking(1).foregroundStyle(Theme.text_dim) }

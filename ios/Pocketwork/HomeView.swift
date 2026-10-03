@@ -37,12 +37,13 @@ struct HomeView: View {
 					section(number: "01", label: "My pages", heading: library.sorted_tools.isEmpty ? "Nothing here yet." : nil, supporting: library.sorted_tools.isEmpty ? "Create a page here, or sign in to bring in pages from your computer." : nil) {
 						if library.storage_blocked { storage_warning }
 						Button { editing = RoutineDraft(document: AppDocument.blank(), is_new: true) } label: { Label("New page", systemImage: "plus") }.buttonStyle(PrimaryButtonStyle(accent: true))
-						LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+						// Two tiles across on iPhone; more on iPad.
+						LazyVGrid(columns: [GridItem(.adaptive(minimum: 160, maximum: 280), spacing: 12)], spacing: 12) {
 							ForEach(library.sorted_tools) { entry in page_tile(entry) }
 						}
 					}
 					Hairline()
-					section(number: "02", label: "App groups", heading: "Groups of apps to block or limit.", supporting: nil) {
+					section(number: "02", label: "Groups of apps", heading: nil, supporting: "Make your own groups, like Social, Games, or School, and choose the apps in each. Any page can block or limit a group.") {
 						ForEach(library.groups) { group in
 							Button { picking_group = group } label: {
 								DocumentRow(icon: "square.grid.2x2") {
@@ -54,10 +55,11 @@ struct HomeView: View {
 							}.buttonStyle(.plain).accessibilityIdentifier("home.group.\(group.id)")
 							Hairline()
 						}
-						Button { showing_groups = true } label: { Label(library.groups.isEmpty ? "Create an app group" : "Manage app groups", systemImage: "plus") }.buttonStyle(QuietButtonStyle()).accessibilityIdentifier("home.groups")
+						Button { showing_groups = true } label: { Label("New group", systemImage: "plus") }.buttonStyle(QuietButtonStyle()).accessibilityIdentifier("home.groups")
 					}
 
 				}
+				.readable(900)
 			}
 			.refreshable { await cloud.sync() }
 			.page()
@@ -70,7 +72,7 @@ struct HomeView: View {
 				ToolbarItem(placement: .topBarTrailing) {
 					Menu {
 						Button("Account & sync", systemImage: "person.crop.circle") { account_intent = cloud.signed_in ? .manage : .sign_in }
-						Button("App groups", systemImage: "square.grid.2x2") { showing_groups = true }
+						Button("Groups of apps", systemImage: "square.grid.2x2") { showing_groups = true }
 						Button("Add from file", systemImage: "square.and.arrow.down") { showing_import = true }
 						Button(role: .destructive) { Task { for id in await sessions.clear_everything() { library.set_enabled(id, false) } } } label: { Label("Clear all focus restrictions", systemImage: "lock.open") }.disabled(sessions.is_busy)
 					} label: { Image(systemName: "ellipsis") }

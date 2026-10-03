@@ -52,6 +52,7 @@ struct ToolView: View {
 					}
 					.padding(Theme.pad)
 					.padding(.bottom, 24).disabled(editor.saving)
+					.readable()
 				}
 				.page()
 				.navigationTitle(library.tool(document_id)?.name ?? document.name)

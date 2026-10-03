@@ -78,7 +78,7 @@ struct HomeAllowanceView: View {
 					Text("Home uses a 150 m boundary. iOS may detect crossings late. Usage is saved in whole minutes; a final partial minute may not count when you leave.").supporting()
 				}.disabled(editor.active)
 				if let error = home.error_message ?? sessions.error_message { Text(error).foregroundStyle(Theme.danger).font(.system(size: 13)) }
-			}.padding(Theme.pad).disabled(editor.saving)
+			}.padding(Theme.pad).disabled(editor.saving).readable()
 		}.page().navigationTitle("Home allowance").navigationBarTitleDisplayMode(.inline)
 		.onAppear { visible = true; if !ui_testing { home.restore() }; refresh(); if !opened { opened = true; if edit_on_open { editor.begin(document) } } }
 		.onDisappear { visible = false }

@@ -1,7 +1,7 @@
 import FamilyControls
 import SwiftUI
 
-// App groups: named once, shared by every routine, filled with real apps here through Apple's private picker.
+// Groups of apps: people name their own, shared by every page, filled with real apps here through Apple's private picker.
 struct GroupsView: View {
 	@EnvironmentObject private var library: LibraryController
 	@EnvironmentObject private var sessions: SessionController
@@ -15,9 +15,8 @@ struct GroupsView: View {
 		ScrollView {
 			VStack(alignment: .leading, spacing: 20) {
 				VStack(alignment: .leading, spacing: 6) {
-					SectionLabel(number: "02", text: "App groups")
-					Text("Groups of apps to block or limit.").heading_font(20)
-					Text("Pick the apps for a group once, then use the group in any routine. Your app choices stay on this iPhone.").supporting()
+					Text("Make your own groups").heading_font(20)
+					Text("Name a group, like Social or Games, then tap it to choose its apps. Any page can block or limit a group. Your app choices stay on this device.").supporting()
 				}
 				if library.groups.isEmpty {
 					Card(tinted: true, dashed: true) { Text("No groups yet. Name one below, then tap it to choose its apps.").supporting() }
@@ -30,22 +29,23 @@ struct GroupsView: View {
 							Field(label: "Name") { TextField("Social, Games, Work…", text: $new_name).accessibilityIdentifier("groups.new").onSubmit(add) }
 							Button { add() } label: { Label("Add", systemImage: "plus") }.buttonStyle(QuietButtonStyle()).disabled(new_name.trimmingCharacters(in: .whitespaces).isEmpty).padding(.top, 18)
 						}
-						Text("Up to \(ToolLibrary.max_groups) groups. Routines that mention a new group create it here automatically.").supporting()
+						Text("Up to \(ToolLibrary.max_groups) groups. Pages that mention a new group create it here automatically.").supporting()
 					}
 				}
 			}
 			.padding(Theme.pad)
 			.padding(.bottom, 24)
+			.readable()
 		}
 		.page()
-		.navigationTitle("App groups")
+		.navigationTitle("Groups of Apps")
 		.navigationBarTitleDisplayMode(.inline)
 		.sheet(item: $picking) { group in AppGroupSelectionSheet(group: group) }
 		.alert("Rename group", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
 			TextField("Name", text: $rename_text)
 			Button("Save") { if let group = renaming { library.rename_group(group.id, to: rename_text) }; renaming = nil }
 			Button("Cancel", role: .cancel) { renaming = nil }
-		} message: { Text("Every routine that uses this group follows the new name.") }
+		} message: { Text("Every page that uses this group follows the new name.") }
 		.confirmationDialog("Delete \"\(pending_delete?.name ?? "this group")\"? The apps chosen for it are forgotten too.", isPresented: Binding(get: { pending_delete != nil }, set: { if !$0 { pending_delete = nil } }), titleVisibility: .visible) {
 			Button("Delete", role: .destructive) {
 				if let group = pending_delete, library.remove_group(group.id) { sessions.forget_group(group.id) }

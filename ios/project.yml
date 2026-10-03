@@ -11,7 +11,7 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
     CODE_SIGN_STYLE: Automatic
     APP_GROUP: group.com.braydenfeng.pocketwork
-    TARGETED_DEVICE_FAMILY: "1"
+    TARGETED_DEVICE_FAMILY: "1,2"
     POCKETWORK_WEBSITE_URL: https://pocketwork-wine.vercel.app
 targets:
   Pocketwork:

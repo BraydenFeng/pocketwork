@@ -89,7 +89,7 @@ final class ScreenshotTests: XCTestCase {
 		app.navigationBars["My page"].buttons["My pages"].tap()
 		app.swipeUp()
 		element("home.groups").tap()
-		XCTAssertTrue(app.navigationBars["App groups"].waitForExistence(timeout: 10))
+		XCTAssertTrue(app.navigationBars["Groups of Apps"].waitForExistence(timeout: 10))
 		try snap("06-app-groups")
 		let name = app.textFields["groups.new"]
 		name.tap(); name.typeText("Distractions")

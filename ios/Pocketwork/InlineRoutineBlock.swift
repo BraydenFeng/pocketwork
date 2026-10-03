@@ -108,7 +108,7 @@ struct InlineRoutineBlock: View {
 							ChipRow(label: "Minutes before it locks", options: Array(Set(Self.limit_options + [block.limit_minutes ?? 30])).sorted(), selected: block.limit_minutes ?? 30, text: { "\($0) min" }) { block.limit_minutes = $0 }
 						}
 						VStack(alignment: .leading, spacing: 6) {
-							Text("App groups").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.text_dim)
+							Text("Groups of apps").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.text_dim)
 							let names = Array(Set(groups.map(\.name) + block.group_names)).sorted { $0.lowercased() < $1.lowercased() }
 							if names.isEmpty { Text("No groups yet. Name one below; you choose its apps under App groups.").supporting() }
 							FlowChips(names: names, selected: block.group_names) { name in

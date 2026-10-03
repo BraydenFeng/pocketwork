@@ -38,6 +38,7 @@ struct EditorView: View {
 					if draft.blocks.count == 1 { Text("Tap a block to edit it. Add a timer, schedule, or anything else your routine needs.").supporting() }
 				}
 				.padding(24).padding(.bottom, 24)
+				.readable()
 			}.paper_page().scrollDismissesKeyboard(.interactively)
 			.navigationTitle(is_new ? "New page" : "Edit page").navigationBarTitleDisplayMode(.inline)
 			.toolbar {
@@ -230,7 +231,7 @@ struct BlockEditorView: View {
 				}
 			}
 			VStack(alignment: .leading, spacing: 4) {
-				SectionLabel(text: "App groups")
+				SectionLabel(text: "Groups of apps")
 				let names = Array(Set(groups.map(\.name) + block.group_names)).sorted { $0.lowercased() < $1.lowercased() }
 				if names.isEmpty { Text("No groups yet. Name one below; you choose its apps under App groups.").supporting().padding(.vertical, 6) }
 				ForEach(names, id: \.self) { name in

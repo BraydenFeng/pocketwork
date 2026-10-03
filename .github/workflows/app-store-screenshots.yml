@@ -1,14 +1,24 @@
 name: App Store screenshots
 
-# Captures App Store screenshots on the largest iPhone simulator (6.9-inch). Run on demand; macOS minutes cost money.
+# Captures App Store screenshots on the largest iPhone (6.9-inch) and iPad (13-inch) simulators. Run on demand; macOS minutes cost money.
 on:
   workflow_dispatch:
 
 jobs:
   screenshots:
-    name: 6.9-inch iPhone screenshots
+    name: ${{ matrix.name }} screenshots
     runs-on: macos-15
     timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: 6.9-inch iPhone
+            device: "iPhone 1[6-9] Pro Max"
+            artifact: app-store-screenshots
+          - name: 13-inch iPad
+            device: "iPad Pro 13-inch"
+            artifact: app-store-screenshots-ipad
     steps:
       - uses: actions/checkout@v4
       - name: Install XcodeGen
@@ -16,12 +26,12 @@ jobs:
       - name: Generate project
         working-directory: ios
         run: xcodegen generate
-      - name: Boot a Pro Max simulator with a clean status bar
+      - name: Boot the simulator with a clean status bar
         id: sim
         run: |
           set -euo pipefail
-          LINE=$(xcrun simctl list devices available | grep -E "iPhone 1[6-9] Pro Max \(" | head -n 1)
-          test -n "$LINE" || { echo "No 6.9-inch iPhone simulator on this runner"; xcrun simctl list devices available; exit 1; }
+          LINE=$(xcrun simctl list devices available | grep -E "${{ matrix.device }} \(" | head -n 1)
+          test -n "$LINE" || { echo "No ${{ matrix.name }} simulator on this runner"; xcrun simctl list devices available; exit 1; }
           UDID=$(echo "$LINE" | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
           echo "Using: $LINE"
           xcrun simctl boot "$UDID" || true
@@ -47,7 +57,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: app-store-screenshots
+          name: ${{ matrix.artifact }}
           path: |
             ios/app-store-screenshots/*.png
             ios/screenshots.log
