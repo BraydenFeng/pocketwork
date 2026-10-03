@@ -121,8 +121,10 @@ struct ToolView: View {
 	@ViewBuilder private func page_sections(_ document: AppDocument) -> some View {
 		if !document.description.isEmpty { Text(document.description).font(.system(size: 15)).foregroundStyle(Theme.text_dim) }
 		ForEach(document.blocks.filter { $0.type == .heading }) { block in
+			// The large navigation title already shows the page name; a heading that repeats it only adds its subtitle.
+			let repeats_name = block.title.trimmingCharacters(in: .whitespaces).caseInsensitiveCompare(document.name.trimmingCharacters(in: .whitespaces)) == .orderedSame
 			VStack(alignment: .leading, spacing: 4) {
-				Text(block.title).heading_font(20).fixedSize(horizontal: false, vertical: true)
+				if !repeats_name { Text(block.title).heading_font(20).fixedSize(horizontal: false, vertical: true) }
 				if let subtitle = block.subtitle, !subtitle.isEmpty { Text(subtitle).supporting() }
 			}
 			.contentShape(Rectangle())
@@ -131,15 +133,16 @@ struct ToolView: View {
 		SectionLabel(text: "Routines").padding(.top, 4)
 		ForEach(document.blocks.filter { Self.routine_kinds.contains($0.type) }) { block in routine_view(block, in: document) }
 		if document.behaviors != nil {
-			BehaviorPanel(document: document, after_routines: { add_button("Add routine", kinds: Self.routine_kinds, in: document) }, data_section: { data_section(document) })
+			BehaviorPanel(document: document, after_routines: { add_button("Add routine", kinds: Self.routine_kinds, in: document) }, data_section: { data_section(document, adding: false) }, after_data: { add_button("Add data", kinds: Self.data_kinds, in: document) })
 		} else {
 			if !document.blocks.contains(where: { Self.routine_kinds.contains($0.type) }) { Text("No routines yet. Add a timer, a schedule, or app blocking.").supporting() }
 			add_button("Add routine", kinds: Self.routine_kinds, in: document)
-			data_section(document)
+			data_section(document, adding: true)
 		}
 	}
 
-	@ViewBuilder private func data_section(_ document: AppDocument) -> some View {
+	// With connected logic, Add data comes after the logic's own data instead (see BehaviorPanel's after_data).
+	@ViewBuilder private func data_section(_ document: AppDocument, adding: Bool) -> some View {
 		let blocks = document.blocks.filter { Self.data_kinds.contains($0.type) }
 		SectionLabel(text: "Data").padding(.top, 8)
 		ForEach(blocks) { block in
@@ -148,7 +151,7 @@ struct ToolView: View {
 		}
 		focus_history(document)
 		if blocks.isEmpty && !document.has_timer && document.behaviors == nil { Text("Nothing tracked yet. Add a checklist, a counter, or a note.").supporting() }
-		add_button("Add data", kinds: Self.data_kinds, in: document)
+		if adding { add_button("Add data", kinds: Self.data_kinds, in: document) }
 	}
 
 	@ViewBuilder private func focus_history(_ document: AppDocument) -> some View {

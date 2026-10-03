@@ -3,17 +3,19 @@ import SwiftUI
 import UserNotifications
 
 private struct SavedBehaviors: Codable { var graph: BehaviorGraph; var state: BehaviorState }
-// One running copy of a page's connected logic. Controls render first (under the page's Routines); the caller's
-// slots come next, then the logic's values, logs, and charts so they land under the page's Data.
-struct BehaviorPanel<AfterRoutines: View, DataSection: View>: View {
+// One running copy of a page's connected logic. Controls render first (under the page's Routines), then the caller's
+// slots and the logic's values, logs, and charts in order, so they land under the page's Data.
+struct BehaviorPanel<AfterRoutines: View, DataSection: View, AfterData: View>: View {
 	let document: AppDocument
 	private let after_routines: AfterRoutines
 	private let data_section: DataSection
+	private let after_data: AfterData
 	private static var data_kinds: Set<String> { ["count", "streak", "variable", "goal", "app_usage", "number_input", "text_input", "checkbox", "form", "save_entry", "aggregate", "calculate", "table", "chart", "progress", "health"] }
-	init(document: AppDocument, @ViewBuilder after_routines: () -> AfterRoutines, @ViewBuilder data_section: () -> DataSection) {
+	init(document: AppDocument, @ViewBuilder after_routines: () -> AfterRoutines, @ViewBuilder data_section: () -> DataSection, @ViewBuilder after_data: () -> AfterData) {
 		self.document = document
 		self.after_routines = after_routines()
 		self.data_section = data_section()
+		self.after_data = after_data()
 	}
 	@EnvironmentObject private var library: LibraryController
 	@EnvironmentObject private var sessions: SessionController
@@ -62,6 +64,7 @@ struct BehaviorPanel<AfterRoutines: View, DataSection: View>: View {
 				data_section
 				let data_nodes = graph.nodes.filter { Self.data_kinds.contains($0.kind) }
 				if !data_nodes.isEmpty { VStack(alignment: .leading, spacing: 12) { ForEach(data_nodes) { node in node_view(node) } } }
+				after_data
 			}.onAppear { visible = true; load(graph); Task { if graph.nodes.contains(where: { $0.kind == "health" }) { await health.refresh(graph.nodes.filter { $0.kind == "health" }.map { $0.config.metric ?? "steps" }) }; await run() } }
 			.onDisappear { visible = false; release_gates() }
 			.onChange(of: paused) { _, value in if value { release_gates() } else { reconcile_actions = true } }
@@ -161,6 +164,6 @@ struct BehaviorPanel<AfterRoutines: View, DataSection: View>: View {
 	}
 }
 
-extension BehaviorPanel where AfterRoutines == EmptyView, DataSection == EmptyView {
-	init(document: AppDocument) { self.init(document: document, after_routines: { EmptyView() }, data_section: { EmptyView() }) }
+extension BehaviorPanel where AfterRoutines == EmptyView, DataSection == EmptyView, AfterData == EmptyView {
+	init(document: AppDocument) { self.init(document: document, after_routines: { EmptyView() }, data_section: { EmptyView() }, after_data: { EmptyView() }) }
 }
