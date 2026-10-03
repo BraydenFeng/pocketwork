@@ -26,7 +26,7 @@ struct HomeView: View {
 					if !cloud.signed_in {
 						VStack(alignment: .leading, spacing: Theme.gap) {
 							Text("Save your pages to an account").heading_font(15)
-							Text("Open them on your iPhone or computer. You can also keep using this device without an account.").supporting()
+							Text("Open them on your iPhone, iPad, or computer. You can also keep using this device without an account.").supporting()
 							ViewThatFits(in: .horizontal) {
 								HStack(spacing: Theme.gap) { account_buttons }
 								VStack(alignment: .leading, spacing: Theme.gap) { account_buttons }
@@ -117,7 +117,7 @@ struct HomeView: View {
 			Text("Each page holds routines and the data they track.").supporting()
 			HStack(spacing: 8) {
 				Circle().fill(library.storage_blocked ? Theme.danger : Theme.success).frame(width: 6, height: 6)
-				Text(library.storage_blocked ? "Saved pages need attention" : "\(library.sorted_tools.count) saved on this iPhone").font(.system(size: 13)).foregroundStyle(library.storage_blocked ? Theme.danger : Theme.text_faint)
+				Text(library.storage_blocked ? "Saved pages need attention" : "\(library.sorted_tools.count) saved on this \(UIDevice.current.model)").font(.system(size: 13)).foregroundStyle(library.storage_blocked ? Theme.danger : Theme.text_faint)
 			}.padding(.top, 4)
 		}
 		.padding(Theme.pad)

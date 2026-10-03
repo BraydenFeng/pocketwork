@@ -177,7 +177,7 @@ struct LogicEditorView: View {
 						if node.kind == "schedule", graph.nodes.contains(where: { $0.kind == "allowance" }) { Text("Your time windows live in Daily allowance. The schedule keeps the allowance active throughout the day.").supporting() } else if let block = node.block { BlockEditorView(block: Binding(get: { graph.nodes.first { $0.id == id }?.block ?? block }, set: { value in update(id) { $0.block = value } }), groups: library.groups, embedded: true) }
 						if let config = node.config { BehaviorSettings(kind: node.kind, variables: graph.nodes.filter { $0.kind == "variable" && $0.id != id }, config: Binding(get: { graph.nodes.first { $0.id == id }?.config ?? config }, set: { value in update(id) { $0.config = value } })) }
 						if let policy = node.policy { LogicAllowanceSettings(policy: Binding(get: { graph.nodes.first { $0.id == id }?.policy ?? policy }, set: { value in update(id) { $0.policy = value } })) }
-						if ["home", "usage"].contains(node.kind) { Text("Uses the saved location and distraction selection on this phone. Usage away from that location does not count.").supporting() }
+						if ["home", "usage"].contains(node.kind) { Text("Uses the saved location and distraction selection on this device. Usage away from that location does not count.").supporting() }
 						SectionLabel(text: "Connections")
 						ForEach(node.inputs.keys.sorted(), id: \.self) { name in Button("Input · \(name)") { inspector = nil; pending_port = LogicPortSelection(node: id, name: name, output: false) }.buttonStyle(QuietButtonStyle()).frame(minHeight: 44) }
 						ForEach(node.outputs.keys.sorted(), id: \.self) { name in Button("Output · \(name)") { inspector = nil; pending_port = LogicPortSelection(node: id, name: name, output: true) }.buttonStyle(QuietButtonStyle()).frame(minHeight: 44) }
@@ -221,7 +221,7 @@ private struct BehaviorSettings: View {
 				ForEach(1...7, id: \.self) { day in Toggle(Calendar.current.weekdaySymbols[day - 1], isOn: Binding(get: { config.days.contains(day) }, set: { on in if on { config.days.append(day); config.days.sort() } else if config.days.count > 1 { config.days.removeAll { $0 == day } } })).tint(Theme.accent) }
 			}
 			if kind == "reminder" { Field(label: "Message") { TextField("Your reminder", text: $config.message, axis: .vertical).accessibilityIdentifier("logic.message") } }
-			if ["location", "arrive", "leave"].contains(kind) { Text("Uses the location saved on this phone, shared with your home allowance.").supporting() }
+			if ["location", "arrive", "leave"].contains(kind) { Text("Uses the location saved on this device, shared with your home allowance.").supporting() }
 			if kind == "app_usage" { Text("Reads distraction minutes counted by your home allowance. Away usage is excluded.").supporting() }
 			Text("Behaviors run while this routine is open. Scheduled app restrictions continue in the background.").supporting()
 		}

@@ -200,7 +200,7 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 			status = "Account deleted. This iPhone's cleanup needs attention."
 			throw DocumentError.invalid("Your cloud account was deleted, but device cleanup did not fully finish. Use Clear all focus restrictions and remove local app data before reusing this iPhone. " + failures.joined(separator: " · "))
 		}
-		status = "Account deleted. Your cloud pages and this iPhone's account library were removed."
+		status = "Account deleted. Your cloud pages and this device's account library were removed."
 	}
 
 	private func store(_ value: CloudSession) throws {
@@ -285,7 +285,7 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 				return
 			}
 			throw DocumentError.invalid("Another device is saving. Pull to refresh to retry.")
-		} catch { status = "Saved on this iPhone · sync needs attention"; fail(error) }
+		} catch { status = "Saved on this device · sync needs attention"; fail(error) }
 	}
 
 	// A newer app choice from another device replaces this device's saved one before routines are re-applied below.

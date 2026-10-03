@@ -38,7 +38,7 @@ struct ToolLibrary: Codable, Equatable {
 	}
 
 	func validate() throws {
-		guard tools.filter({ $0.document.home_allowance != nil }).count <= 1 else { throw DocumentError.invalid("Only one home allowance can run on this iPhone.") }
+		guard tools.filter({ $0.document.home_allowance != nil }).count <= 1 else { throw DocumentError.invalid("Only one home allowance can run on this device.") }
 		guard schema_version == 1 else { throw DocumentError.invalid("Your saved tools use a newer format than this version of the app understands.") }
 		guard tools.count <= Self.max_tools else { throw DocumentError.invalid("Too many tools to open.") }
 		var ids = Set<String>()

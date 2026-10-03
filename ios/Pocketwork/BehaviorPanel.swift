@@ -40,7 +40,7 @@ struct BehaviorPanel<AfterRoutines: View, DataSection: View, AfterData: View>: V
 			VStack(alignment: .leading, spacing: 20) {
 				VStack(alignment: .leading, spacing: 12) {
 					Text("Connected logic").heading_font(17)
-					Text("Runs while this page is open. Progress stays on this phone. Screen Time schedules keep running in the background.").supporting()
+					Text("Runs while this page is open. Progress stays on this device. Screen Time schedules keep running in the background.").supporting()
 					HStack { Button(paused ? "Resume" : "Pause") { paused.toggle() }.buttonStyle(TextButtonStyle()); Button("Allow notifications") { Task { do { let granted = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert,.sound]); if !granted { error = "Notifications are off. Messages still appear here." } } catch { self.error = error.localizedDescription } } }.buttonStyle(TextButtonStyle()) }
 					if graph.nodes.contains(where: { ["location","arrive","leave"].contains($0.kind) }) {
 						Text("One location is shared by all pages, including your home allowance.").supporting()

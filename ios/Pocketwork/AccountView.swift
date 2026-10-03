@@ -51,10 +51,10 @@ struct AccountView: View {
 				Button("Delete account", role: .destructive) { confirmation = ""; deleting = true }.disabled(cloud.busy)
 			} else {
 				Text(intent == .create ? "Your pages, on both devices" : "Welcome back").heading_font(20)
-				Text(intent == .create ? "Save your pages and open them on your iPhone or computer." : "Use the same account you used before.").supporting()
+				Text(intent == .create ? "Save your pages and open them on your iPhone, iPad, or computer." : "Use the same account you used before.").supporting()
 				Text("Your first sign-in creates your Pocketwork account. No separate password needed.").supporting()
 				if !cloud.configured {
-					Text("Account access is unavailable in this build. You can still use pages on this iPhone. Please try again after updating Pocketwork.").supporting().accessibilityIdentifier("account.unavailable")
+					Text("Account access is unavailable in this build. You can still use pages on this device. Please try again after updating Pocketwork.").supporting().accessibilityIdentifier("account.unavailable")
 				}
 				Button("Continue with Apple") { cloud.sign_in(provider: "apple") }.buttonStyle(PrimaryButtonStyle()).disabled(!cloud.configured || cloud.busy).accessibilityIdentifier("account.apple")
 				if Bundle.main.object(forInfoDictionaryKey: "SupabaseGoogleEnabled") as? Bool == true {
@@ -73,6 +73,6 @@ struct AccountView: View {
 			TextField("Type DELETE", text: $confirmation).textInputAutocapitalization(.characters)
 			Button("Delete account", role: .destructive) { Task { await cloud.delete_account() } }.disabled(confirmation != "DELETE")
 			Button("Cancel", role: .cancel) { }
-		} message: { Text("This deletes your cloud pages and this phone's account library. Export anything you want to keep. " + (subscriptions.configured ? "Cancel your Apple subscription separately first. " : "") + "Apple sign-in requires one more confirmation.") }
+		} message: { Text("This deletes your cloud pages and this device's account library. Export anything you want to keep. " + (subscriptions.configured ? "Cancel your Apple subscription separately first. " : "") + "Apple sign-in requires one more confirmation.") }
 	}
 }
