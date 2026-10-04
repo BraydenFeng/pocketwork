@@ -26,3 +26,13 @@ describe("connected behavior runtime", () => {
 		const invalid=structuredClone(document); invalid.behaviors!.connections=[]; expect(document_schema.safeParse(invalid).success).toBe(false);
 	});
 });
+
+describe("operations the phone accepts", () => {
+	const graph = (kind: string, operation: string) => ({ nodes: [{ id: "node", kind, x: 0, y: 0, config: { operation } }], connections: [] });
+	it("rejects an operation that does not belong to the block kind", () => {
+		expect(behaviors_schema.safeParse(graph("calculate", "sum")).success).toBe(false);
+		expect(behaviors_schema.safeParse(graph("aggregate", "add")).success).toBe(false);
+		expect(behaviors_schema.safeParse(graph("calculate", "add")).success).toBe(true);
+		expect(behaviors_schema.safeParse(graph("aggregate", "average")).success).toBe(true);
+	});
+});

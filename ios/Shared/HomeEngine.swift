@@ -81,18 +81,26 @@ enum HomeEngine {
 		try reconcile()
 	}
 
-	static func clock_names(_ policy: HomePolicy) -> [String] {
-		var names: [String] = []
-		for rule in policy.rules { for day in rule.days { for index in rule.windows.indices { names.append(prefix + "clock.\(day).\(index)") } } }
-		return names + [prefix + "midnight"]
+	// One daily trigger per distinct window time (reconcile checks the weekday), which keeps the allowance well inside
+	// iOS's 20-activity limit alongside scheduled routines. Windows never cross midnight.
+	static func window_times(_ policy: HomePolicy) -> [HomeWindow] {
+		var seen = Set<String>(), result: [HomeWindow] = []
+		for rule in policy.rules { for window in rule.windows where seen.insert("\(window.start)-\(window.end)").inserted { result.append(window) } }
+		return result
 	}
 
+	static func clock_name(_ window: HomeWindow) -> String {
+		prefix + "clock." + window.start.replacingOccurrences(of: ":", with: "") + "-" + window.end.replacingOccurrences(of: ":", with: "")
+	}
+
+	static func clock_names(_ policy: HomePolicy) -> [String] { window_times(policy).map(clock_name) + [prefix + "midnight"] }
+
 	private static func start_clocks(_ policy: HomePolicy) throws {
-		for rule in policy.rules { for day in rule.days { for (index, window) in rule.windows.enumerated() {
+		for window in window_times(policy) {
 			let start = ScheduleWindow.minutes(window.start)!, end = ScheduleWindow.minutes(window.end)!
-			let schedule = DeviceActivitySchedule(intervalStart: DateComponents(timeZone: policy.calendar.timeZone, hour: start / 60, minute: start % 60, weekday: day), intervalEnd: DateComponents(timeZone: policy.calendar.timeZone, hour: end / 60, minute: end % 60, weekday: day), repeats: true)
-			try center.startMonitoring(DeviceActivityName(prefix + "clock.\(day).\(index)"), during: schedule)
-		} } }
+			let schedule = DeviceActivitySchedule(intervalStart: DateComponents(timeZone: policy.calendar.timeZone, hour: start / 60, minute: start % 60), intervalEnd: DateComponents(timeZone: policy.calendar.timeZone, hour: end / 60, minute: end % 60), repeats: true)
+			try center.startMonitoring(DeviceActivityName(clock_name(window)), during: schedule)
+		}
 		try center.startMonitoring(DeviceActivityName(prefix + "midnight"), during: DeviceActivitySchedule(intervalStart: DateComponents(timeZone: policy.calendar.timeZone, hour: 0, minute: 0), intervalEnd: DateComponents(timeZone: policy.calendar.timeZone, hour: 23, minute: 59), repeats: true))
 	}
 	static func set_home(_ place: HomePlace) throws {
@@ -107,9 +115,12 @@ enum HomeEngine {
 		try reconcile()
 	}
 	static func disable() throws {
+		// Shields come off and monitoring stops even if the saved state cannot be written.
+		defer {
+			shield.clearAllSettings()
+			center.stopMonitoring(center.activities.filter { $0.rawValue.hasPrefix(prefix) })
+		}
 		try transaction { $0.enabled = false; $0.ledger.pause() }
-		shield.clearAllSettings()
-		center.stopMonitoring(center.activities.filter { $0.rawValue.hasPrefix(prefix) })
 	}
 	static func forget_account_data() throws {
 		defer {
@@ -127,7 +138,11 @@ enum HomeEngine {
 	static func configure(_ document: AppDocument, plan: SharedStore.ShieldPlan, enabled: Bool) throws {
 		try document.validate()
 		guard enabled else { try disable(); return }
-		guard try snapshot().place != nil, AuthorizationCenter.shared.authorizationStatus == .approved else { throw DocumentError.invalid("Set your home and allow Screen Time access first.") }
+		guard try snapshot().place != nil, AuthorizationCenter.shared.authorizationStatus == .approved else {
+			// An allowance that can no longer run is switched off here too, so the engine never outlives the page's switch.
+			try disable()
+			throw DocumentError.invalid("Set your home and allow Screen Time access first.")
+		}
 		try SharedStore().save_plan(plan, for: document.id)
 		try transaction { state in
 			if state.document?.id != document.id { state.ledger = HomeLedger() }
@@ -201,7 +216,7 @@ enum HomeEngine {
 				for minute in meter_thresholds(remaining: remaining) {
 					events[DeviceActivityEvent.Name(String(minute))] = DeviceActivityEvent(applications: selection.applicationTokens, categories: selection.categoryTokens, webDomains: selection.webDomainTokens, threshold: DateComponents(minute: minute))
 				}
-				let now = Date(), end = policy.calendar.date(byAdding: .day, value: 1, to: policy.calendar.startOfDay(for: now))!.addingTimeInterval(-1)
+				let now = Date(), end = max(policy.calendar.date(byAdding: .day, value: 1, to: policy.calendar.startOfDay(for: now))!.addingTimeInterval(-1), now.addingTimeInterval(16 * 60))
 				let components: Set<Calendar.Component> = [.timeZone, .year, .month, .day, .hour, .minute, .second]
 				let schedule = DeviceActivitySchedule(intervalStart: policy.calendar.dateComponents(components, from: now), intervalEnd: policy.calendar.dateComponents(components, from: end), repeats: false)
 				// The generation is persisted before IPC so callbacks can immediately read it.

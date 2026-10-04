@@ -112,8 +112,15 @@ final class SessionController: ObservableObject {
 		guard !is_busy else { return false }
 		is_busy = true
 		defer { is_busy = false }
+		let shield_plan: SharedStore.ShieldPlan?
+		do { shield_plan = enabled ? try plan(for: document, groups: groups) : nil }
+		catch {
+			report(error)
+			// Switching on failed before the engine was touched; stop the engine too so it matches the page showing Off.
+			do { try await HomeWorker.run { try HomeEngine.disable(); try SharedStore().set_standing(document.id, enabled: false) } } catch { report(error) }
+			return false
+		}
 		do {
-			let shield_plan = enabled ? try plan(for: document, groups: groups) : nil
 			try await HomeWorker.run {
 				if let shield_plan { try HomeEngine.configure(document, plan: shield_plan, enabled: true) }
 				else { try HomeEngine.disable() }
@@ -135,6 +142,9 @@ final class SessionController: ObservableObject {
 				let shield_plan = try plan(for: document, groups: groups)
 				try shared.save_plan(shield_plan, for: document.id)
 				let events = try limit_events(shield_plan, document_id: document.id, shared: shared)
+				// Mark it switched on before monitoring starts: starting inside the window launches the extension right away,
+				// and the extension clears routines it does not find switched on.
+				shared.set_standing(document.id, enabled: true)
 				var scheduled: [DeviceActivityName] = []
 				do {
 					for day in days {
@@ -145,12 +155,13 @@ final class SessionController: ObservableObject {
 						scheduled.append(activity)
 					}
 				} catch { center.stopMonitoring(scheduled); throw error }
-				shared.set_standing(document.id, enabled: true)
+				// Weekdays taken out of the schedule must stop too, or the old day keeps blocking.
+				center.stopMonitoring(center.activities.filter { SharedStore.standing_id(from: $0) == document.id && !scheduled.contains($0) })
 				let store = SharedStore.standing_store(document.id)
 				if shield_plan.mode != .limit, ScheduleWindow.status(schedule, at: .now).active { try shared.apply_plan(for: document.id, to: store) } else { store.clearAllSettings() }
 				objectWillChange.send()
 				return true
-			} catch { release_standing(document.id); report(error); return false }
+			} catch { release_standing(document.id); (try? SharedStore())?.set_standing(document.id, enabled: false); report(error); return false }
 		}
 		release_standing(document.id)
 		do { try SharedStore().set_standing(document.id, enabled: false) } catch { report(error) }
@@ -177,7 +188,9 @@ final class SessionController: ObservableObject {
 
 	// The emergency exit: every shield this app has ever applied comes off. Returns the standing routines that were switched off.
 	func clear_everything() async -> [String] {
-		do { try await HomeWorker.run { try HomeEngine.disable(); try BuilderAppRules.clear() } } catch { report(error) }
+		// Separate steps, so a failure in one never leaves the other's shields up.
+		do { try await HomeWorker.run { try HomeEngine.disable() } } catch { report(error) }
+		do { try await HomeWorker.run { try BuilderAppRules.clear() } } catch { report(error) }
 		stop()
 		let ids = (try? SharedStore().standing_ids()) ?? []
 		for id in ids { release_standing(id); _ = try? SharedStore().set_standing(id, enabled: false) }

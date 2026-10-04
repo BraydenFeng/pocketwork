@@ -40,11 +40,13 @@ struct PocketworkApp: App {
 				.environmentObject(home)
 				.task {
 					if !CommandLine.arguments.contains("--ui-testing") { do { try await HomeWorker.run { try BuilderAppRules.clear() } } catch { sessions.report(error) } }
+					await cloud.attach(library, sessions)
+					// After attach, so a signed-in person's own library is the one being repaired.
 					if !CommandLine.arguments.contains("--ui-testing") { sessions.restore_standing(library.library.tools.map(\.document), groups: library.groups) }
-					await cloud.attach(library, sessions); await subscriptions.attach(cloud); await subscriptions.refresh()
+					await subscriptions.attach(cloud); await subscriptions.refresh()
 				}
 				.onChange(of: cloud.account_id) { _, _ in Task { await subscriptions.refresh() } }
-				.onChange(of: scene_phase) { _, phase in if phase == .active { Task { await subscriptions.refresh(); await cloud.sync() }; HomeScreenBridge.reconcile(session: sessions.session) } }
+				.onChange(of: scene_phase) { _, phase in if phase == .active { sessions.refresh(); Task { await subscriptions.refresh(); await cloud.sync() }; HomeScreenBridge.reconcile(session: sessions.session) } }
 				// Widgets read a snapshot, not the library; refresh it whenever routines or the session change.
 				.onAppear { HomeScreenBridge.publish(library: library.library, session: sessions.session) }
 				.onChange(of: library.library) { _, next in HomeScreenBridge.publish(library: next, session: sessions.session) }

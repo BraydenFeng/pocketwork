@@ -17,7 +17,20 @@ export const behavior_config_schema = z.object({
 export type BehaviorConfig = z.infer<typeof behavior_config_schema>;
 export const behavior_node_schema = z.object({ id: z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/), kind: z.enum(behavior_kinds), x: z.number().finite(), y: z.number().finite(), config: behavior_config_schema }).strict();
 export const edge_schema = z.object({ from: z.string(), output: z.string(), to: z.string(), input: z.string() }).strict();
-export const behaviors_schema = z.object({ nodes: z.array(behavior_node_schema).max(48), connections: z.array(edge_schema).max(128) }).strict();
+// The phone accepts only these operations per block kind; anything else would make it reject the whole library on sync.
+export const operations_by_kind: Partial<Record<string, readonly string[]>> = {
+	calculate: ["add", "subtract", "multiply", "divide", "floor"],
+	aggregate: ["sum", "average", "minimum", "maximum", "count"],
+	text_compare: ["equals", "contains", "starts_with"],
+};
+export const behaviors_schema = z.object({ nodes: z.array(behavior_node_schema).max(48), connections: z.array(edge_schema).max(128) }).strict().superRefine((graph, context) => {
+	for (const node of graph.nodes) {
+		const allowed = operations_by_kind[node.kind];
+		if (node.config.operation && allowed && !allowed.includes(node.config.operation)) {
+			context.addIssue({ code: "custom", message: `${node.kind} blocks cannot use "${node.config.operation}". Use one of: ${allowed.join(", ")}.` });
+		}
+	}
+});
 export type Behaviors = z.infer<typeof behaviors_schema>;
 export type BehaviorNode = Behaviors["nodes"][number];
 export const behavior_catalog: Record<BehaviorKind, { title: string; detail: string; category: string; inputs: Record<string, PortType>; outputs: Record<string, PortType> }> = {

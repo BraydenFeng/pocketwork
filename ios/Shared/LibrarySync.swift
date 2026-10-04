@@ -30,6 +30,11 @@ extension ToolLibrary {
 			}.sorted { $0.id < $1.id }
 			if result.groups?.isEmpty == true { result.groups = nil }
 		}
+		// Groups added on two devices at once: keep any group a merged page still names, from whichever side has it.
+		for name in result.tools.flatMap({ $0.document.referenced_groups }) where result.group(named: name) == nil {
+			guard let group = (groups ?? []).first(where: { $0.name.lowercased() == name.lowercased() }) ?? (remote.groups ?? []).first(where: { $0.name.lowercased() == name.lowercased() }), result.group(id: group.id) == nil else { continue }
+			result.groups = (result.groups ?? []) + [group]
+		}
 		// App choices merge per group by their own stamp, so a rename on one device cannot wipe apps picked on another.
 		var newest: [String: AppGroup] = [:]
 		for group in (groups ?? []) + (remote.groups ?? []) {

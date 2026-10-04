@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { starter_document, type AppDocument } from "../lib/document";
 import { delete_tool, empty_library, upsert_tool, type Library } from "../lib/library";
-import { merge_libraries, same_library, TOMBSTONE_DAYS } from "../lib/sync";
+import { adopt_guest_pages, merge_libraries, same_library, TOMBSTONE_DAYS } from "../lib/sync";
 
 const NOW = Date.parse("2026-09-12T12:00:00.000Z");
 const MINUTE = 60_000;
@@ -81,5 +81,33 @@ describe("syncing each group's app choices", () => {
 		const newer: Library = { ...base, groups: [{ id: "social", name: "Social", apps: "bmV3", apps_updated_at: "2026-09-12T11:05:00.000Z" }] };
 		expect(merge_libraries(older, newer, NOW).groups?.[0].apps).toBe("bmV3");
 		expect(merge_libraries(newer, older, NOW).groups?.[0].apps).toBe("bmV3");
+	});
+});
+
+describe("bug hunt, October 4", () => {
+	const v3 = (id: string) => ({ ...doc(id), schema_version: 3, behaviors: { nodes: [], connections: [] } }) as unknown as AppDocument;
+	it("does not revert a page whose format went down on another device", () => {
+		const web: Library = { schema_version: 1, tools: [{ document: v3("a"), updated_at: "2026-10-04T10:00:00.000Z" }] };
+		const phone: Library = { schema_version: 1, tools: [{ document: doc("a"), updated_at: "2026-10-04T10:01:00.000Z" }] };
+		expect(merge_libraries(web, phone, NOW).tools[0].document.schema_version).toBe(1);
+		expect(merge_libraries(phone, web, NOW).tools[0].document.schema_version).toBe(1);
+	});
+	it("treats the same library with different key order as unchanged", () => {
+		const left: Library = { schema_version: 1, tools: [], removed: { b: "2026-10-04T10:00:00.000Z", a: "2026-10-04T09:00:00.000Z" } };
+		const right = JSON.parse('{"removed":{"a":"2026-10-04T09:00:00.000Z","b":"2026-10-04T10:00:00.000Z"},"tools":[],"schema_version":1}') as Library;
+		expect(same_library(left, right)).toBe(true);
+	});
+	it("keeps a group that a merged page still names when the other device's group list wins", () => {
+		const games_page = { ...doc("games-page"), blocks: doc("games-page").blocks.map((block) => block.type === "screen_time" ? { ...block, groups: ["Games"] } : block) } as AppDocument;
+		const web: Library = { schema_version: 1, tools: [{ document: games_page, updated_at: "2026-10-04T10:00:00.000Z" }], groups_updated_at: "2026-10-04T10:00:00.000Z", groups: [{ id: "games", name: "Games" }] };
+		const phone: Library = { schema_version: 1, tools: [], groups_updated_at: "2026-10-04T10:05:00.000Z", groups: [{ id: "social", name: "Social" }] };
+		expect(merge_libraries(web, phone, NOW).groups?.map((group) => group.name).sort()).toEqual(["Games", "Social"]);
+	});
+	it("adopts pages made while signed out, up to the limit, and leaves the rest", () => {
+		const account: Library = { schema_version: 1, tools: [{ document: doc("a"), updated_at: "2026-10-04T09:00:00.000Z" }, { document: doc("b"), updated_at: "2026-10-04T09:00:00.000Z" }] };
+		const guest: Library = { schema_version: 1, tools: [{ document: doc("c"), updated_at: "2026-10-04T10:00:00.000Z" }, { document: doc("d"), updated_at: "2026-10-04T09:30:00.000Z" }] };
+		const { library, leftover } = adopt_guest_pages(account, guest, 3, NOW);
+		expect(library.tools.map((entry) => entry.document.id).sort()).toEqual(["a", "b", "c"]);
+		expect(leftover.tools.map((entry) => entry.document.id)).toEqual(["d"]);
 	});
 });

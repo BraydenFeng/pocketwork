@@ -112,9 +112,8 @@ struct AppDocument: Codable, Equatable {
 	// Group names this routine mentions, in order, without case-insensitive duplicates.
 	var referenced_groups: [String] {
 		var names: [String] = []
-		for block in blocks where block.type == .screen_time {
-			for name in block.group_names where !names.contains(where: { $0.lowercased() == name.lowercased() }) { names.append(name) }
-		}
+		let gate_groups = (behaviors?.nodes ?? []).filter { $0.kind == "app_gate" }.flatMap { $0.config.groups ?? [] }
+		for name in blocks.filter({ $0.type == .screen_time }).flatMap(\.group_names) + gate_groups where !names.contains(where: { $0.lowercased() == name.lowercased() }) { names.append(name) }
 		return names
 	}
 

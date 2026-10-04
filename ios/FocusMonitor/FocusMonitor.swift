@@ -34,7 +34,7 @@ final class FocusMonitor: DeviceActivityMonitor {
 		if let routine_id = SharedStore.standing_id(from: activity) { SharedStore.standing_store(routine_id).clearAllSettings(); return }
 		do {
 			let shared = try SharedStore()
-			guard let session = try shared.session(), session.activity_name == activity.rawValue, session.has_ended(at: .now) else { return }
+			guard let session = try shared.session(), session.activity_name == activity.rawValue, session.has_ended(at: .now.addingTimeInterval(60)) else { return }
 			ManagedSettingsStore(named: SharedStore.settings_name).clearAllSettings()
 			shared.clear_session()
 		} catch {

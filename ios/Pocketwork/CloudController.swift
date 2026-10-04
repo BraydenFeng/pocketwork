@@ -90,7 +90,9 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 					guard let callback, callback.host == "auth", callback.path == "/callback", let code = URLComponents(url: callback, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "code" })?.value else { throw DocumentError.invalid("Sign-in did not return a code. Check the Supabase mobile redirect URL.") }
 					let data = try await self.request("auth/v1/token?grant_type=pkce", method: "POST", body: JSONSerialization.data(withJSONObject: ["auth_code": code, "code_verifier": verifier]))
 					var found = try JSONDecoder().decode(CloudSession.self, from: data); found.saved_at = .now
+					let before = self.library?.library.tools.map(\.document) ?? []
 					try self.library?.switch_account(found.user.id)
+					await self.release_dropped(before)
 					try self.store(found)
 					self.session = found; self.email = found.user.email; self.signed_in = true; self.generation += 1
 					await self.sync()
@@ -113,6 +115,9 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 			for id in await sessions?.clear_everything() ?? [] { library?.set_enabled(id, false) }
 			try library?.switch_account(nil)
 			generation += 1; session = nil; signed_in = false; email = nil; status = "Signed out. Your cloud routines are kept in your account."
+			// Sharing status is a per-account choice; the next account opts in for itself.
+			StatusReporter.sharing = false; share_status = false
+			if let library { sessions?.restore_standing(library.library.tools.map(\.document), groups: library.groups) }
 		} catch { fail(error) }
 		}
 	}
@@ -253,7 +258,7 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 				let merged = try remote.map { try old.merging($0.library) } ?? old
 				if merged != old {
 					try library.receive_cloud(merged)
-					reconcile_group_apps(merged)
+					reconcile_group_apps(merged, old: old)
 					// Cloud settings take effect when this app opens, after on-device consent and selection.
 					for entry in old.tools {
 						if merged.find(entry.id) == nil { await sessions?.forget(entry.id) }
@@ -281,6 +286,8 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 				}
 				if merged != library.library { continue }
 				status = "Synced with your account"; error_message = nil
+				// Routines that are switched on in the account but not monitored on this device get their schedule back.
+				sessions?.restore_standing(library.library.tools.map(\.document), groups: library.groups)
 				await publish_status()
 				return
 			}
@@ -289,9 +296,11 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 	}
 
 	// A newer app choice from another device replaces this device's saved one before routines are re-applied below.
-	private func reconcile_group_apps(_ merged: ToolLibrary) {
+	private func reconcile_group_apps(_ merged: ToolLibrary, old: ToolLibrary) {
 		do {
 			let shared = try SharedStore()
+			// A group deleted on another device takes its app tokens with it here too.
+			for group in old.groups ?? [] where merged.group(id: group.id) == nil { shared.remove_group_selection(group.id) }
 			for group in merged.groups ?? [] {
 				guard let apps = group.apps, apps != shared.group_selection_data(group.id)?.base64EncodedString(), let data = Data(base64Encoded: apps) else { continue }
 				try shared.save_group_selection_data(data, for: group.id)
@@ -310,6 +319,12 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 				library.set_group_apps(group.id, apps: data.base64EncodedString())
 			}
 		} catch { logger.error("Local app choices were not uploaded: \(error.localizedDescription, privacy: .public)") }
+	}
+
+	// Pages that leave this device with an account switch stop enforcing too; they are no longer visible to switch off.
+	private func release_dropped(_ before: [AppDocument]) async {
+		guard let library else { return }
+		for document in before where library.tool(document.id) == nil && (document.enabled == true || document.home_allowance != nil) { await sessions?.forget(document.id) }
 	}
 
 	private struct StatusRow: Encodable { let user_id: String; let status: StatusReport }

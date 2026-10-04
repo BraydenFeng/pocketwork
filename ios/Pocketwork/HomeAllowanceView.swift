@@ -64,7 +64,7 @@ struct HomeAllowanceView: View {
 				}
 				Group {
 					Button(home.has_home ? "Update home to here" : "Set home here") { home.set_here() }.buttonStyle(QuietButtonStyle())
-					Button("Choose Distractions") { picking_group = library.groups.first { $0.name == document.shield?.group_names.first } }.buttonStyle(QuietButtonStyle())
+					Button("Choose Distractions") { picking_group = library.groups.first { $0.name.lowercased() == document.shield?.group_names.first?.lowercased() } }.buttonStyle(QuietButtonStyle())
 					if !editor.active, document.behaviors != nil, !document.behaviors_are_compiled_allowance { BehaviorPanel(document: document) }
 				}.disabled(editor.active)
 				SectionLabel(text: "Data").padding(.top, 8)

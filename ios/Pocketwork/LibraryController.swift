@@ -111,11 +111,23 @@ final class LibraryController: ObservableObject {
 		guard owner != id else { return }
 		let old_owner = owner
 		let key = id.map { Self.library_key + "." + $0 } ?? Self.library_key
-		let next: ToolLibrary
-		if let data = defaults.data(forKey: key) { next = try ToolLibrary.decode(data) }
+		var next: ToolLibrary
+		var leftover = ToolLibrary.empty
+		if let data = defaults.data(forKey: key) {
+			next = try ToolLibrary.decode(data)
+			// Signing in again keeps pages made while signed out (up to the free page limit) instead of deleting them.
+			if id != nil && old_owner == nil && !library.tools.isEmpty {
+				let adopted = try next.adopting_guest(library, limit: 3, now: .now)
+				next = adopted.library; leftover = adopted.leftover
+			}
+		}
 		else { next = id != nil && old_owner == nil ? library : .empty }
 		defaults.set(try next.encoded(), forKey: key)
-		if id != nil && old_owner == nil { defaults.removeObject(forKey: Self.library_key); defaults.removeObject(forKey: Self.legacy_key) }
+		if id != nil && old_owner == nil {
+			// Pages that did not fit stay in the signed-out library and reappear after signing out.
+			if leftover.tools.isEmpty { defaults.removeObject(forKey: Self.library_key) } else { defaults.set(try leftover.encoded(), forKey: Self.library_key) }
+			defaults.removeObject(forKey: Self.legacy_key)
+		}
 		owner = id; pro_until = nil; test_pro_until = nil; storage_blocked = false; library = next
 	}
 	func purge_account() {

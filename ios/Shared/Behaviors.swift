@@ -58,7 +58,7 @@ struct BehaviorGraph: Codable, Equatable {
 			try AppDocument.validate_id(node.id)
 			let c = node.config
 			try BuilderRuntime.validate(node)
-			guard Self.ports[node.kind] != nil, external[node.id] == nil, node.x.isFinite, node.y.isFinite, c.label.count <= 80, c.message.count <= 240, c.value.isFinite, abs(c.value) <= 1000000, c.minutes.isFinite, (1...1440).contains(c.minutes), ScheduleWindow.minutes(c.time) != nil, (1...7).contains(c.days.count), c.days.allSatisfy({ (1...7).contains($0) }), ["gte","gt","eq","lt","lte"].contains(c.operator) else { throw DocumentError.invalid("Invalid behavior settings.") }
+			guard Self.ports[node.kind] != nil, external[node.id] == nil, node.x.isFinite, node.y.isFinite, c.label.utf16.count <= 80, c.message.utf16.count <= 240, c.value.isFinite, abs(c.value) <= 1000000, c.minutes.isFinite, (1...1440).contains(c.minutes), ScheduleWindow.minutes(c.time) != nil, (1...7).contains(c.days.count), c.days.allSatisfy({ (1...7).contains($0) }), ["gte","gt","eq","lt","lte"].contains(c.operator) else { throw DocumentError.invalid("Invalid behavior settings.") }
 		}
 		var occupied = Set<String>()
 		for edge in connections {

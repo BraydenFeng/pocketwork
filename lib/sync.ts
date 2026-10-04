@@ -1,11 +1,15 @@
+import { new_id, referenced_groups } from "./document";
 import type { AppGroup, Library, LibraryEntry } from "./library";
 import { native_format_five, native_format_four } from "./release-flags";
 
 export const TOMBSTONE_DAYS = 30;
 
+// The newest page format every syncing phone can read; newer pages stay local drafts until the phone update ships.
+function supported_format(): number { return native_format_five ? 5 : native_format_four ? 4 : 3; }
+
 // New formats stay local until their phone reader is released, without removing the last compatible cloud copy.
 export function cloud_compatible_library(local: Library, remote: Library | null): Library {
-	const supported = native_format_five ? 5 : native_format_four ? 4 : 3;
+	const supported = supported_format();
 	return { ...local, tools: local.tools.flatMap(entry => {
 		if (entry.document.schema_version <= supported) { return [entry]; }
 		const previous = remote?.tools.find(item => item.document.id === entry.document.id);
@@ -24,7 +28,9 @@ export function merge_libraries(local: Library, remote: Library, now: number): L
 	const by_id = new Map<string, LibraryEntry>();
 	for (const entry of [...local.tools, ...remote.tools]) {
 		const current = by_id.get(entry.document.id);
-		if (current && current.document.schema_version > entry.document.schema_version) { continue; }
+		// A page in a format that cannot sync yet stays this browser's local draft. Otherwise the newest edit wins, exactly as
+		// on the phone; a page's format goes down when blocks are removed, and an older copy must not win back.
+		if (current && current.document.schema_version > entry.document.schema_version && current.document.schema_version > supported_format()) { continue; }
 		if (!current || entry.updated_at > current.updated_at) { by_id.set(entry.document.id, entry); }
 	}
 	const tools: LibraryEntry[] = [];
@@ -51,6 +57,12 @@ export function merge_libraries(local: Library, remote: Library, now: number): L
 		}
 		if (groups.size) { merged.groups = [...groups.values()].sort((a, b) => a.id.localeCompare(b.id)); }
 	}
+	// Groups added on two devices at once: keep any group a merged page still names, from whichever side has it.
+	for (const name of tools.flatMap((entry) => referenced_groups(entry.document))) {
+		const has = (merged.groups ?? []).some((group) => group.name.toLowerCase() === name.toLowerCase());
+		const found = [...(local.groups ?? []), ...(remote.groups ?? [])].find((group) => group.name.toLowerCase() === name.toLowerCase());
+		if (!has && found && !(merged.groups ?? []).some((group) => group.id === found.id)) { merged.groups = [...(merged.groups ?? []), found]; }
+	}
 	// App choices merge per group by their own stamp, so a rename on one device cannot wipe apps picked on another.
 	if (merged.groups) {
 		const newest = new Map<string, AppGroup>();
@@ -67,7 +79,37 @@ export function merge_libraries(local: Library, remote: Library, now: number): L
 }
 
 export function same_library(left: Library, right: Library): boolean {
-	return JSON.stringify(normalize(left)) === JSON.stringify(normalize(right));
+	return stable_stringify(normalize(left)) === stable_stringify(normalize(right));
+}
+
+// Key order differs between what the database returns and what this browser built; compare content, not order.
+function stable_stringify(value: unknown): string {
+	if (Array.isArray(value)) { return `[${value.map(stable_stringify).join(",")}]`; }
+	if (value && typeof value === "object") {
+		const entries = Object.entries(value as Record<string, unknown>).filter(([, item]) => item !== undefined).sort(([left], [right]) => left.localeCompare(right));
+		return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${stable_stringify(item)}`).join(",")}}`;
+	}
+	return JSON.stringify(value);
+}
+
+// Signing in again: pages made while signed out join the account instead of being deleted. Pages past the limit, or a
+// second home allowance, stay behind in the signed-out library (returned as leftover).
+export function adopt_guest_pages(account: Library, guest: Library, limit: number, now: number): { library: Library; leftover: Library } {
+	let library: Library = { ...account, tools: [...account.tools] };
+	const leftover: Library = { schema_version: 1, tools: [] };
+	for (const entry of [...guest.tools].sort((left, right) => right.updated_at.localeCompare(left.updated_at))) {
+		if (library.tools.some((item) => item.document.id === entry.document.id)) { continue; }
+		const second_allowance = Boolean(entry.document.home_allowance) && library.tools.some((item) => item.document.home_allowance);
+		if (second_allowance || library.tools.length >= limit) { leftover.tools.push(entry); continue; }
+		library.tools.push(entry);
+		for (const name of referenced_groups(entry.document)) {
+			if ((library.groups ?? []).some((group) => group.name.toLowerCase() === name.toLowerCase())) { continue; }
+			const group = (guest.groups ?? []).find((item) => item.name.toLowerCase() === name.toLowerCase()) ?? { id: new_id(), name };
+			library = { ...library, groups: [...(library.groups ?? []), group], groups_updated_at: new Date(now).toISOString() };
+		}
+	}
+	if (leftover.tools.length) { leftover.groups = guest.groups; leftover.groups_updated_at = guest.groups_updated_at; }
+	return { library, leftover };
 }
 
 function normalize(library: Library) {

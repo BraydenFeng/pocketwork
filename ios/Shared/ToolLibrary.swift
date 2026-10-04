@@ -114,6 +114,15 @@ struct ToolLibrary: Codable, Equatable {
 				copy.groups = block.group_names.map { $0.lowercased() == old.name.lowercased() ? name : $0 }
 				return copy
 			}
+			if var graph = document.behaviors {
+				graph.nodes = graph.nodes.map { node in
+					guard node.kind == "app_gate", let names = node.config.groups else { return node }
+					var copy = node
+					copy.config.groups = names.map { $0.lowercased() == old.name.lowercased() ? name : $0 }
+					return copy
+				}
+				document.behaviors = graph
+			}
 			return LibraryEntry(document: document, updated_at: Self.iso_formatter.string(from: now))
 		}
 		return next
@@ -132,6 +141,27 @@ struct ToolLibrary: Codable, Equatable {
 			return updated
 		}
 		return next
+	}
+
+	// Signing in again: pages made while signed out join the account instead of being deleted. Pages that would go past
+	// the page limit, or a second home allowance, stay behind in the signed-out library (returned as leftover).
+	func adopting_guest(_ guest: ToolLibrary, limit: Int, now: Date) throws -> (library: ToolLibrary, leftover: ToolLibrary) {
+		var next = self, leftover = ToolLibrary.empty
+		for entry in guest.tools.sorted(by: { $0.updated_at > $1.updated_at }) where find(entry.id) == nil {
+			let second_allowance = entry.document.home_allowance != nil && next.tools.contains { $0.document.home_allowance != nil }
+			if second_allowance || next.tools.count >= limit { leftover.tools.append(entry); continue }
+			next.tools.append(entry)
+			// Keep the signed-out group (and its id, which the saved app choices are stored under) when the account has no group of that name.
+			for name in entry.document.referenced_groups where next.group(named: name) == nil {
+				let group = guest.group(named: name) ?? AppGroup(id: UUID().uuidString, name: name)
+				next.groups = (next.groups ?? []) + [group]
+				next.groups_updated_at = Self.iso_formatter.string(from: now)
+			}
+		}
+		next.tools.sort { $0.id < $1.id }
+		try next.validate()
+		if !leftover.tools.isEmpty { leftover.groups = guest.groups; leftover.groups_updated_at = guest.groups_updated_at }
+		return (next, leftover)
 	}
 
 	func removing_group(_ id: String) throws -> ToolLibrary {
@@ -180,6 +210,7 @@ struct ToolLibrary: Codable, Equatable {
 		guard var copy = find(id) else { throw DocumentError.invalid("That tool no longer exists.") }
 		copy.id = UUID().uuidString
 		copy.name = String("\(copy.name) copy".prefix(80))
+		if copy.is_standing { copy.enabled = false }
 		return (try upserting(copy, now: now), copy)
 	}
 
@@ -187,6 +218,7 @@ struct ToolLibrary: Codable, Equatable {
 	func importing(_ document: AppDocument, now: Date) throws -> (library: ToolLibrary, document: AppDocument) {
 		var next_document = document
 		if find(document.id) != nil { next_document.id = UUID().uuidString }
+		if next_document.is_standing { next_document.enabled = false }
 		return (try upserting(next_document, now: now), next_document)
 	}
 }

@@ -124,10 +124,12 @@ export function rename_group(library: Library, id: string, name: string, now: nu
 	if (clash && clash.id !== id) { throw new Error(`There is already an app group called "${clean}".`); }
 	const groups = (library.groups ?? []).map((entry) => entry.id === id ? { ...entry, name: clean } : entry);
 	const tools = library.tools.map((entry) => {
-		const uses = entry.document.blocks.some((block) => block.type === "screen_time" && (block.groups ?? []).some((entry_name) => entry_name.toLowerCase() === group.name.toLowerCase()));
+		const uses = referenced_groups(entry.document).some((entry_name) => entry_name.toLowerCase() === group.name.toLowerCase());
 		if (!uses) { return entry; }
 		const blocks = entry.document.blocks.map((block) => block.type === "screen_time" ? { ...block, groups: (block.groups ?? []).map((entry_name) => entry_name.toLowerCase() === group.name.toLowerCase() ? clean : entry_name) } : block);
-		return { document: { ...entry.document, blocks }, updated_at: timestamp(now) };
+		const renamed = (names: string[] | undefined) => names?.map((entry_name) => entry_name.toLowerCase() === group.name.toLowerCase() ? clean : entry_name);
+		const behaviors = entry.document.behaviors ? { ...entry.document.behaviors, nodes: entry.document.behaviors.nodes.map((node) => node.kind === "app_gate" && node.config.groups ? { ...node, config: { ...node.config, groups: renamed(node.config.groups) } } : node) } : undefined;
+		return { document: { ...entry.document, blocks, ...(behaviors ? { behaviors } : {}) }, updated_at: timestamp(now) };
 	});
 	return { ...library, groups, tools, groups_updated_at: timestamp(now) };
 }

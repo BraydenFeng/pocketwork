@@ -55,6 +55,10 @@ struct SharedStore {
 
 	func remove_group_selection(_ group_id: String) { defaults.removeObject(forKey: group_key(group_id)) }
 
+	func stored_group_ids() -> [String] {
+		defaults.dictionaryRepresentation().keys.filter { $0.hasPrefix("group_activities.") }.map { String($0.dropFirst("group_activities.".count)) }
+	}
+
 	// The saved bytes themselves, for syncing a group's choice to the person's other devices unchanged.
 	func group_selection_data(_ group_id: String) -> Data? { defaults.data(forKey: group_key(group_id)) }
 

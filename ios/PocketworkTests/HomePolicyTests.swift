@@ -33,12 +33,14 @@ final class HomePolicyTests: XCTestCase {
 		XCTAssertEqual(ledger.used_minutes, 20, "the 10 and 15 minute reports were lost, the 20 minute one still counts all of it")
 	}
 
-	func test_clock_names_cover_every_day_window_and_midnight() {
+	func test_clock_names_are_one_daily_trigger_per_distinct_window_plus_midnight() {
 		let policy = HomePolicy(timezone: "America/Los_Angeles", away_usage_counts: false, outside_windows: "unrestricted", rules: [
 			HomeDayRule(days: [2, 3], allowance_minutes: 30, windows: [HomeWindow(start: "18:00", end: "18:30"), HomeWindow(start: "19:00", end: "20:00")]),
+			HomeDayRule(days: [4], allowance_minutes: 45, windows: [HomeWindow(start: "18:00", end: "18:30")]),
 			HomeDayRule(days: [1], allowance_minutes: 60, windows: [HomeWindow(start: "10:00", end: "12:00")]),
 		])
-		XCTAssertEqual(HomeEngine.clock_names(policy), ["pocketwork.home.clock.2.0", "pocketwork.home.clock.2.1", "pocketwork.home.clock.3.0", "pocketwork.home.clock.3.1", "pocketwork.home.clock.1.0", "pocketwork.home.midnight"])
+		// Four day/window pairs share three distinct times: three triggers instead of four, well inside iOS's 20-activity limit.
+		XCTAssertEqual(HomeEngine.clock_names(policy), ["pocketwork.home.clock.1800-1830", "pocketwork.home.clock.1900-2000", "pocketwork.home.clock.1000-1200", "pocketwork.home.midnight"])
 	}
 
 	func test_daily_reset_and_split_windows() throws {

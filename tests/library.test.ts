@@ -163,3 +163,16 @@ describe("group app choices", () => {
 		expect(library_schema.safeParse(group("A".repeat(MAX_GROUP_APPS + 4))).success).toBe(false);
 	});
 });
+
+describe("App gate groups", () => {
+	const gate_page = (groups: string[]) => ({ ...structuredClone(starter_document), id: "gate-page", behaviors: { nodes: [{ id: "gate", kind: "app_gate", x: 0, y: 0, config: { groups } }], connections: [] } }) as unknown as AppDocument;
+	it("count as used, follow renames, and block deleting their group", () => {
+		let library = add_group(empty_library, "Distractions");
+		library = { ...library, tools: [{ document: gate_page(["Distractions"]), updated_at: "2026-10-04T10:00:00.000Z" }] };
+		const id = library.groups![0].id;
+		expect(() => remove_group(library, id)).toThrow(/used by/);
+		const renamed = rename_group(library, id, "Social", Date.parse("2026-10-04T11:00:00.000Z"));
+		const gate = renamed.tools[0].document.behaviors!.nodes.find((node) => node.kind === "app_gate")!;
+		expect(gate.config.groups).toEqual(["Social"]);
+	});
+});

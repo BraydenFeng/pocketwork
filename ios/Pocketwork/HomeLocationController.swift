@@ -20,12 +20,16 @@ final class HomeLocationController: NSObject, ObservableObject, CLLocationManage
 	}
 	func restore() {
 		let epoch = generation
-		Task { do {
-			let state = try await HomeWorker.run { try HomeEngine.refresh_on_launch(); return try HomeEngine.snapshot() }
-			guard epoch == generation else { return }; has_home = state.place != nil
-			always_allowed = manager.authorizationStatus == .authorizedAlways
-			if let place = state.place, always_allowed { monitor(place) }
-		} catch { error_message = error.localizedDescription } }
+		Task {
+			// A failed repair (for example a group with no apps) must not stop home detection below.
+			do { try await HomeWorker.run { try HomeEngine.refresh_on_launch() } } catch { error_message = error.localizedDescription }
+			do {
+				let state = try await HomeWorker.run { try HomeEngine.snapshot() }
+				guard epoch == generation else { return }; has_home = state.place != nil
+				always_allowed = manager.authorizationStatus == .authorizedAlways
+				if let place = state.place, always_allowed { monitor(place) }
+			} catch { error_message = error.localizedDescription }
+		}
 	}
 	func forget_account_data() async throws {
 		generation += 1; setting_home = false; manager.stopUpdatingLocation()
@@ -37,7 +41,7 @@ final class HomeLocationController: NSObject, ObservableObject, CLLocationManage
 		} catch { status = "Saved location could not be removed."; throw error }
 	}
 	func set_here() {
-		setting_home = true
+		setting_home = true; error_message = nil
 		if manager.authorizationStatus == .notDetermined { manager.requestWhenInUseAuthorization() }
 		else if manager.authorizationStatus == .denied || manager.authorizationStatus == .restricted { error_message = "Allow Location access in Settings first."; setting_home = false }
 		else { manager.requestLocation() }
@@ -53,6 +57,8 @@ final class HomeLocationController: NSObject, ObservableObject, CLLocationManage
 		// Unsigned UI-test builds have no App Group, so the engine call below would only report a storage error.
 		guard !CommandLine.arguments.contains("--ui-testing") else { return }
 		always_allowed = manager.authorizationStatus == .authorizedAlways
+		// A denied prompt ends the request, so a later grant in Settings never saves home wherever the person happens to be.
+		if manager.authorizationStatus == .denied || manager.authorizationStatus == .restricted { setting_home = false }
 		if setting_home, manager.authorizationStatus == .authorizedAlways || manager.authorizationStatus == .authorizedWhenInUse { manager.requestLocation() }
 		if always_allowed { restore() }
 		else { update(false); status = "Allow Always location access for automatic home detection." }
@@ -62,7 +68,7 @@ final class HomeLocationController: NSObject, ObservableObject, CLLocationManage
 		guard location.horizontalAccuracy >= 0, location.horizontalAccuracy <= 100, abs(location.timestamp.timeIntervalSinceNow) < 60 else { error_message = "Could not locate home accurately. Try again near a window with Precise Location enabled."; setting_home = false; return }
 		setting_home = false
 		let epoch = generation
-		Task { do { guard epoch == generation else { return }; let place = HomePlace(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude); try await HomeWorker.run { try HomeEngine.set_home(place) }; guard epoch == generation else { return }; has_home = true; monitor(place); if always_allowed { update(true) }; status = "Home saved on this iPhone." }
+		Task { do { guard epoch == generation else { return }; let place = HomePlace(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude); try await HomeWorker.run { try HomeEngine.set_home(place) }; guard epoch == generation else { return }; has_home = true; monitor(place); if always_allowed { update(true) }; status = "Home saved on this device."; error_message = nil }
 		catch { error_message = error.localizedDescription } }
 	}
 	func locationManager(_ manager: CLLocationManager, didDetermineState state: CLRegionState, for region: CLRegion) { if region.identifier == "pocketwork.home" { update(state == .inside && always_allowed) } }

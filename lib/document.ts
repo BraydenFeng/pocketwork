@@ -110,9 +110,10 @@ export function shield_mode(block: Extract<Block, { type: "screen_time" }>): Shi
 // Group names a routine refers to, in document order, without duplicates.
 export function referenced_groups(document: AppDocument): string[] {
 	const names: string[] = [];
-	for (const block of document.blocks) {
-		if (block.type !== "screen_time") { continue; }
-		for (const name of block.groups ?? []) { if (!names.some((entry) => entry.toLowerCase() === name.toLowerCase())) { names.push(name); } }
+	// App gate blocks name groups too; they count as used, get created, and follow renames like Screen Time blocks.
+	const gate_groups = (document.behaviors?.nodes ?? []).filter((node) => node.kind === "app_gate").flatMap((node) => node.config.groups ?? []);
+	for (const name of [...document.blocks.flatMap((block) => block.type === "screen_time" ? block.groups ?? [] : []), ...gate_groups]) {
+		if (!names.some((entry) => entry.toLowerCase() === name.toLowerCase())) { names.push(name); }
 	}
 	return names;
 }

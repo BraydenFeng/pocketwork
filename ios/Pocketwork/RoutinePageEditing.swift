@@ -36,7 +36,8 @@ final class RoutinePageEditing: ObservableObject {
 		do { try document.validate() } catch { failure = error.localizedDescription; return }
 		saving = true
 		defer { saving = false }
-		if original.enabled == true && document.enabled != true {
+		// Turning a schedule into a home allowance (or back) in Logic must stop the old engine before the new one starts.
+		if original.enabled == true && (document.enabled != true || (original.home_allowance != nil) != (document.home_allowance != nil)) {
 			guard await sessions.set_routine(original, enabled: false, groups: library.groups) else { failure = sessions.error_message; return }
 			library.set_enabled(original.id, false)
 			self.original = library.tool(original.id)

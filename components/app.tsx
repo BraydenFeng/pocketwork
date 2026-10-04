@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppDocument } from "@/lib/document";
 import { connect_cloud, current_account, fetch_library, push_library, sign_out, watch_account, type Account, type Cloud } from "@/lib/cloud";
 import { add_group, delete_tool, duplicate_tool, empty_library, find_tool, import_tool, load_library, remove_group, rename_group, save_library, upsert_tool, LIBRARY_KEY, library_schema, type Library } from "@/lib/library";
-import { cloud_compatible_library, merge_libraries, same_library } from "@/lib/sync";
+import { cloud_compatible_library, merge_libraries, same_library, adopt_guest_pages } from "@/lib/sync";
 import { fetch_status, type StatusReport } from "@/lib/status";
 import { Home } from "./home";
 import { fetch_plan } from "@/lib/account-client";
@@ -88,10 +88,16 @@ export function PocketworkApp() {
 			const previous_owner = active_owner.current;
 			active_owner.current = owner;
 			const raw = storage().getItem(LIBRARY_KEY);
-			const next = raw ? library_schema.parse(JSON.parse(raw)) : !previous_owner ? library_ref.current : empty_library;
+			const stored = raw ? library_schema.parse(JSON.parse(raw)) : null;
+			// Signing in again keeps pages made while signed out (up to the free page limit); the rest stay in the signed-out library.
+			const adopted = stored && owner && !previous_owner && library_ref.current.tools.length ? adopt_guest_pages(stored, library_ref.current, 3, Date.now()) : null;
+			const next = adopted ? library_schema.parse(adopted.library) : stored ?? (!previous_owner ? library_ref.current : empty_library);
 			library_ref.current = next; set_library(next); set_open_id(null);
 			save_library(storage(), next);
-			if (owner && !previous_owner) { window.localStorage.removeItem(LIBRARY_KEY); window.localStorage.removeItem("pocketwork.document.v1"); }
+			if (owner && !previous_owner) {
+				if (adopted?.leftover.tools.length) { window.localStorage.setItem(LIBRARY_KEY, JSON.stringify(adopted.leftover)); } else { window.localStorage.removeItem(LIBRARY_KEY); }
+				window.localStorage.removeItem("pocketwork.document.v1");
+			}
 			set_storage_blocked(false); last_pushed.current = null; account_ready.current = true;
 		} catch (failure) { set_storage_blocked(true); set_error(error_message(failure)); }
 	}, [account, storage]);
@@ -151,6 +157,8 @@ export function PocketworkApp() {
 
 	function persist(next: Library) {
 		assert_page_limit(library_ref.current, next, plan_active(plan));
+		// Check before keeping it: an invalid library in memory would fail every later save and sync.
+		library_schema.parse(next);
 		library_ref.current = next;
 		set_library(next);
 		if (storage_blocked) { return; }
@@ -166,6 +174,7 @@ export function PocketworkApp() {
 		if (active_owner.current !== (account?.id ?? null)) { return; }
 		const next = upsert_tool(library_ref.current, document, Date.now());
 		assert_page_limit(library_ref.current, next, plan_active(plan));
+		library_schema.parse(next);
 		library_ref.current = next;
 		set_library(next);
 		if (!storage_blocked) { save_library(storage(), next); }
