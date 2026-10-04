@@ -17,6 +17,22 @@ final class HomePolicyTests: XCTestCase {
 		ledger.checkpoint(generation: "second", minutes: 3, at_home: true)
 		XCTAssertEqual(ledger.used_minutes, 25)
 	}
+	func test_meters_check_in_every_five_minutes_and_at_the_limit_twice() {
+		XCTAssertEqual(HomeEngine.meter_thresholds(remaining: 12), [5, 10, 12, 13])
+		XCTAssertEqual(HomeEngine.meter_thresholds(remaining: 15), [5, 10, 15, 16])
+		XCTAssertEqual(HomeEngine.meter_thresholds(remaining: 3), [3, 4])
+		XCTAssertEqual(HomeEngine.meter_thresholds(remaining: 0), [])
+		XCTAssertEqual(HomeEngine.meter_thresholds(remaining: 60).count, 13, "60 minutes needs 13 checkpoints instead of 60")
+	}
+
+	func test_a_later_report_covers_reports_that_never_arrived() {
+		var ledger = HomeLedger(day: "2026-10-4")
+		ledger.generation = "meter"
+		ledger.checkpoint(generation: "meter", minutes: 5, at_home: true)
+		ledger.checkpoint(generation: "meter", minutes: 20, at_home: true)
+		XCTAssertEqual(ledger.used_minutes, 20, "the 10 and 15 minute reports were lost, the 20 minute one still counts all of it")
+	}
+
 	func test_daily_reset_and_split_windows() throws {
 		try policy.validate()
 		let formatter = ISO8601DateFormatter()

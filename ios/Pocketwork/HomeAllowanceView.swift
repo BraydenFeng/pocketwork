@@ -79,7 +79,7 @@ struct HomeAllowanceView: View {
 					}
 					Button("Refresh remaining time") { refresh() }.buttonStyle(TextButtonStyle())
 					if let state = allowance.state, let policy = document.home_allowance { diagnostics(state, policy: policy) }
-					Text("Home uses a 150 m boundary. iOS may detect crossings late. Usage is saved in whole minutes; a final partial minute may not count when you leave.").supporting()
+					Text("Home uses a 150 m boundary. iOS may detect crossings late. iOS reports usage every 5 minutes and again at your limit, so minutes used can trail Screen Time by a few minutes.").supporting()
 				}.disabled(editor.active)
 				if let error = home.error_message ?? sessions.error_message { Text(error).foregroundStyle(Theme.danger).font(.system(size: 13)) }
 			}.padding(Theme.pad).disabled(editor.saving).readable()

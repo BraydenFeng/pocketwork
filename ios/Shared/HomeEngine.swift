@@ -26,6 +26,13 @@ struct HomeLogEntry: Codable, Equatable { var at: Double; var text: String }
 // One shared file and a process lock serialize app/geofence and monitor-extension callbacks.
 enum HomeEngine {
 	static let prefix = "pocketwork.home."
+	// iOS drops or throttles usage reports when a meter asks for one every minute (observed on device October 4),
+	// so meters check in every five minutes, at the exact limit, and once more a minute later in case that report is lost.
+	static let checkpoint_step = 5
+	static func meter_thresholds(remaining: Int) -> [Int] {
+		guard remaining > 0 else { return [] }
+		return Array(stride(from: checkpoint_step, to: remaining, by: checkpoint_step)) + [remaining, remaining + 1]
+	}
 	static var center: DeviceActivityCenter { DeviceActivityCenter() }
 	static var shield: ManagedSettingsStore { ManagedSettingsStore(named: ManagedSettingsStore.Name(prefix + "shield")) }
 	private static func storage_folder() throws -> URL {
@@ -171,7 +178,7 @@ enum HomeEngine {
 				let remaining = state.ledger.budget(policy.rule(at: .now)?.allowance_minutes ?? 0) - state.ledger.used_minutes
 				guard remaining > 0 else { try transaction { $0.ledger.pause() }; try reconcile(); return }
 				var events: [DeviceActivityEvent.Name: DeviceActivityEvent] = [:]
-				for minute in 1...remaining {
+				for minute in meter_thresholds(remaining: remaining) {
 					events[DeviceActivityEvent.Name(String(minute))] = DeviceActivityEvent(applications: selection.applicationTokens, categories: selection.categoryTokens, webDomains: selection.webDomainTokens, threshold: DateComponents(minute: minute))
 				}
 				let now = Date(), end = policy.calendar.date(byAdding: .day, value: 1, to: policy.calendar.startOfDay(for: now))!.addingTimeInterval(-1)
