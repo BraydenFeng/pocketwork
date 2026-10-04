@@ -16,6 +16,7 @@ struct HomeAllowanceView: View {
 	@State private var opened = false
 	@State private var visible = false
 	@State private var showing_logic = false
+	@State private var activating: PendingActivation?
 	private let ui_testing = CommandLine.arguments.contains("--ui-testing")
 	private let refresh_clock = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
 	private let days = ["", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
@@ -35,8 +36,12 @@ struct HomeAllowanceView: View {
 							}
 							.frame(maxWidth: .infinity, alignment: .leading)
 							Toggle("Enable home allowance", isOn: Binding(get: { document.enabled == true }, set: { enabled in
-								Task { if await sessions.set_routine(document, enabled: enabled, groups: library.groups) { library.set_enabled(document.id, enabled); refresh() } }
-							})).labelsHidden().disabled(sessions.is_busy || !home.has_home || !home.always_allowed).tint(Theme.success).accessibilityLabel("Enable home allowance")
+								if enabled { activate() } else { switch_allowance(false) }
+							})).labelsHidden().disabled(sessions.is_busy).tint(Theme.success).accessibilityLabel("Enable home allowance")
+						}
+						if document.enabled == true && !Activation.missing(for: document, in: Activation.context(for: document, library: library, sessions: sessions, home: home)).isEmpty {
+							Button { activating = PendingActivation(document: document, verb: "Turn on") { switch_allowance(true) } } label: { Label("Needs setup", systemImage: "exclamationmark.triangle") }
+								.buttonStyle(TextButtonStyle()).foregroundStyle(Theme.warning).accessibilityIdentifier("allowance.finish-setup")
 						}
 						if sessions.is_busy { ProgressView("Updating home allowance…") }
 						Text("Inside your windows, at home, you get these minutes and then the apps lock until the next window. Outside a window, or away from home, nothing is blocked. Resets at midnight in Los Angeles.").font(.system(size: 12)).foregroundStyle(Theme.text_faint)
@@ -59,7 +64,6 @@ struct HomeAllowanceView: View {
 				}
 				Group {
 					Button(home.has_home ? "Update home to here" : "Set home here") { home.set_here() }.buttonStyle(QuietButtonStyle())
-					if !home.always_allowed { Button("Allow background home detection") { home.allow_background() }.buttonStyle(QuietButtonStyle()) }
 					Button("Choose Distractions") { picking_group = library.groups.first { $0.name == document.shield?.group_names.first } }.buttonStyle(QuietButtonStyle())
 					if !editor.active, document.behaviors != nil, !document.behaviors_are_compiled_allowance { BehaviorPanel(document: document) }
 				}.disabled(editor.active)
@@ -95,6 +99,7 @@ struct HomeAllowanceView: View {
 		.alert("Couldn’t save changes", isPresented: Binding(get: { editor.failure != nil }, set: { if !$0 { editor.failure = nil } })) { Button("OK") { editor.failure = nil } } message: { Text(editor.failure ?? "") }
 		.fullScreenCover(isPresented: $showing_logic) { if let draft = editor.draft { LogicEditorView(document: Binding(get: { editor.draft ?? draft }, set: { editor.draft = $0 })) } }
 		.sheet(item: $picking_group) { group in AppGroupSelectionSheet(group: group) }
+		.sheet(item: $activating) { pending in ActivationSheet(document: pending.document, verb: pending.verb, run: pending.run) }
 	}
 
 	private func diagnostics(_ state: HomeState, policy: HomePolicy) -> some View {
@@ -110,6 +115,16 @@ struct HomeAllowanceView: View {
 			.font(.system(size: 12, design: .monospaced)).foregroundStyle(Theme.text_dim).frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8)
 		}
 		.font(.system(size: 13, weight: .medium)).tint(Theme.text_dim)
+	}
+
+	// Switching on asks for whatever is still missing (Screen Time, apps, home, Always location) before the engine starts.
+	private func activate() {
+		if Activation.missing(for: document, in: Activation.context(for: document, library: library, sessions: sessions, home: home)).isEmpty { switch_allowance(true) }
+		else { activating = PendingActivation(document: document, verb: "Turn on") { switch_allowance(true) } }
+	}
+
+	private func switch_allowance(_ enabled: Bool) {
+		Task { if await sessions.set_routine(document, enabled: enabled, groups: library.groups) { library.set_enabled(document.id, enabled); refresh() } }
 	}
 
 	private func refresh_if_active() {

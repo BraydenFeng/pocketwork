@@ -9,6 +9,7 @@ struct ToolView: View {
 	var edit_on_open = false
 	@EnvironmentObject private var library: LibraryController
 	@EnvironmentObject private var sessions: SessionController
+	@EnvironmentObject private var home: HomeLocationController
 	@Environment(\.scenePhase) private var scene_phase
 	@StateObject private var editor = RoutinePageEditing()
 	@State private var opened = false
@@ -20,6 +21,7 @@ struct ToolView: View {
 	@State private var palette_kinds: Set<BlockKind>?
 	@State private var palette_heading = "Add to this page"
 	@State private var focus = SessionHistory()
+	@State private var activating: PendingActivation?
 	private static let routine_kinds: Set<BlockKind> = [.timer, .schedule, .screen_time]
 	private static let data_kinds: Set<BlockKind> = [.checklist, .counter, .note]
 	// UI tests freeze the clock; a view that redraws every second never lets XCUITest see the app as idle.
@@ -74,6 +76,7 @@ struct ToolView: View {
 					}
 				}
 				.safeAreaInset(edge: .bottom) { if editor.active { editing_bar } }
+				.sheet(item: $activating) { pending in ActivationSheet(document: pending.document, verb: pending.verb, run: pending.run) }
 				.sheet(isPresented: $showing_palette) { BlockPalette(can_add: { editor.draft?.can_add($0) == true }, add: { editor.add($0) }, kinds: palette_kinds, heading: palette_heading) }
 				.fullScreenCover(isPresented: $showing_behavior) { if let draft = editor.draft { LogicEditorView(document: Binding(get: { editor.draft ?? draft }, set: { editor.draft = $0 })) } }
 				.onAppear { focus = SessionHistory.load(from: .standard); if !opened { opened = true; if edit_on_open { editor.begin(document) } } }
@@ -205,7 +208,7 @@ struct ToolView: View {
 					.contentShape(Rectangle())
 					.onTapGesture { if can_edit(document) { begin_editing(document) } }
 					Button(sessions.is_busy ? "Wait" : running ? "Stop" : "Start") {
-						if running { sessions.stop() } else { Task { await sessions.start(document, groups: library.groups) } }
+						if running { sessions.stop() } else { activate(document, verb: "Start") { Task { await sessions.start(document, groups: library.groups) } } }
 					}
 					.buttonStyle(QuietButtonStyle()).disabled(sessions.is_busy || other_running)
 					.accessibilityLabel("\(running ? "Stop" : "Start") \(block.title)")
@@ -214,6 +217,7 @@ struct ToolView: View {
 			}
 		case .schedule:
 			let enabled = document.enabled == true
+			let needs_setup = enabled && !Activation.missing(for: document, in: Activation.context(for: document, library: library, sessions: sessions, home: home)).isEmpty
 			Card(tinted: true) {
 				HStack(spacing: 12) {
 					VStack(alignment: .leading, spacing: 4) {
@@ -222,17 +226,27 @@ struct ToolView: View {
 						TimelineView(.periodic(from: .now, by: frozen ? 3600 : 30)) { timeline in
 							Text(ScheduleWindow.describe_status(block, enabled: enabled, at: timeline.date)).font(.system(size: 11)).foregroundStyle(Theme.text_faint)
 						}
+						if needs_setup {
+							Button { activating = PendingActivation(document: document, verb: "Turn on") { set_standing(document, true) } } label: { Label("Needs setup", systemImage: "exclamationmark.triangle") }
+								.buttonStyle(TextButtonStyle()).foregroundStyle(Theme.warning).accessibilityIdentifier("tool.finish-setup")
+						}
 					}
 					.frame(maxWidth: .infinity, alignment: .leading)
 					.contentShape(Rectangle())
 					.onTapGesture { if can_edit(document) { begin_editing(document) } }
-					Toggle(enabled ? "On" : "Off", isOn: Binding(get: { enabled }, set: { set_standing(document, $0) }))
+					Toggle(enabled ? "On" : "Off", isOn: Binding(get: { enabled }, set: { on in if on { activate(document, verb: "Turn on") { set_standing(document, true) } } else { set_standing(document, false) } }))
 						.labelsHidden().tint(Theme.success).accessibilityLabel("Switch \(block.title) on or off").accessibilityIdentifier("tool.switch")
 				}
 			}
 		default:
 			block_view(block, in: document).contentShape(Rectangle()).onTapGesture { if can_edit(document) { begin_editing(document) } }
 		}
+	}
+
+	// Runs the routine when everything it needs is in place; otherwise asks for exactly what is missing first.
+	private func activate(_ document: AppDocument, verb: String, run: @escaping () -> Void) {
+		if Activation.missing(for: document, in: Activation.context(for: document, library: library, sessions: sessions, home: home)).isEmpty { run() }
+		else { activating = PendingActivation(document: document, verb: verb, run: run) }
 	}
 
 	private func can_edit(_ document: AppDocument) -> Bool { !sessions.is_running(document) && !sessions.is_busy }
@@ -283,7 +297,7 @@ struct ToolView: View {
 						Label(block.title, systemImage: "calendar.badge.clock").font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text_dim)
 						Spacer()
 						Text(enabled ? "On" : "Off").font(.system(size: 13)).foregroundStyle(Theme.text_dim)
-						Toggle(enabled ? "On" : "Off", isOn: Binding(get: { enabled }, set: { set_standing(document, $0) }))
+						Toggle(enabled ? "On" : "Off", isOn: Binding(get: { enabled }, set: { on in if on { activate(document, verb: "Turn on") { set_standing(document, true) } } else { set_standing(document, false) } }))
 							.labelsHidden().tint(Theme.success).accessibilityLabel("Switch \(block.title) on or off").accessibilityIdentifier("tool.switch")
 					}
 					Text(ScheduleWindow.describe(block)).heading_font(22)
