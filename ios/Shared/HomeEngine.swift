@@ -65,8 +65,35 @@ enum HomeEngine {
 
 	// Launch and foreground: re-evaluate the shield against the clock so a policy change (or the migration above) takes effect without a toggle.
 	static func refresh_on_launch() throws {
-		guard try snapshot().enabled else { return }
+		let state = try snapshot()
+		guard state.enabled, let policy = state.document?.home_allowance else { return }
+		// Builds before October 4 stopped every Pocketwork monitor whenever the app opened; put back whatever is missing.
+		let registered = Set(center.activities.map(\.rawValue))
+		if !clock_names(policy).allSatisfy(registered.contains) {
+			center.stopMonitoring(center.activities.filter { $0.rawValue.hasPrefix(prefix + "clock.") || $0.rawValue == prefix + "midnight" })
+			try start_clocks(policy)
+			note("Restored the window schedule")
+		}
+		if let generation = state.ledger.generation, !registered.contains(prefix + "meter." + generation) {
+			try transaction { state in if state.ledger.generation == generation { state.ledger.pause() } }
+			note("Restarted counting after iOS lost the previous count")
+		}
 		try reconcile()
+	}
+
+	static func clock_names(_ policy: HomePolicy) -> [String] {
+		var names: [String] = []
+		for rule in policy.rules { for day in rule.days { for index in rule.windows.indices { names.append(prefix + "clock.\(day).\(index)") } } }
+		return names + [prefix + "midnight"]
+	}
+
+	private static func start_clocks(_ policy: HomePolicy) throws {
+		for rule in policy.rules { for day in rule.days { for (index, window) in rule.windows.enumerated() {
+			let start = ScheduleWindow.minutes(window.start)!, end = ScheduleWindow.minutes(window.end)!
+			let schedule = DeviceActivitySchedule(intervalStart: DateComponents(timeZone: policy.calendar.timeZone, hour: start / 60, minute: start % 60, weekday: day), intervalEnd: DateComponents(timeZone: policy.calendar.timeZone, hour: end / 60, minute: end % 60, weekday: day), repeats: true)
+			try center.startMonitoring(DeviceActivityName(prefix + "clock.\(day).\(index)"), during: schedule)
+		} } }
+		try center.startMonitoring(DeviceActivityName(prefix + "midnight"), during: DeviceActivitySchedule(intervalStart: DateComponents(timeZone: policy.calendar.timeZone, hour: 0, minute: 0), intervalEnd: DateComponents(timeZone: policy.calendar.timeZone, hour: 23, minute: 59), repeats: true))
 	}
 	static func set_home(_ place: HomePlace) throws {
 		try transaction { $0.place = place; $0.at_home = false; $0.ledger.pause() }
@@ -109,14 +136,7 @@ enum HomeEngine {
 		do {
 			// DeviceActivity may synchronously launch the extension. Never hold home.lock across IPC.
 			center.stopMonitoring(center.activities.filter { $0.rawValue.hasPrefix(prefix) })
-			if let policy = document.home_allowance {
-				for rule in policy.rules { for day in rule.days { for (index, window) in rule.windows.enumerated() {
-					let start = ScheduleWindow.minutes(window.start)!, end = ScheduleWindow.minutes(window.end)!
-					let schedule = DeviceActivitySchedule(intervalStart: DateComponents(timeZone: policy.calendar.timeZone, hour: start / 60, minute: start % 60, weekday: day), intervalEnd: DateComponents(timeZone: policy.calendar.timeZone, hour: end / 60, minute: end % 60, weekday: day), repeats: true)
-					try center.startMonitoring(DeviceActivityName(prefix + "clock.\(day).\(index)"), during: schedule)
-				} } }
-				try center.startMonitoring(DeviceActivityName(prefix + "midnight"), during: DeviceActivitySchedule(intervalStart: DateComponents(timeZone: policy.calendar.timeZone, hour: 0, minute: 0), intervalEnd: DateComponents(timeZone: policy.calendar.timeZone, hour: 23, minute: 59), repeats: true))
-			}
+			if let policy = document.home_allowance { try start_clocks(policy) }
 			try transaction { $0.enabled = true }
 			try reconcile()
 		} catch {

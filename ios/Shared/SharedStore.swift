@@ -25,6 +25,12 @@ struct SharedStore {
 		return String(rest[..<dot])
 	}
 
+	// Focus sessions monitor as "pocketwork.<UUID>"; home allowance and standing routines use their own prefixes and must survive a session ending.
+	static func is_session_activity(_ activity: DeviceActivityName) -> Bool {
+		let name = activity.rawValue
+		return name.hasPrefix("pocketwork.") && UUID(uuidString: String(name.dropFirst("pocketwork.".count))) != nil
+	}
+
 	init() throws {
 		guard let group = Bundle.main.object(forInfoDictionaryKey: "PocketworkAppGroup") as? String,
 			FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group) != nil,

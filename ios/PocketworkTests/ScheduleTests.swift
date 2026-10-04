@@ -79,4 +79,13 @@ final class ScheduleTests: XCTestCase {
 		XCTAssertEqual(SharedStore.standing_id(from: activity), id)
 		XCTAssertNil(SharedStore.standing_id(from: DeviceActivityName("pocketwork.abc")))
 	}
+
+	// Ending a focus session must leave the home allowance and switched-on schedules monitored (October 4 bug).
+	func test_only_focus_session_monitors_count_as_sessions() {
+		XCTAssertTrue(SharedStore.is_session_activity(DeviceActivityName("pocketwork.\(UUID().uuidString)")))
+		XCTAssertFalse(SharedStore.is_session_activity(DeviceActivityName("pocketwork.home.meter.\(UUID().uuidString)")))
+		XCTAssertFalse(SharedStore.is_session_activity(DeviceActivityName("pocketwork.home.clock.1.0")))
+		XCTAssertFalse(SharedStore.is_session_activity(DeviceActivityName("pocketwork.home.midnight")))
+		XCTAssertFalse(SharedStore.is_session_activity(SharedStore.standing_activity("bedtime", weekday: 2)))
+	}
 }

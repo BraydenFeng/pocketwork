@@ -158,6 +158,17 @@ final class SessionController: ObservableObject {
 		return true
 	}
 
+	// Builds before October 4 stopped every Pocketwork monitor on launch. Routines that are switched on but no longer
+	// monitored get their schedule back; without Screen Time access they are left for the page's Needs setup.
+	func restore_standing(_ documents: [AppDocument], groups: [AppGroup]) {
+		guard AuthorizationCenter.shared.authorizationStatus == .approved else { return }
+		let registered = Set(center.activities.map(\.rawValue))
+		for document in documents where document.enabled == true && document.is_standing && document.home_allowance == nil {
+			let expected = (document.schedule?.days ?? []).map { SharedStore.standing_activity(document.id, weekday: $0).rawValue }
+			if !expected.allSatisfy(registered.contains) { _ = set_standing(document, enabled: true, groups: groups) }
+		}
+	}
+
 	private func release_standing(_ document_id: String) {
 		center.stopMonitoring(center.activities.filter { SharedStore.standing_id(from: $0) == document_id })
 		SharedStore.standing_store(document_id).clearAllSettings()
@@ -245,7 +256,7 @@ final class SessionController: ObservableObject {
 	func stop() {
 		if let running = session { record_session(running, ended_at: .now) }
 		ManagedSettingsStore(named: SharedStore.settings_name).clearAllSettings()
-		center.stopMonitoring(center.activities.filter { $0.rawValue.hasPrefix("pocketwork.") })
+		center.stopMonitoring(center.activities.filter(SharedStore.is_session_activity))
 		notifications.removePendingNotificationRequests(withIdentifiers: [notification_id])
 		notifications.removeDeliveredNotifications(withIdentifiers: [notification_id])
 		do {
@@ -267,7 +278,7 @@ final class SessionController: ObservableObject {
 				session = stored
 			} else {
 				ManagedSettingsStore(named: SharedStore.settings_name).clearAllSettings()
-				center.stopMonitoring(center.activities.filter { $0.rawValue.hasPrefix("pocketwork.") })
+				center.stopMonitoring(center.activities.filter(SharedStore.is_session_activity))
 				// A session that ran to its end counts in full.
 				if let finished = stored ?? session, finished.has_ended(at: .now) { record_session(finished, ended_at: finished.ends_at) }
 				shared.clear_session()
