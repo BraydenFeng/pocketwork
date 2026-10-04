@@ -171,13 +171,35 @@ final class SessionController: ObservableObject {
 
 	// Builds before October 4 stopped every Pocketwork monitor on launch. Routines that are switched on but no longer
 	// monitored get their schedule back; without Screen Time access they are left for the page's Needs setup.
-	func restore_standing(_ documents: [AppDocument], groups: [AppGroup]) {
+	private func restore_standing(_ documents: [AppDocument], groups: [AppGroup]) {
 		guard AuthorizationCenter.shared.authorizationStatus == .approved else { return }
 		let registered = Set(center.activities.map(\.rawValue))
 		for document in documents where document.enabled == true && document.is_standing && document.home_allowance == nil {
 			let expected = (document.schedule?.days ?? []).map { SharedStore.standing_activity(document.id, weekday: $0).rawValue }
 			if !expected.allSatisfy(registered.contains) { _ = set_standing(document, enabled: true, groups: groups) }
 		}
+	}
+
+	// Launch, sync, and account switches: schedules first, then a home allowance that is switched on but whose engine is
+	// off here (for example after signing out and back in). The allowance waits, silently, until this device has a home
+	// and the group's apps; until then its page shows Needs setup.
+	func restore_routines(_ documents: [AppDocument], groups: [AppGroup]) async {
+		restore_standing(documents, groups: groups)
+		guard AuthorizationCenter.shared.authorizationStatus == .approved,
+			let allowance = documents.first(where: { $0.enabled == true && $0.home_allowance != nil }),
+			(try? plan(for: allowance, groups: groups)) != nil,
+			let state = try? await HomeWorker.run({ try HomeEngine.snapshot() }),
+			state.place != nil, !(state.enabled && state.document?.id == allowance.id) else { return }
+		_ = await set_routine(allowance, enabled: true, groups: groups)
+	}
+
+	// A page hidden by an account switch stops enforcing but keeps its app choices and progress, so it can start again
+	// when that library is shown again.
+	func suspend(_ document_id: String) async {
+		do { try await HomeWorker.run { if try HomeEngine.snapshot().document?.id == document_id { try HomeEngine.disable() } } } catch { report(error) }
+		if session?.document_id == document_id { stop() }
+		release_standing(document_id)
+		(try? SharedStore())?.set_standing(document_id, enabled: false)
 	}
 
 	private func release_standing(_ document_id: String) {

@@ -92,7 +92,7 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 					var found = try JSONDecoder().decode(CloudSession.self, from: data); found.saved_at = .now
 					let before = self.library?.library.tools.map(\.document) ?? []
 					try self.library?.switch_account(found.user.id)
-					await self.release_dropped(before)
+					await self.settle_switch(before)
 					try self.store(found)
 					self.session = found; self.email = found.user.email; self.signed_in = true; self.generation += 1
 					await self.sync()
@@ -112,12 +112,15 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 		do {
 			let code = SecItemDelete(keychain_query as CFDictionary)
 			guard code == errSecSuccess || code == errSecItemNotFound else { throw DocumentError.invalid("Could not clear the saved sign-in.") }
-			for id in await sessions?.clear_everything() ?? [] { library?.set_enabled(id, false) }
+			// Shields come off here, but the account's routines stay switched on: marking them off would sync to every other
+			// device. They start again on this device when the account signs back in.
+			let before = library?.library.tools.map(\.document) ?? []
+			_ = await sessions?.clear_everything()
 			try library?.switch_account(nil)
 			generation += 1; session = nil; signed_in = false; email = nil; status = "Signed out. Your cloud routines are kept in your account."
 			// Sharing status is a per-account choice; the next account opts in for itself.
 			StatusReporter.sharing = false; share_status = false
-			if let library { sessions?.restore_standing(library.library.tools.map(\.document), groups: library.groups) }
+			await settle_switch(before)
 		} catch { fail(error) }
 		}
 	}
@@ -286,8 +289,8 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 				}
 				if merged != library.library { continue }
 				status = "Synced with your account"; error_message = nil
-				// Routines that are switched on in the account but not monitored on this device get their schedule back.
-				sessions?.restore_standing(library.library.tools.map(\.document), groups: library.groups)
+				// Routines that are switched on in the account but not running on this device start again.
+				await sessions?.restore_routines(library.library.tools.map(\.document), groups: library.groups)
 				await publish_status()
 				return
 			}
@@ -321,10 +324,12 @@ final class CloudController: NSObject, ObservableObject, ASWebAuthenticationPres
 		} catch { logger.error("Local app choices were not uploaded: \(error.localizedDescription, privacy: .public)") }
 	}
 
-	// Pages that leave this device with an account switch stop enforcing too; they are no longer visible to switch off.
-	private func release_dropped(_ before: [AppDocument]) async {
+	// After an account switch, pages that left this device stop enforcing (nobody can see them to switch them off), and
+	// switched-on pages of the library now shown start again.
+	private func settle_switch(_ before: [AppDocument]) async {
 		guard let library else { return }
-		for document in before where library.tool(document.id) == nil && (document.enabled == true || document.home_allowance != nil) { await sessions?.forget(document.id) }
+		for document in before where library.tool(document.id) == nil { await sessions?.suspend(document.id) }
+		await sessions?.restore_routines(library.library.tools.map(\.document), groups: library.groups)
 	}
 
 	private struct StatusRow: Encodable { let user_id: String; let status: StatusReport }

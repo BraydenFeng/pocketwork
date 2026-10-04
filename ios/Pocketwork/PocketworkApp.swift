@@ -42,7 +42,7 @@ struct PocketworkApp: App {
 					if !CommandLine.arguments.contains("--ui-testing") { do { try await HomeWorker.run { try BuilderAppRules.clear() } } catch { sessions.report(error) } }
 					await cloud.attach(library, sessions)
 					// After attach, so a signed-in person's own library is the one being repaired.
-					if !CommandLine.arguments.contains("--ui-testing") { sessions.restore_standing(library.library.tools.map(\.document), groups: library.groups) }
+					if !CommandLine.arguments.contains("--ui-testing") { await sessions.restore_routines(library.library.tools.map(\.document), groups: library.groups) }
 					await subscriptions.attach(cloud); await subscriptions.refresh()
 				}
 				.onChange(of: cloud.account_id) { _, _ in Task { await subscriptions.refresh() } }
