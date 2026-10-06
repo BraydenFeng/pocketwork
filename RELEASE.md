@@ -1,6 +1,6 @@
 # Pocketwork launch checklist
 
-Status: release preparation, not permission to submit. Vercel deployment alone does not make this App Store-ready.
+Status: version 1.0 (build 40) submitted to App Review on October 5, 2026, with manual release. Vercel deployment alone does not make a later version App Store-ready.
 
 ## Version 1.0 submission prep, October 2
 
@@ -12,6 +12,7 @@ Status: release preparation, not permission to submit. Vercel deployment alone d
 - October 4, bug hunt (four review passes, each finding checked against the code before fixing): routine repair now runs after the signed-in library loads and after each sync; weekdays removed from a schedule stop; a routine is marked on before monitoring starts; copies and imports start off; a failed switch-on or a failed repair no longer leaves the allowance engine running or stops home detection; the home allowance uses one daily trigger per distinct window (well under iOS's 20-monitor limit); a focus session's end tolerates an early callback and the app re-checks sessions on foreground; signing in again keeps signed-out pages up to the page limit; signing out no longer switches the account's routines off on every other device, and they start again on this device (home allowance included) at the next sign-in; groups added on two devices at once, App gate groups, and deleted groups' app tokens now sync correctly; the website rejects operations and text lengths the phone would reject.
 - Not fixed yet, by decision or because they need more than a code change: "Copy agent connection" hands the agent the full session token (needs scoped MCP tokens and a migration); a limit routine re-applied mid-window restarts its count; allow-only cannot exempt categories (iOS API); an older synced app choice can win in a rare tie.
 - App Privacy was answered in the browser: Email Address, User ID, Other User Content, Other Usage Data, each App Functionality only, linked to identity, not used for tracking. Health and location stay on device and are not declared as collected.
+- October 5: Brayden approved publishing. Build 40 replaced build 36 on the version; the description and reviewer notes now say app choices sync when signed in and that Pocketwork runs on iPad; the 6.9-inch iPhone set was regenerated and a five-image 13-inch iPad set added (from `App Store screenshots` run 37247055918). With his explicit permission App Privacy was published and 1.0 was submitted; App Store Connect shows Waiting for Review. Release is manual: an approved build goes live only when someone presses Release.
 - The `com.braydenfeng.pocketwork.pro.monthly` subscription stays in Missing Metadata and is not attached to 1.0. Before Pro ships: paid apps agreement, tax and banking, subscription metadata, server keys, commercial hosting, and the 4.10 review risk above all still apply.
 
 ## Billing verification, September 27
