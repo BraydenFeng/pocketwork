@@ -56,7 +56,7 @@ struct AccountView: View {
 				if !cloud.configured {
 					Text("Account access is unavailable in this build. You can still use pages on this device. Please try again after updating Pocketwork.").supporting().accessibilityIdentifier("account.unavailable")
 				}
-				Button("Continue with Apple") { cloud.sign_in(provider: "apple") }.buttonStyle(PrimaryButtonStyle()).disabled(!cloud.configured || cloud.busy).accessibilityIdentifier("account.apple")
+				AppleSignInButton { cloud.sign_in(provider: "apple") }.disabled(!cloud.configured || cloud.busy)
 				if Bundle.main.object(forInfoDictionaryKey: "SupabaseGoogleEnabled") as? Bool == true {
 					Button("Continue with Google") { cloud.sign_in(provider: "google") }.buttonStyle(QuietButtonStyle()).disabled(!cloud.configured || cloud.busy).accessibilityIdentifier("account.google")
 				}
