@@ -1,6 +1,6 @@
 # Pocketwork launch checklist
 
-Status: version 1.0 (build 40) submitted to App Review on October 5, 2026, with manual release. Vercel deployment alone does not make a later version App Store-ready.
+Status: version 1.0 (build 40) submitted to App Review on October 5, 2026, auto-rejected October 6 (2.5.1, see below), and resubmitted the same day with manual release. Vercel deployment alone does not make a later version App Store-ready.
 
 ## Version 1.0 submission prep, October 2
 
@@ -13,6 +13,7 @@ Status: version 1.0 (build 40) submitted to App Review on October 5, 2026, with 
 - Not fixed yet, by decision or because they need more than a code change: "Copy agent connection" hands the agent the full session token (needs scoped MCP tokens and a migration); a limit routine re-applied mid-window restarts its count; allow-only cannot exempt categories (iOS API); an older synced app choice can win in a rare tie.
 - App Privacy was answered in the browser: Email Address, User ID, Other User Content, Other Usage Data, each App Functionality only, linked to identity, not used for tracking. Health and location stay on device and are not declared as collected.
 - October 5: Brayden approved publishing. Build 40 replaced build 36 on the version; the description and reviewer notes now say app choices sync when signed in and that Pocketwork runs on iPad; the 6.9-inch iPhone set was regenerated and a five-image 13-inch iPad set added (from `App Store screenshots` run 37247055918). With his explicit permission App Privacy was published and 1.0 was submitted; App Store Connect shows Waiting for Review. Release is manual: an approved build goes live only when someone presses Release.
+- October 6: an automated 2.5.1 message said the app uses Screen Time APIs without the Family Controls entitlement. Checked and false: both bundle IDs that use those APIs (app and FocusMonitor) have FAMILY_CONTROLS_DISTRIBUTION, build 40 was signed with App Store profiles that include `com.apple.developer.family-controls`, and App Store Connect's Build Metadata lists it as true for both binaries. The widget extension imports no Screen Time framework, and the app uses no app-and-website-usage APIs. Apple Developer Forums thread 838802 reports the same automated message for other correctly signed Screen Time apps since July 2026, with no Apple fix posted. With Brayden's go-ahead, a reply with this evidence was sent and build 40 was resubmitted unchanged (Update Review, then Resubmit). If it is flagged again, the next step is an App Review Board appeal.
 - The `com.braydenfeng.pocketwork.pro.monthly` subscription stays in Missing Metadata and is not attached to 1.0. Before Pro ships: paid apps agreement, tax and banking, subscription metadata, server keys, commercial hosting, and the 4.10 review risk above all still apply.
 
 ## Billing verification, September 27
