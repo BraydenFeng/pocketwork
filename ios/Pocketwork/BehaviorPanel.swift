@@ -21,7 +21,6 @@ struct BehaviorPanel<AfterRoutines: View, DataSection: View, AfterData: View>: V
 	@EnvironmentObject private var sessions: SessionController
 	@EnvironmentObject private var home: HomeLocationController
 	@Environment(\.scenePhase) private var scene_phase
-	@StateObject private var health = HealthInputs()
 	@State private var reconcile_actions = true
 	@State private var groups_open = false
 	@State private var state = BehaviorState()
@@ -49,8 +48,7 @@ struct BehaviorPanel<AfterRoutines: View, DataSection: View, AfterData: View>: V
 						Text(home.status).supporting()
 					}
 					if graph.nodes.contains(where: { $0.kind == "health" }) {
-						HStack { Button("Allow Health access") { Task { await health.refresh(graph.nodes.filter { $0.kind == "health" }.map { $0.config.metric ?? "steps" }, authorize: true); await run() } }; Button("Refresh health") { Task { await health.refresh(graph.nodes.filter { $0.kind == "health" }.map { $0.config.metric ?? "steps" }); await run() } } }.buttonStyle(TextButtonStyle()).disabled(health.busy)
-						if let message = health.message { Text(message).supporting() }
+						Text("Health values aren't available in this version, so those blocks stay empty.").supporting()
 					}
 					if graph.nodes.contains(where: { $0.kind == "app_gate" }) {
 						HStack { Button("Choose app groups") { groups_open = true }; Button("Allow Screen Time") { Task { _ = await sessions.authorize_screen_time() } } }.buttonStyle(TextButtonStyle())
@@ -65,17 +63,14 @@ struct BehaviorPanel<AfterRoutines: View, DataSection: View, AfterData: View>: V
 				let data_nodes = graph.nodes.filter { Self.data_kinds.contains($0.kind) }
 				if !data_nodes.isEmpty { VStack(alignment: .leading, spacing: 12) { ForEach(data_nodes) { node in node_view(node) } } }
 				after_data
-			}.onAppear { visible = true; load(graph); Task { if graph.nodes.contains(where: { $0.kind == "health" }) { await health.refresh(graph.nodes.filter { $0.kind == "health" }.map { $0.config.metric ?? "steps" }) }; await run() } }
+			}.onAppear { visible = true; load(graph); Task { await run() } }
 			.onDisappear { visible = false; release_gates() }
 			.onChange(of: paused) { _, value in if value { release_gates() } else { reconcile_actions = true } }
 			.onChange(of: scene_phase) { _, value in
 				if value != .active { release_gates() }
 				else {
 					reconcile_actions = true
-					Task {
-						if graph.nodes.contains(where: { $0.kind == "health" }) { await health.refresh(graph.nodes.filter { $0.kind == "health" }.map { $0.config.metric ?? "steps" }) }
-						await run()
-					}
+					Task { await run() }
 				}
 			}
 			.sheet(isPresented: $groups_open) { NavigationStack { GroupsView().toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { groups_open = false; reconcile_actions = true } } } } }
@@ -140,7 +135,7 @@ struct BehaviorPanel<AfterRoutines: View, DataSection: View, AfterData: View>: V
 				external["daily-allowance"] = ["reached":signal(reached,String(reached))]
 				external["daily-allowance"]?["reached"]?.available = used != nil
 			}
-			let result = try BehaviorRuntime.run(graph, state: state, context: BehaviorContext(now: now, at_location: location, usage_minutes: used, usage_history: usage_history, tap: tap, external: external, inputs: inputs, submission: submission, health: health.values, reconcile_actions: reconcile_actions, timer_command: timer_command))
+			let result = try BehaviorRuntime.run(graph, state: state, context: BehaviorContext(now: now, at_location: location, usage_minutes: used, usage_history: usage_history, tap: tap, external: external, inputs: inputs, submission: submission, health: [:], reconcile_actions: reconcile_actions, timer_command: timer_command))
 			if !testing {
 				let id = document.id, groups = library.groups, active_nodes = Set(graph.nodes.filter { $0.kind == "app_gate" }.map(\.id)), reconcile = reconcile_actions
 				try await HomeWorker.run {

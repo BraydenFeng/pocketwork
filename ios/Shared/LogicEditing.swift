@@ -26,7 +26,7 @@ struct LogicEditing: Equatable {
 	]
 	static let sections: [(title: String, kinds: [String])] = [
 		("Building blocks", ["elapsed_timer", "variable", "change_value", "time_window", "record"]),
-		("Inputs", ["number_input", "text_input", "checkbox", "form", "health"]),
+		("Inputs", ["number_input", "text_input", "checkbox", "form"]),
 		("Time & location", ["timer", "schedule", "clock", "interval", "location", "arrive", "leave", "delay"]),
 		("Data", ["count", "streak", "usage", "app_usage", "allowance", "save_entry", "aggregate"]),
 		("Logic", ["compare", "and", "or", "not", "branch", "goal", "calculate", "text_compare"]),

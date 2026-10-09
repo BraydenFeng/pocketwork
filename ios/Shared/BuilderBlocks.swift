@@ -28,7 +28,7 @@ struct BuilderAction { var id: String; var kind: String; var token: String; var 
 enum BuilderRuntime {
 	static let fields = [BuilderField(id: "value", label: "Value", type: "number", required: true)]
 	static let health_metrics = ["steps", "active_energy", "exercise_minutes", "protein", "carbohydrates", "fat", "water"]
-	static let names = ["number_input":"Number input", "text_input":"Text input", "checkbox":"Checkbox", "form":"Form", "save_entry":"Save entry", "aggregate":"Summarize data", "calculate":"Calculate", "text_compare":"Compare text", "table":"Table", "chart":"Chart", "progress":"Progress bar", "health":"Apple Health", "app_gate":"App gate", "add_allowance":"Add screen time"]
+	static let names = ["number_input":"Number input", "text_input":"Text input", "checkbox":"Checkbox", "form":"Form", "save_entry":"Save entry", "aggregate":"Summarize data", "calculate":"Calculate", "text_compare":"Compare text", "table":"Table", "chart":"Chart", "progress":"Progress bar", "health":"Health value", "app_gate":"App gate", "add_allowance":"Add screen time"]
 	static let ports: [String: (inputs: [String: String], outputs: [String: String])] = [
 		"number_input": ([:], ["value":"number", "changed":"boolean"]), "text_input": ([:], ["value":"text", "changed":"boolean"]), "checkbox": ([:], ["checked":"boolean", "changed":"boolean"]),
 		"form": ([:], ["submitted":"boolean", "record":"record"]), "save_entry": (["record":"record", "save":"boolean", "clear":"boolean"], ["rows":"table", "count":"number", "saved":"boolean"]),
