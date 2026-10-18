@@ -1,6 +1,6 @@
 # Pocketwork launch checklist
 
-Status: version 1.0 submitted to App Review on October 5, 2026 (build 40), rejected October 6, 7 and 8 (see below), and resubmitted October 8 with build 42. Release is manual. Vercel deployment alone does not make a later version App Store-ready.
+Status: version 1.0 (build 42) approved after three rejections (see below) and released to the App Store on October 18, 2026 at Brayden's request: https://apps.apple.com/app/id6811637793 Vercel deployment alone does not make a later version App Store-ready.
 
 ## Version 1.0 submission prep, October 2
 
