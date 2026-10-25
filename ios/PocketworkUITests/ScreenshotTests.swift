@@ -50,6 +50,8 @@ final class ScreenshotTests: XCTestCase {
 	func test_walkthrough_screens() throws {
 		XCTAssertTrue(app.navigationBars["My pages"].waitForExistence(timeout: 10))
 		try snap("01-home-empty")
+		XCTAssertTrue(app.buttons["first-page.create"].exists)
+		XCTAssertTrue(app.buttons["first-page.apps"].exists)
 		XCTAssertFalse(app.buttons["Use this routine"].exists)
 		app.buttons["New page"].tap()
 		XCTAssertTrue(app.navigationBars["New page"].waitForExistence(timeout: 10))

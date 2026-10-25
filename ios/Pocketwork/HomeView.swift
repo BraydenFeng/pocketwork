@@ -16,6 +16,7 @@ struct HomeView: View {
 	@State private var editing: RoutineDraft?
 	@State private var picking_group: AppGroup?
 	@State private var account_intent: AccountIntent?
+	@State private var first_page: FirstPageResult?
 	private let logger = Logger(subsystem: "Pocketwork", category: "FileImport")
 
 	var body: some View {
@@ -34,9 +35,14 @@ struct HomeView: View {
 						}.padding(Theme.pad)
 					}
 					Hairline()
-					section(number: "01", label: "My pages", heading: library.sorted_tools.isEmpty ? "Nothing here yet." : nil, supporting: library.sorted_tools.isEmpty ? "Create a page here, or sign in to bring in pages from your computer." : nil) {
+					section(number: "01", label: "My pages", heading: pages_heading, supporting: pages_supporting) {
 						if library.storage_blocked { storage_warning }
-						Button { editing = RoutineDraft(document: AppDocument.blank(), is_new: true) } label: { Label("New page", systemImage: "plus") }.buttonStyle(PrimaryButtonStyle(accent: true))
+						if first_run {
+							FirstPageCard { document in first_page = FirstPageResult(document: document) }
+							Button { editing = RoutineDraft(document: AppDocument.blank(), is_new: true) } label: { Label("New page", systemImage: "plus") }.buttonStyle(QuietButtonStyle())
+						} else {
+							Button { editing = RoutineDraft(document: AppDocument.blank(), is_new: true) } label: { Label("New page", systemImage: "plus") }.buttonStyle(PrimaryButtonStyle(accent: true))
+						}
 						// Two tiles across on iPhone; more on iPad.
 						LazyVGrid(columns: [GridItem(.adaptive(minimum: 160, maximum: 280), spacing: 12)], spacing: 12) {
 							ForEach(library.sorted_tools) { entry in page_tile(entry) }
@@ -80,6 +86,7 @@ struct HomeView: View {
 			}
 			.sheet(item: $editing) { item in RoutineEditorSheet(item: item) }
 			.sheet(item: $picking_group) { group in AppGroupSelectionSheet(group: group) }
+			.sheet(item: $first_page) { result in FirstPageDoneSheet(document: result.document) { path = [RoutineRoute(id: result.document.id)] } }
 			// A widget tap arrives as com.braydenfeng.pocketwork://routine/<id>; the sign-in callback uses a different host and is handled elsewhere.
 			.onOpenURL { url in if let id = WidgetSnapshot.routine_id(from: url), library.tool(id) != nil { path = [RoutineRoute(id: id)] } }
 			.sheet(item: $account_intent) { intent in NavigationStack { ScrollView { AccountView(intent: intent) }.page().navigationTitle(cloud.signed_in ? "Account & sync" : intent.title).navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .confirmationAction) { Button(cloud.signed_in ? "Done" : "Not now") { account_intent = nil }.accessibilityIdentifier("account.dismiss") } } } }
@@ -95,6 +102,14 @@ struct HomeView: View {
 				Button("OK") { library.error_message = nil }
 			} message: { Text(library.error_message ?? "") }
 		}
+	}
+
+	// Someone with no pages yet starts from a sentence; a blank page stays one tap away.
+	private var first_run: Bool { library.sorted_tools.isEmpty && !library.storage_blocked }
+	private var pages_heading: String? { library.sorted_tools.isEmpty ? (first_run ? "Start with one sentence." : "Nothing here yet.") : nil }
+	private var pages_supporting: String? {
+		guard library.sorted_tools.isEmpty else { return nil }
+		return first_run ? "Fill in the blanks to build your first blocker, start from a blank page, or sign in to bring in pages from your computer." : "Create a page here, or sign in to bring in pages from your computer."
 	}
 
 	private var account_buttons: some View {
