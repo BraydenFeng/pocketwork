@@ -10,6 +10,7 @@ import { Button } from "@/components/ui";
 import { LegalPage } from "@/components/legal-page";
 
 const pending_key = "pocketwork.delete.pending";
+const agent_count_schema = z.object({ count: z.number().int().min(0) });
 export default function AccountPage() {
 	const [cloud, set_cloud] = useState<Cloud | null>(null);
 	const [account, set_account] = useState<Account | null>(null);
@@ -20,6 +21,8 @@ export default function AccountPage() {
 	const [deleted, set_deleted] = useState(false);
 	const [creating, set_creating] = useState(false);
 	const [signing_in, set_signing_in] = useState<"apple" | "google" | null>(null);
+	const [agents, set_agents] = useState<number | "loading" | "unavailable">("loading");
+	const [revoking, set_revoking] = useState(false);
 	async function clear_account(connection: Cloud, id: string) {
 		window.localStorage.removeItem(`${LIBRARY_KEY}.${id}`);
 		window.localStorage.removeItem(`pocketwork.document.v1.${id}`);
@@ -44,7 +47,11 @@ export default function AccountPage() {
 				if (query.get("deleted") !== "true") { window.sessionStorage.removeItem(pending_key); throw new Error("Deletion did not finish. Your account has not been confirmed deleted. Start again below."); }
 				await clear_account(connection, pending.id); return;
 			}
-			if (found) { const next = await fetch_plan(connection); if (!cancelled) { set_plan(next); } }
+			if (found) {
+				const next = await fetch_plan(connection); if (!cancelled) { set_plan(next); }
+				try { const connections = agent_count_schema.parse(await account_request(connection, "/api/agent-tokens")); if (!cancelled) { set_agents(connections.count); } }
+				catch (failure) { console.warn("Agent connections could not be loaded", failure instanceof Error ? failure.message : failure); if (!cancelled) { set_agents("unavailable"); } }
+			}
 		})().catch(failure => { if (!cancelled) { set_error(failure instanceof Error ? failure.message : "Could not load your account."); } }).finally(() => { if (!cancelled) { set_busy(false); } });
 		return () => { cancelled = true; };
 	}, []);
@@ -53,6 +60,13 @@ export default function AccountPage() {
 		set_signing_in(provider); set_error(null);
 		try { await sign_in_with_google(cloud, provider); }
 		catch (failure) { set_error(failure instanceof Error ? failure.message : "Could not open sign-in. Please try again."); set_signing_in(null); }
+	}
+	async function revoke_agents() {
+		if (!cloud || revoking) { return; }
+		set_revoking(true); set_error(null);
+		try { set_agents(agent_count_schema.parse(await account_request(cloud, "/api/agent-tokens", undefined, "DELETE")).count); }
+		catch (failure) { set_error(failure instanceof Error ? failure.message : "Could not revoke agent connections."); }
+		finally { set_revoking(false); }
 	}
 	async function remove_account() {
 		if (!cloud || !account || confirm !== "DELETE" || busy) { return; }
@@ -83,6 +97,7 @@ export default function AccountPage() {
 			<a href="/">Continue without an account</a>
 		</section>}
 		{account && <><section><h2>{plan_active(plan) ? "Pocketwork Pro" : "Free plan"}</h2><p>{plan_active(plan) ? "Up to 50 pages, with cloud sync and MCP." : "Keep 3 pages at a time. Delete one to make room for another. Cloud sync and MCP are included."}</p><p>Routines are the actions. Data holds the values, entries, and displays. Pages hold both.</p><p>Upgrade or restore purchases in the iPhone app. Subscriptions renew automatically until cancelled. Cancelling never deletes or disables your existing pages.</p><a href="https://apps.apple.com/account/subscriptions">Manage Apple subscriptions</a></section>
+		<section><h2>Agent connections</h2><p>{agents === "loading" ? "Checking agent connections…" : agents === "unavailable" ? "Agent connections could not be loaded. Reload to try again." : agents === 0 ? "No agents are connected. Use Copy agent connection on My pages to connect one." : `${agents} agent connection${agents === 1 ? " can" : "s can"} read and change your pages until you revoke ${agents === 1 ? "it" : "them"}.`}</p><Button disabled={typeof agents !== "number" || agents === 0 || revoking} onClick={() => { void revoke_agents(); }}>{revoking ? "Revoking…" : "Revoke agent connections"}</Button></section>
 		<section><h2>Delete account</h2><p>This permanently removes your account, cloud pages, shared status, and subscription link. Export any pages you want to keep first. Copies and exports on other devices may remain until you remove them there.</p><p>Deleting your account does not cancel an Apple subscription. Cancel it through the link above first. If you signed in with Apple, you will confirm with Apple to revoke access.</p><label className="connection-field"><span>Type DELETE to confirm</span><input className="field" value={confirm} onChange={event => set_confirm(event.target.value)} autoComplete="off" /></label><Button variant="danger" disabled={confirm !== "DELETE" || busy} onClick={() => { void remove_account(); }}>{busy ? "Please wait…" : "Delete my account"}</Button></section></>}
 	</LegalPage>;
 }

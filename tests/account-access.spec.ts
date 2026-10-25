@@ -109,3 +109,33 @@ test("a simulated successful sign-in syncs guest pages into the account", async 
 	await expect(page.getByRole("link", { name: "Create account", exact: true })).toHaveCount(0);
 	expect(saved).toMatchObject({ user_id, library: { tools: [{ document: { name: "My focus space" } }] } });
 });
+
+test("signed-in people can see and revoke their agent connections", async ({ page }) => {
+	test.skip(unconfigured, "No provider can start without configuration.");
+	const user_id = "22222222-2222-4222-8222-222222222222";
+	const user = { id: user_id, aud: "authenticated", role: "authenticated", email: "agents@example.com", app_metadata: { provider: "apple", providers: ["apple"] }, user_metadata: {}, created_at: "2026-10-25T00:00:00Z" };
+	const token = [Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url"), Buffer.from(JSON.stringify({ sub: user_id, exp: Math.floor(Date.now() / 1000) + 3600 })).toString("base64url"), "test-signature"].join(".");
+	await page.route("https://example.supabase.co/**", async route => {
+		const url = new URL(route.request().url());
+		if (url.pathname === "/auth/v1/authorize") {
+			const destination = new URL(url.searchParams.get("redirect_to")!);
+			destination.hash = new URLSearchParams({ access_token: token, refresh_token: "test-refresh-token", expires_in: "3600", token_type: "bearer", type: "signup" }).toString();
+			await route.fulfill({ status: 302, headers: { location: destination.href } });
+		} else if (url.pathname === "/auth/v1/user") { await route.fulfill({ json: user }); }
+		else { throw new Error(`Unexpected auth fixture request: ${route.request().method()} ${url.pathname}`); }
+	});
+	let connections = 2;
+	await page.route("**/api/agent-tokens", async route => {
+		expect(route.request().headers().authorization).toBe(`Bearer ${token}`);
+		if (route.request().method() === "DELETE") { connections = 0; }
+		await route.fulfill({ json: { count: connections } });
+	});
+	await page.goto("/account?mode=signin");
+	await page.getByRole("button", { name: "Continue with Apple" }).click();
+	await expect(page.getByText("agents@example.com", { exact: true })).toBeVisible();
+	await expect(page.getByText("2 agent connections can read and change your pages until you revoke them.")).toBeVisible();
+	await page.getByRole("button", { name: "Revoke agent connections" }).click();
+	await expect(page.getByText("No agents are connected. Use Copy agent connection on My pages to connect one.")).toBeVisible();
+	await expect(page.getByRole("button", { name: "Revoke agent connections" })).toBeDisabled();
+	expect(connections).toBe(0);
+});

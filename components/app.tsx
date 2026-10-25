@@ -7,7 +7,7 @@ import { add_group, delete_tool, duplicate_tool, empty_library, find_tool, impor
 import { cloud_compatible_library, merge_libraries, same_library, adopt_guest_pages } from "@/lib/sync";
 import { fetch_status, type StatusReport } from "@/lib/status";
 import { Home } from "./home";
-import { fetch_plan } from "@/lib/account-client";
+import { account_request, fetch_plan } from "@/lib/account-client";
 import { assert_page_limit, free_plan, plan_active, type PagePlan } from "@/lib/page-plan";
 import { Workbench } from "./workbench";
 
@@ -229,12 +229,17 @@ export function PocketworkApp() {
 
 	async function copy_agent_connection() {
 		if (!cloud) { return; }
+		// Safari only allows a clipboard write that starts during the click, so the write starts now and waits for the new connection.
+		const connection = account_request(cloud, "/api/agent-tokens", {}).then(reply => {
+			const token = typeof reply === "object" && reply !== null && "token" in reply && typeof reply.token === "string" ? reply.token : null;
+			if (!token) { throw new Error("Pocketwork could not create an agent connection. Please try again."); }
+			return JSON.stringify({ mcpServers: { pocketwork: { type: "http", url: `${window.location.origin}/api/mcp`, headers: { Authorization: `Bearer ${token}` } } } }, null, 2);
+		});
 		try {
-			const { data, error } = await cloud.client.auth.getSession();
-			if (error || !data.session) { throw new Error("Sign in before connecting an agent."); }
-			await navigator.clipboard.writeText(JSON.stringify({ mcpServers: { pocketwork: { type: "http", url: `${window.location.origin}/api/mcp`, headers: { Authorization: `Bearer ${data.session.access_token}` } } } }, null, 2));
-			set_notice("Agent connection copied. It contains a private, short-lived account token. Paste it only into your own agent. Copy again when it expires.");
-		} catch (failure) { set_error(error_message(failure)); }
+			if (typeof ClipboardItem === "undefined") { await navigator.clipboard.writeText(await connection); }
+			else { await navigator.clipboard.write([new ClipboardItem({ "text/plain": connection.then(text => new Blob([text], { type: "text/plain" })) })]); }
+			set_notice("Agent connection copied. It keeps working until you revoke it in Account. Paste it only into your own agent.");
+		} catch (failure) { set_error(error_message(await connection.then(() => failure, problem => problem))); }
 	}
 
 	async function finish_sign_out() {
