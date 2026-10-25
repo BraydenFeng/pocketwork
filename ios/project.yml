@@ -34,7 +34,7 @@ targets:
       properties:
         CFBundleDisplayName: Pocketwork
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        CFBundleShortVersionString: "1.0"
+        CFBundleShortVersionString: "1.1"
         SupabaseURL: $(SUPABASE_URL)
         SupabaseAnonKey: $(SUPABASE_ANON_KEY)
         PocketworkWebsiteURL: $(POCKETWORK_WEBSITE_URL)
@@ -87,7 +87,7 @@ targets:
       properties:
         CFBundleDisplayName: Pocketwork Focus Monitor
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        CFBundleShortVersionString: "1.0"
+        CFBundleShortVersionString: "1.1"
         PocketworkAppGroup: $(APP_GROUP)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.deviceactivity.monitor-extension
@@ -118,7 +118,7 @@ targets:
       properties:
         CFBundleDisplayName: Pocketwork
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        CFBundleShortVersionString: "1.0"
+        CFBundleShortVersionString: "1.1"
         PocketworkAppGroup: $(APP_GROUP)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
