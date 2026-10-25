@@ -24,7 +24,7 @@ struct BuilderState: Codable {
 	var gates: [String: Bool] = [:]
 }
 struct BuilderSubmission { var node: String; var values: [String: BuilderValue] }
-struct BuilderAction { var id: String; var kind: String; var token: String; var active: Bool?; var minutes: Double?; var groups: [String]? }
+struct BuilderAction { var id: String; var kind: String; var token: String; var active: Bool?; var minutes: Double?; var groups: [String]?; var scope: String? }
 enum BuilderRuntime {
 	static let fields = [BuilderField(id: "value", label: "Value", type: "number", required: true)]
 	static let health_metrics = ["steps", "active_energy", "exercise_minutes", "protein", "carbohydrates", "fat", "water"]
@@ -34,7 +34,7 @@ enum BuilderRuntime {
 		"form": ([:], ["submitted":"boolean", "record":"record"]), "save_entry": (["record":"record", "save":"boolean", "clear":"boolean"], ["rows":"table", "count":"number", "saved":"boolean"]),
 		"aggregate": (["rows":"table"], ["value":"number"]), "calculate": (["a":"number", "b":"number"], ["value":"number"]), "text_compare": (["text":"text"], ["result":"boolean"]),
 		"table": (["rows":"table"], ["rows":"table"]), "chart": (["rows":"table"], ["rows":"table"]), "progress": (["value":"number", "target":"number"], ["value":"number", "fraction":"number", "target":"number"]),
-		"health": ([:], ["value":"number"]), "app_gate": (["closed":"boolean"], ["active":"boolean"]), "add_allowance": (["grant":"boolean", "minutes":"number"], ["granted":"boolean"])
+		"health": ([:], ["value":"number"]), "app_gate": (["closed":"boolean"], ["active":"boolean"]), "add_allowance": (["grant":"boolean", "minutes":"number", "once_per":"text"], ["granted":"boolean"])
 	]
 	static func validate(_ node: BehaviorNode) throws {
 		let c = node.config
@@ -93,9 +93,12 @@ enum BuilderRuntime {
 			let dynamic = connections.contains { $0.to == node.id && $0.input == "minutes" }
 			let minutes = dynamic ? floor(input("minutes").value) : c.minutes
 			guard minutes.isFinite, (0...1440).contains(minutes) else { throw DocumentError.invalid("Screen-time rewards must be between 0 and 1,440 minutes.") }
-			let token = dynamic ? day + ":" + String(Int(minutes)) : day
-			let grant = input("grant").value != 0 && minutes > 0 && data.rewards[node.id] != token
-			if grant { actions.append(BuilderAction(id: node.id, kind: node.kind, token: node.id + ":" + token, minutes: minutes)); data.rewards[node.id] = token }
+			// A connected code grants once per different code instead of once a day, so a fresh code can add time again and a used one never repeats.
+			let per_code = connections.contains { $0.to == node.id && $0.input == "once_per" }
+			let code = per_code ? (input("once_per").text ?? "").trimmingCharacters(in: .whitespacesAndNewlines) : ""
+			let token = per_code ? "code:" + code : dynamic ? day + ":" + String(Int(minutes)) : day
+			let grant = input("grant").value != 0 && minutes > 0 && (!per_code || !code.isEmpty) && data.rewards[node.id] != token
+			if grant { actions.append(BuilderAction(id: node.id, kind: node.kind, token: node.id + ":" + token, minutes: minutes, scope: per_code ? code : nil)); data.rewards[node.id] = token }
 			emit("granted", grant ? 1 : 0, token: token)
 		default: throw DocumentError.invalid("Unknown building block.")
 		}

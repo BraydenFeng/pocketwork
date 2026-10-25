@@ -7,7 +7,7 @@ import { personal_routine } from "../lib/personal-routine";
 import * as release_flags from "../lib/release-flags";
 
 vi.mock("../lib/cloud", () => ({ fetch_library: vi.fn(), push_library: vi.fn() }));
-vi.mock("../lib/release-flags", () => ({ native_format_four: false, native_format_five: false }));
+vi.mock("../lib/release-flags", () => ({ native_format_four: false, native_format_five: false, native_format_six: false }));
 
 const cloud = {} as Cloud;
 const account = { id: "owner", email: "test@example.com" };
@@ -31,6 +31,7 @@ beforeEach(() => {
 	vi.resetAllMocks();
 	vi.spyOn(release_flags, "native_format_four", "get").mockReturnValue(false);
 	vi.spyOn(release_flags, "native_format_five", "get").mockReturnValue(false);
+	vi.spyOn(release_flags, "native_format_six", "get").mockReturnValue(false);
 });
 
 it("advertises Every only after the format-5 phone rollout", async () => {
@@ -78,6 +79,26 @@ it("builds calculated Screen Time rewards and a usage chart through public MCP b
 		expect.objectContaining({ from: reward_minutes.block_id, output: "value", input: "minutes" }),
 		expect.objectContaining({ from: usage.block_id, output: "history", input: "rows" }),
 	]));
+});
+
+it("builds a code unlock and only connects once-per-code after the format-6 phone rollout", async () => {
+	vi.spyOn(release_flags, "native_format_four", "get").mockReturnValue(true);
+	vi.spyOn(release_flags, "native_format_five", "get").mockReturnValue(true);
+	const reward_inputs = async () => parsed(await call_mcp_tool(cloud, account, "get_block_catalog", {})).blocks.find((block: { kind: string }) => block.kind === "add_allowance").inputs.map((input: { input: string }) => input.input);
+	expect(await reward_inputs()).toEqual(["grant", "minutes"]);
+	const library = use_memory_cloud();
+	await call_mcp_tool(cloud, account, "create_page", { id: "unlock", name: "Unlock code" });
+	const code = parsed(await call_mcp_tool(cloud, account, "add_block", { page_id: "unlock", kind: "text_input", name: "Code" }));
+	const match = parsed(await call_mcp_tool(cloud, account, "add_block", { page_id: "unlock", kind: "text_compare", name: "Code matches", settings: { text: "K7Q2" }, inputs: { text: { block_id: code.block_id, output: "value" } } }));
+	const reward = { page_id: "unlock", kind: "add_allowance", name: "Add 30 minutes", settings: { minutes: 30 }, inputs: { grant: { block_id: match.block_id, output: "result" }, once_per: { block_id: code.block_id, output: "value" } } };
+	await expect(call_mcp_tool(cloud, account, "add_block", reward)).rejects.toThrow("phone update");
+	expect(library().tools[0].document.schema_version).toBe(3);
+	vi.spyOn(release_flags, "native_format_six", "get").mockReturnValue(true);
+	expect(await reward_inputs()).toEqual(["grant", "minutes", "once_per"]);
+	await call_mcp_tool(cloud, account, "add_block", reward);
+	expect(library().tools[0].document.schema_version).toBe(6);
+	await call_mcp_tool(cloud, account, "update_block", { page_id: "unlock", block_id: match.block_id, settings: { text: "P4X9" } });
+	expect(library().tools[0].document.behaviors?.nodes.find(node => node.id === match.block_id)?.config.text).toBe("P4X9");
 });
 
 it("advertises block operations instead of raw graphs, documents, or presets", () => {

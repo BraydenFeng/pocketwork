@@ -4,7 +4,7 @@ import { behavior_ports, behavior_catalog, behavior_config_schema, behavior_kind
 import { home_policy_schema } from "./home-policy";
 import { block_schema, create_block, document_schema, type AppDocument, type Block } from "./document";
 import type { HomePolicy } from "./home-policy";
-import { requires_format_five, requires_format_four } from "./primitives";
+import { requires_format_five, requires_format_four, requires_format_six } from "./primitives";
 
 export type NodeKind = BehaviorKind | "timer" | "schedule" | "apps" | "notification" | "home" | "usage" | "allowance";
 export type LogicNode = { id: string; kind: NodeKind; x: number; y: number; block?: Block; policy?: HomePolicy; config?: BehaviorConfig };
@@ -140,7 +140,7 @@ export function compile_graph(base: AppDocument, graph: LogicGraph): AppDocument
 	if (compiled_allowance) { result.enabled = base.enabled ?? false; }
 	else if (by_kind("schedule")) { result.enabled = base.blocks.some((block) => block.id === by_kind("schedule")?.id) ? base.enabled ?? false : false; }
 	else { delete result.enabled; }
-	if (behaviors.nodes.length) { behavior_order(behaviors, external_ports(graph), true); result.behaviors = behaviors_schema.parse(behaviors); result.schema_version = requires_format_five(behaviors) ? 5 : requires_format_four(behaviors) ? 4 : 3; } else { delete result.behaviors; }
+	if (behaviors.nodes.length) { behavior_order(behaviors, external_ports(graph), true); result.behaviors = behaviors_schema.parse(behaviors); result.schema_version = requires_format_six(behaviors) ? 6 : requires_format_five(behaviors) ? 5 : requires_format_four(behaviors) ? 4 : 3; } else { delete result.behaviors; }
 	const parsed = document_schema.safeParse(result);
 	if (!parsed.success) { throw new Error(parsed.error.issues[0].message); }
 	return parsed.data;

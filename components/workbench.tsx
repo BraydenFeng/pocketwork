@@ -1,6 +1,6 @@
 "use client";
 
-import { native_format_five, native_format_four } from "@/lib/release-flags";
+import { native_format_five, native_format_four, native_format_six } from "@/lib/release-flags";
 
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Check, ChevronRight, Download, Info, MoreHorizontal, Play, Redo2, RotateCcw, Smartphone, Undo2, X } from "lucide-react";
@@ -186,7 +186,7 @@ export function Workbench({ tool, groups, on_save, on_back, storage_blocked, sto
 	function dispatch(action: RuntimeAction) { set_runtime(state => transition(document, state, action)); }
 
 	const has_native_preview = document.blocks.some(block => block.type !== "note" || Boolean(block.text));
-	const needs_phone_update = document.schema_version === 5 ? !native_format_five : document.schema_version === 4 ? !native_format_four : false;
+	const needs_phone_update = document.schema_version === 6 ? !native_format_six : document.schema_version === 5 ? !native_format_five : document.schema_version === 4 ? !native_format_four : false;
 	const save_label = storage_blocked ? "Storage needs attention" : save_failed ? "Not saved" : page_draft_error ? "Schedule needs attention" : graph_dirty ? "Block needs a setting" : saving ? "Saving…" : needs_phone_update ? "Saved here · local-only blocks" : sync === "syncing" ? "Syncing…" : sync === "error" ? "Saved here · sync paused" : sync === "synced" ? "Saved & synced" : "Saved on this browser";
 	return <div className="creation-workspace"><a className="skip-link" href="#page-editor">Skip to page</a>
 		<header className="creation-topbar"><nav className="creation-breadcrumb" aria-label="Breadcrumb"><Button variant="quiet" onClick={back}><ArrowLeft /><span>My pages</span></Button><ChevronRight /><span>{document.name}</span></nav><div className="creation-topbar-actions"><Button variant={view === "preview" ? "primary" : "quiet"} aria-pressed={view === "preview"} onClick={() => show(view === "preview" ? "page" : "preview")}><Play />{view === "preview" ? "Back to editing" : "Preview"}</Button><div className="creation-more"><Button variant="quiet" aria-label="More page options" aria-expanded={more} onClick={() => set_more(!more)}><MoreHorizontal /></Button>{more && <div className="creation-more-menu"><Button variant="quiet" onClick={export_page}><Download />Export page</Button><Button variant="quiet" onClick={() => { set_help(true); set_more(false); }}><Smartphone />Use on iPhone</Button></div>}</div></div></header>

@@ -1,4 +1,4 @@
-import { native_format_five, native_format_four } from "./release-flags";
+import { native_format_five, native_format_four, native_format_six } from "./release-flags";
 import { z } from "zod";
 import { creation_catalog, type CreationKind } from "./creation";
 import { empty_library, upsert_tool, delete_tool, find_tool, type Library } from "./library";
@@ -39,8 +39,8 @@ function capabilities() {
 	const primitives = native_format_four
 		? "These blocks can sync to a compatible updated iPhone. Connected logic runs while its page is open. Timers track elapsed time while away, but completion actions run on reopening."
 		: "Routine and Data blocks are local web drafts only; cloud writes reject them until the compatible phone update is rolled out.";
-	const blocks = block_catalog().filter(block => block.kind !== "interval" || native_format_five).map(block => !native_format_five && block.kind === "add_allowance"
-		? { ...block, inputs: block.inputs.filter(input => input.input !== "minutes") }
+	const blocks = block_catalog().filter(block => block.kind !== "interval" || native_format_five).map(block => block.kind === "add_allowance"
+		? { ...block, inputs: block.inputs.filter(input => (input.input !== "minutes" || native_format_five) && (input.input !== "once_per" || native_format_six)) }
 		: !native_format_five && block.kind === "app_usage"
 			? { ...block, outputs: block.outputs.filter(output => output.output !== "history") }
 			: block);
@@ -48,7 +48,9 @@ function capabilities() {
 		model: "Pages contain Page, Routine, and Data blocks. Agents use the same block catalog and editing operations as the visual builder.",
 		native_format_four,
 		native_format_five,
+		native_format_six,
 		blocks,
+		...(native_format_six ? { rewards: "Add screen time grants once a day. Connect text to once_per to grant once per different text instead, such as an unlock code that you replace after each use." } : {}),
 		execution: `${primitives} Native focus, schedule, and home-allowance pages have separate background support. Browser Preview simulates events. Progress is device-local; no AI API is used.`,
 		limits: "Three free pages at a time. MCP and sync are free. Existing pages stay usable after cancellation.",
 		phone: "App selections and saved locations stay on the phone. Cloud changes apply when the phone app opens.",
@@ -72,6 +74,9 @@ function require_page(library: Library, page_id: string) {
 }
 
 function assert_syncable(document: ReturnType<typeof blank_tool>) {
+	if (document.schema_version === 6 && !native_format_six) {
+		throw new Error("Once-per-code screen time needs a phone update that is not released yet. Do not sync it until the compatible native update is released.");
+	}
 	if (document.schema_version === 5 && !native_format_five) {
 		throw new Error("This page uses newer blocks that are currently a local web draft. Do not sync it until the compatible native update is released.");
 	}

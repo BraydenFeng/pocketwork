@@ -118,7 +118,7 @@ struct LogicEditing: Equatable {
 		} else { result.home_allowance = nil }
 		result.enabled = result.is_standing ? (base.schedule?.id == result.schedule?.id ? base.enabled ?? false : false) : nil
 		result.behaviors = behaviors.nodes.isEmpty ? nil : behaviors
-		result.schema_version = result.behaviors.map { PrimitiveRuntime.requires_five($0) ? 5 : PrimitiveRuntime.requires_four($0) ? 4 : 3 } ?? (result.home_allowance != nil ? 2 : 1)
+		result.schema_version = result.behaviors.map { PrimitiveRuntime.requires_six($0) ? 6 : PrimitiveRuntime.requires_five($0) ? 5 : PrimitiveRuntime.requires_four($0) ? 4 : 3 } ?? (result.home_allowance != nil ? 2 : 1)
 		try result.validate()
 		return result
 	}

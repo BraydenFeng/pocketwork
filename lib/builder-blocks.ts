@@ -5,7 +5,7 @@ export type PortType = "boolean" | "number" | "text" | "record" | "table";
 export type Scalar = number | string | boolean;
 export type Entry = { id: string; at: number; values: Record<string, Scalar> };
 export type BuilderState = { inputs: Record<string, Scalar>; forms: Record<string, Record<string, Scalar>>; entries: Record<string, Entry[]>; rewards: Record<string, string>; gates: Record<string, boolean> };
-export type BuilderAction = { id: string; kind: "app_gate" | "add_allowance"; token: string; active?: boolean; minutes?: number; groups?: string[] };
+export type BuilderAction = { id: string; kind: "app_gate" | "add_allowance"; token: string; active?: boolean; minutes?: number; groups?: string[]; scope?: string };
 export const builder_kinds = ["number_input", "text_input", "checkbox", "form", "save_entry", "aggregate", "calculate", "text_compare", "table", "chart", "progress", "health", "app_gate", "add_allowance"] as const;
 export const health_metrics = ["steps", "active_energy", "exercise_minutes", "protein", "carbohydrates", "fat", "water"] as const;
 const scalar_schema = z.union([z.number().finite().min(-1000000).max(1000000), z.string().max(240), z.boolean()]);
@@ -32,7 +32,7 @@ export const builder_catalog = {
 	progress: entry("Progress bar", "Show a number against a target", "Display", { value: "number", target: "number" }, { value: "number", fraction: "number", target: "number" }),
 	health: entry("Apple Health", "Read a daily health metric on iPhone", "Inputs", {}, { value: "number" }),
 	app_gate: entry("App gate", "Block selected groups while a condition is true", "Actions", { closed: "boolean" }, { active: "boolean" }),
-	add_allowance: entry("Add screen time", "Add fixed or calculated minutes to the active home allowance", "Actions", { grant: "boolean", minutes: "number" }, { granted: "boolean" }),
+	add_allowance: entry("Add screen time", "Add fixed or calculated minutes to the active home allowance", "Actions", { grant: "boolean", minutes: "number", once_per: "text" }, { granted: "boolean" }),
 };
 export function form_fields(node: BehaviorNode) { return node.config.fields ?? default_fields; }
 export function blank_builder(): BuilderState { return { inputs: {}, forms: {}, entries: {}, rewards: {}, gates: {} }; }
@@ -79,9 +79,12 @@ export function builder_node(node: BehaviorNode, state: BehaviorState, context: 
 			const dynamic = linked("minutes");
 			const minutes = dynamic ? Math.floor(Number(input("minutes").value)) : c.minutes;
 			if (!Number.isInteger(minutes) || minutes < 0 || minutes > 1440) { throw new Error("Screen-time rewards must be between 0 and 1,440 whole minutes."); }
-			const reward = dynamic ? `${day}:${minutes}` : day;
-			const grant = Boolean(input("grant").value) && minutes > 0 && data.rewards[node.id] !== reward;
-			if (grant) { actions.push({ id: node.id, kind: "add_allowance", token: `${node.id}:${reward}`, minutes }); data.rewards[node.id] = reward; }
+			// A connected code grants once per different code instead of once a day, so a fresh code can add time again and a used one never repeats.
+			const per_code = linked("once_per"); const source = input("once_per");
+			const code = per_code && source.available !== false && typeof source.value === "string" ? source.value.trim() : "";
+			const reward = per_code ? `code:${code}` : dynamic ? `${day}:${minutes}` : day;
+			const grant = Boolean(input("grant").value) && minutes > 0 && (!per_code || code !== "") && data.rewards[node.id] !== reward;
+			if (grant) { actions.push({ id: node.id, kind: "add_allowance", token: `${node.id}:${reward}`, minutes, ...(per_code ? { scope: code } : {}) }); data.rewards[node.id] = reward; }
 			emit("granted", grant, reward); break;
 		}
 	}

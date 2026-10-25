@@ -14,6 +14,7 @@ describe("block descriptions", () => {
 		["app_usage", "Apple Screen Time integration"],
 		["branch", "Run when a condition is true"],
 		["interval", "Do something every few minutes, hours, or days"],
+		["text_compare", "Match text or look for a phrase"],
 	] as const)("uses the same plain description for %s in the picker and page", (kind, detail) => {
 		expect(creation_catalog.find(item => item.kind === kind)?.detail).toBe(detail);
 		expect(behavior_catalog[kind].detail).toBe(detail);

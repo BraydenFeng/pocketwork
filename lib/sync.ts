@@ -1,11 +1,11 @@
 import { new_id, referenced_groups } from "./document";
 import type { AppGroup, Library, LibraryEntry } from "./library";
-import { native_format_five, native_format_four } from "./release-flags";
+import { native_format_five, native_format_four, native_format_six } from "./release-flags";
 
 export const TOMBSTONE_DAYS = 30;
 
 // The newest page format every syncing phone can read; newer pages stay local drafts until the phone update ships.
-function supported_format(): number { return native_format_five ? 5 : native_format_four ? 4 : 3; }
+function supported_format(): number { return native_format_six ? 6 : native_format_five ? 5 : native_format_four ? 4 : 3; }
 
 // New formats stay local until their phone reader is released, without removing the last compatible cloud copy.
 export function cloud_compatible_library(local: Library, remote: Library | null): Library {

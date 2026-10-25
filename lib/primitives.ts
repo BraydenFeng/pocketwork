@@ -49,6 +49,11 @@ export function requires_format_five(graph: Behaviors): boolean {
 		|| graph.connections.some(edge => nodes.get(edge.from)?.kind === "app_usage" && edge.output === "history" || nodes.get(edge.to)?.kind === "add_allowance" && edge.input === "minutes");
 }
 
+export function requires_format_six(graph: Behaviors): boolean {
+	const nodes = new Map(graph.nodes.map(node => [node.id, node]));
+	return graph.connections.some(edge => edge.input === "once_per" && nodes.get(edge.to)?.kind === "add_allowance");
+}
+
 export function interval_duration_ms(config: Pick<BehaviorNode["config"], "value" | "interval_unit">): number {
 	const unit = config.interval_unit ?? "hours";
 	const scale = unit === "minutes" ? 60_000 : unit === "hours" ? 3_600_000 : 86_400_000;
@@ -61,7 +66,7 @@ export function optional_input(node: Pick<BehaviorNode, "kind" | "config">, port
 	return node.kind === "elapsed_timer" || node.kind === "change_value" && port === "amount"
 		|| node.kind === "compare" && port === "threshold" || node.kind === "progress" && port === "target"
 		|| node.kind === "variable" && port === "set" || node.kind === "count" && port === "reset"
-		|| node.kind === "save_entry" && port === "clear" || node.kind === "add_allowance" && port === "minutes"
+		|| node.kind === "save_entry" && port === "clear" || node.kind === "add_allowance" && (port === "minutes" || port === "once_per")
 		|| node.kind === "record" && node.config.fields?.find(field => field.id === port)?.required === false;
 }
 

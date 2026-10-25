@@ -42,6 +42,7 @@ export const creation_catalog: { kind: CreationKind; title: string; detail: stri
 	{ kind: "streak", title: "Streak", detail: "Count consecutive check-in days", section: "Actions & logic" },
 	{ kind: "goal", title: "Goal reached", detail: "When a number reaches your target", section: "Actions & logic" },
 	{ kind: "compare", title: "Compare a number", detail: "Greater than, less than, or equal to", section: "Actions & logic" },
+	{ kind: "text_compare", title: "Compare text", detail: "Match text or look for a phrase", section: "Actions & logic" },
 	{ kind: "and", title: "Both conditions", detail: "True when both conditions are true", section: "Actions & logic" },
 	{ kind: "or", title: "Either condition", detail: "True when at least one condition is true", section: "Actions & logic" },
 	{ kind: "not", title: "Reverse condition", detail: "Flip true and false", section: "Actions & logic" },
@@ -113,6 +114,7 @@ export function input_name(kind: NodeKind, input: string): string {
 	if (input === "closed") { return "Block apps when"; }
 	if (input === "grant") { return "Award minutes when"; }
 	if (kind === "add_allowance" && input === "minutes") { return "Minutes from (optional)"; }
+	if (kind === "add_allowance" && input === "once_per") { return "Once per code (optional)"; }
 	if (input === "send") { return "Show message when"; }
 	if (input === "save") { return "Save an entry when"; }
 	if (input === "increment") { return "Count when"; }

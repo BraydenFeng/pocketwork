@@ -142,7 +142,7 @@ struct BehaviorPanel<AfterRoutines: View, DataSection: View, AfterData: View>: V
 					if reconcile { try BuilderAppRules.prune(document: id, nodes: active_nodes) }
 					for action in result.actions {
 						if action.kind == "app_gate" { try BuilderAppRules.set(document: id, node: action.id, active: action.active == true, names: action.groups ?? [], groups: groups) }
-						else { try HomeEngine.grant_allowance(key: id + "." + action.id, minutes: Int(action.minutes ?? 0)) }
+						else { try HomeEngine.grant_allowance(key: id + "." + action.id + (action.scope.map { ":" + $0 } ?? ""), minutes: Int(action.minutes ?? 0)) }
 					}
 				}
 			}

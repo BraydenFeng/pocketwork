@@ -167,3 +167,36 @@ describe("phone compatibility", () => {
 		expect(cloud_compatible_library(every_local, local).tools[0].document).toEqual(document);
 	});
 });
+
+describe("screen time codes", () => {
+	const unlock = (code: string): Behaviors => ({
+		nodes: [node("code", "text_input"), node("match", "text_compare", { text: code }), node("reward", "add_allowance", { minutes: 30 })],
+		connections: [wire("code", "value", "match", "text"), wire("match", "result", "reward", "grant"), wire("code", "value", "reward", "once_per")],
+	});
+	it("adds minutes once per different code instead of once a day", () => {
+		let result = run_behaviors(unlock("K7Q2"), initial_behaviors(), { now: 0, inputs: { code: "nope" } });
+		expect(result.actions).toEqual([]);
+		result = run_behaviors(unlock("K7Q2"), result.state, { now: 1000, inputs: { code: "K7Q2" } });
+		expect(result.actions).toEqual([expect.objectContaining({ kind: "add_allowance", minutes: 30, scope: "K7Q2" })]);
+		result = run_behaviors(unlock("K7Q2"), result.state, { now: 2000 });
+		expect(result.actions).toEqual([]);
+		result = run_behaviors(unlock("K7Q2"), result.state, { now: 3 * 86_400_000 });
+		expect(result.actions).toEqual([]);
+		result = run_behaviors(unlock("P4X9"), result.state, { now: 3 * 86_400_000 + 1000, inputs: { code: "P4X9" } });
+		expect(result.actions).toEqual([expect.objectContaining({ kind: "add_allowance", minutes: 30, scope: "P4X9" })]);
+	});
+	it("never grants for an empty code", () => {
+		const result = run_behaviors(unlock(""), initial_behaviors(), { now: 0, inputs: { code: "   " } });
+		expect(result.signals.match.result.value).toBe(false);
+		expect(run_behaviors(unlock(""), initial_behaviors(), { now: 0, inputs: { code: "" } }).actions).toEqual([]);
+	});
+	it("needs format 6 and stays a local draft until that phone update ships", () => {
+		const document = compile_graph(blank_tool(), { ...graph_from_document(blank_tool()), nodes: unlock("K7Q2").nodes, connections: unlock("K7Q2").connections });
+		expect(document.schema_version).toBe(6);
+		expect(document_schema.safeParse({ ...document, schema_version: 5 }).success).toBe(false);
+		const local: Library = { schema_version: 1, tools: [{ document, updated_at: "2026-10-25T08:00:00Z" }] };
+		expect(cloud_compatible_library(local, null).tools).toHaveLength(0);
+		const without_code = compile_graph(blank_tool(), { ...graph_from_document(blank_tool()), nodes: unlock("K7Q2").nodes, connections: unlock("K7Q2").connections.filter(edge => edge.input !== "once_per") });
+		expect(without_code.schema_version).toBe(3);
+	});
+});

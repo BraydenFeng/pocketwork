@@ -12,6 +12,7 @@ try {
 	if (process.env.NEXT_PUBLIC_SUBSCRIPTIONS_ENABLED !== "true") { issues.push("Subscriptions are not enabled for the launch website"); }
 	if (process.env.NEXT_PUBLIC_NATIVE_FORMAT4_ENABLED !== "true") { issues.push("Format-4 sync is still held back pending the phone release"); }
 	if (process.env.NEXT_PUBLIC_NATIVE_FORMAT5_ENABLED !== "true") { issues.push("Format-5 block sync is still held back pending the phone release"); }
+	if (process.env.NEXT_PUBLIC_NATIVE_FORMAT6_ENABLED !== "true") { issues.push("Format-6 once-per-code screen time is still held back pending the phone release"); }
 	if (!readFileSync("ios/project.yml", "utf8").includes("PrivacyInfo.xcprivacy")) { issues.push("Native privacy manifest resource is missing"); }
 	if (!readFileSync("ios/project.yml", "utf8").includes("PocketworkSubscriptionsEnabled: true")) { issues.push("Native purchases are disabled"); }
 	if (issues.length) { console.error("Release configuration is NOT ready:\n" + issues.map(issue => `- ${issue}`).join("\n")); process.exitCode = 1; }

@@ -92,4 +92,35 @@ final class BehaviorTests: XCTestCase {
 		var document = AppDocument.blank(); document.schema_version = 5; document.behaviors = graph
 		XCTAssertNoThrow(try document.validate()); document.schema_version = 4; XCTAssertThrowsError(try document.validate())
 	}
+
+	func testCodeRewardsGrantOncePerDifferentCode() throws {
+		func config(_ label: String, text: String? = nil, minutes: Double = 5) -> BehaviorConfig {
+			BehaviorConfig(label: label, value: 1, minutes: minutes, time: "18:00", days: [1,2,3,4,5,6,7], message: "", operator: "gte", text: text)
+		}
+		func graph(_ code: String) -> BehaviorGraph {
+			BehaviorGraph(nodes: [
+				BehaviorNode(id: "code", kind: "text_input", x: 0, y: 0, config: config("Code")),
+				BehaviorNode(id: "match", kind: "text_compare", x: 0, y: 0, config: config("Matches", text: code)),
+				BehaviorNode(id: "reward", kind: "add_allowance", x: 0, y: 0, config: config("Reward", minutes: 30)),
+			], connections: [
+				BehaviorEdge(from: "code", output: "value", to: "match", input: "text"), BehaviorEdge(from: "match", output: "result", to: "reward", input: "grant"),
+				BehaviorEdge(from: "code", output: "value", to: "reward", input: "once_per"),
+			])
+		}
+		func run(_ code: String, _ state: BehaviorState, at seconds: Double, typed: String? = nil) throws -> BehaviorResult {
+			let inputs: [String: BuilderValue] = typed.map { ["code": BuilderValue.text($0)] } ?? [:]
+			return try BehaviorRuntime.run(graph(code), state: state, context: BehaviorContext(now: Date(timeIntervalSince1970: seconds), at_location: nil, usage_minutes: nil, tap: nil, inputs: inputs))
+		}
+		var result = try run("K7Q2", BehaviorState(), at: 0, typed: "nope")
+		XCTAssertTrue(result.actions.isEmpty)
+		result = try run("K7Q2", result.state, at: 1, typed: "K7Q2")
+		XCTAssertEqual(result.actions.map(\.scope), ["K7Q2"]); XCTAssertEqual(result.actions.first?.minutes, 30)
+		result = try run("K7Q2", result.state, at: 3 * 86400)
+		XCTAssertTrue(result.actions.isEmpty)
+		result = try run("P4X9", result.state, at: 3 * 86400 + 1, typed: "P4X9")
+		XCTAssertEqual(result.actions.map(\.scope), ["P4X9"])
+		XCTAssertTrue(try run("", BehaviorState(), at: 0, typed: "").actions.isEmpty)
+		var document = AppDocument.blank(); document.schema_version = 6; document.behaviors = graph("K7Q2")
+		XCTAssertNoThrow(try document.validate()); document.schema_version = 5; XCTAssertThrowsError(try document.validate())
+	}
 }

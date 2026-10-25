@@ -25,6 +25,9 @@ enum PrimitiveRuntime {
 		graph.nodes.contains { $0.kind == "interval" || $0.kind == "calculate" && $0.config.operation == "floor" }
 			|| graph.connections.contains { edge in edge.output == "history" && graph.nodes.first(where: { $0.id == edge.from })?.kind == "app_usage" || edge.input == "minutes" && graph.nodes.first(where: { $0.id == edge.to })?.kind == "add_allowance" }
 	}
+	static func requires_six(_ graph: BehaviorGraph) -> Bool {
+		graph.connections.contains { edge in edge.input == "once_per" && graph.nodes.first(where: { $0.id == edge.to })?.kind == "add_allowance" }
+	}
 	static func interval_seconds(_ config: BehaviorConfig) throws -> Double {
 		let unit = config.interval_unit ?? "hours"
 		guard ["minutes", "hours", "days"].contains(unit), config.value.rounded() == config.value, config.value >= 1 else { throw DocumentError.invalid("Set Every to a whole interval from 1 minute to 7 days.") }
@@ -34,7 +37,7 @@ enum PrimitiveRuntime {
 		return duration
 	}
 	static func optional(_ node: BehaviorNode, _ port: String) -> Bool {
-		node.kind == "elapsed_timer" || node.kind == "change_value" && port == "amount" || node.kind == "compare" && port == "threshold" || node.kind == "progress" && port == "target" || node.kind == "variable" && port == "set" || node.kind == "count" && port == "reset" || node.kind == "save_entry" && port == "clear" || node.kind == "add_allowance" && port == "minutes" || node.kind == "record" && node.config.fields?.first(where: { $0.id == port })?.required == false
+		node.kind == "elapsed_timer" || node.kind == "change_value" && port == "amount" || node.kind == "compare" && port == "threshold" || node.kind == "progress" && port == "target" || node.kind == "variable" && port == "set" || node.kind == "count" && port == "reset" || node.kind == "save_entry" && port == "clear" || node.kind == "add_allowance" && (port == "minutes" || port == "once_per") || node.kind == "record" && node.config.fields?.first(where: { $0.id == port })?.required == false
 	}
 	static func dependencies(_ graph: BehaviorGraph, strict: Bool) throws -> [BehaviorEdge] {
 		var result: [BehaviorEdge] = []
